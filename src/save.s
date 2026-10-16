@@ -56,11 +56,14 @@ new_game:
         sta (ptr1),y
         dex
         bpl @e
-        ; starter car in slot 0
+        ; starter car in slot 0 (a Game Genie code can pick another)
         lda #0
         jsr slot_ptr
+        lda cheat_start_car
+        cmp #NCARS
+        bcc :+
         lda #0
-        jsr init_record
+:       jsr init_record
         ldy #CR_PAINT
         lda #$27                ; orange
         sta (ptr1),y

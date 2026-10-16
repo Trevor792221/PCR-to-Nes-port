@@ -45,6 +45,12 @@ multiplayer, the in-app shop, tournaments, the parts market, real car
 brands, and engine swaps. The hundreds of parts are condensed into 10
 categories. Sprites are 32x16 pixels in races and 64x32 in menus.
 
+## Game Genie codes
+
+[CHEATS.md](CHEATS.md) has Game Genie codes for unlimited money, starting
+with any car, and a hidden debug menu that adds cars, money and gems or
+jumps to any ladder boss.
+
 ## Controls
 
 | Button | In races | In menus |
@@ -153,12 +159,15 @@ physics runs at 50 Hz.
 
 ## Tests
 
-`make test` runs three suites:
+`make test` runs these suites:
 
 * `tests/test_physics.py` runs the physics on a 6502 emulator (py65) and
   checks it against the Python model, frame by frame.
 * `tests/test_nmi.py` checks that every NMI's PPU writes fit in vblank
   (menus, dealer browsing, a street race).
+* `tests/test_cheats.py` runs the game with each Game Genie code applied
+  and checks that the cheat works, and that the debug menu stays hidden
+  without the code.
 * `tests/test_game.py` plays the ROM in the cynes NES emulator. It covers new
   game, buying parts, save persistence across reset, a test run, beating the
   first ladder boss, foul starts, a street race with no dropped frames, the

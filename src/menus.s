@@ -212,7 +212,16 @@ garage_main:
         stx g_sel
         cmp #1
         beq @go
-        jmp @loop
+        cmp #5                  ; SELECT: debug menu (Game Genie only)
+        bne :+
+        lda cheat_debug
+        beq :+
+        jsr debug_screen
+        bcs @redraw
+        lda #MODE_RACE
+        sta next_mode
+        rts
+:       jmp @loop
 @go:    lda g_sel
         asl a
         tax
@@ -266,7 +275,17 @@ g_title:
 
 ; garage_draw: whole garage screen (PPU off -> on)
 garage_draw:
-        lda #0
+        ; money cheat (Game Genie): keep the cash topped up
+        lda cheat_money
+        beq :+
+        lda #$7F                ; 9,999,999 = $98967F
+        sta SV_CASH
+        lda #$96
+        sta SV_CASH+1
+        lda #$98
+        sta SV_CASH+2
+        jsr save_write
+:       lda #0
         jsr screen_begin
         jsr use_menu_palette
         MOVI16 ptr0, str_garage
@@ -1994,3 +2013,203 @@ str_r_help2:  .byte "START:RACE AGAIN", 0
 str_dash:     .byte "--.---", 0
 str_mph:      .byte "MPH", 0
 str_kmh:      .byte "KMH", 0
+
+; ===========================================================================
+; DEBUG MENU -- only reachable with the Game Genie debug code (cheat_debug)
+; ===========================================================================
+.segment "BSS"
+dbg_car:    .res 1
+dbg_boss:   .res 1
+.segment "BANK1"
+
+; debug_screen: carry clear = a boss race was set up, carry set = back
+debug_screen:
+        lda #0
+        jsr screen_begin
+        jsr use_menu_palette
+        MOVI16 ptr0, str_dbg
+        jsr draw_header
+        PRINT str_dbg0, 4, 6
+        PRINT str_dbg1, 4, 9
+        PRINT str_dbg2, 4, 12
+        PRINT str_dbg3, 4, 15
+        PRINT str_dbg4, 4, 18
+        PRINT str_dbg_help, 2, 26
+        PRINT str_dbg_help2, 2, 27
+        jsr attr_upload
+        lda #0
+        sta oam_idx
+        jsr oam_clear
+        jsr ppu_on
+        lda #0
+        sta ui_sel
+        lda #5
+        sta ui_count
+        lda #2
+        sta ui_x
+        lda #6
+        sta ui_y0
+        lda #3
+        sta ui_dy
+        lda #1
+        sta ui_cols
+        jsr dbg_values
+@loop:  jsr wait_frame
+        jsr read_pad
+        jsr list_cursor
+        jsr list_select
+        cmp #2
+        beq @back
+        cmp #6
+        beq @left
+        cmp #7
+        beq @right
+        cmp #1
+        bne @loop
+        lda ui_sel
+        beq @addcar
+        cmp #1
+        jeq @boss
+        cmp #2
+        jeq @cash
+        cmp #3
+        jeq @gems
+@back:  sec
+        rts
+@left:  ldx ui_sel
+        bne :+
+        ldy dbg_car             ; car: 0 .. NCARS-1
+        bne @cdec
+        ldy #NCARS
+@cdec:  dey
+        sty dbg_car
+        jmp @chg
+:       cpx #1
+        bne @loop
+        ldy dbg_boss            ; boss: 0 .. NBOSS-1
+        bne @bdec
+        ldy #NBOSS
+@bdec:  dey
+        sty dbg_boss
+        jmp @chg
+@right: ldx ui_sel
+        bne :+
+        ldy dbg_car
+        iny
+        cpy #NCARS
+        bcc @cset
+        ldy #0
+@cset:  sty dbg_car
+        jmp @chg
+:       cpx #1
+        bne @loop
+        ldy dbg_boss
+        iny
+        cpy #NBOSS
+        bcc @bset
+        ldy #0
+@bset:  sty dbg_boss
+@chg:   lda #SFX_MOVE
+        jsr sfx_play
+        jsr dbg_values
+        jmp @loop
+@addcar:
+        jsr free_slot
+        bcs @full
+        jsr slot_ptr
+        lda dbg_car
+        jsr init_record
+        jsr save_write
+        lda #SFX_BUY
+        jsr sfx_play
+        MOVI16 ptr0, str_dbg_added
+        jmp @msg
+@full:  lda #SFX_ERROR
+        jsr sfx_play
+        MOVI16 ptr0, str_full
+        jmp @msg
+@boss:  lda dbg_boss            ; jump the ladder to this boss and race
+        sta SV_LADDER
+        jsr save_write
+        jsr setup_ladder
+        clc
+        rts
+@cash:  lda #<100000
+        sta m_a
+        lda #>100000
+        sta m_a+1
+        lda #^100000
+        sta m_a+2
+        jsr cash_add
+        jmp @paid
+@gems:  clc
+        lda SV_GEMS
+        adc #100
+        sta SV_GEMS
+        bcc @paid
+        inc SV_GEMS+1
+@paid:  jsr save_write
+        lda #SFX_BUY
+        jsr sfx_play
+        jsr header_update
+        jsr wait_frame
+        MOVI16 ptr0, str_dbg_done
+@msg:   ldy #22
+        jsr vb_msg
+        jmp @loop
+
+; dbg_values: car name and boss name next to their items
+dbg_values:
+        lda dbg_car
+        jsr car_name_ptr
+        lda #12
+        jsr pad_ptr0
+        ldx #17
+        ldy #6
+        jsr vb_str
+        lda dbg_boss
+        jsr boss_line_short
+        lda #14
+        jsr pad_ptr0
+        ldx #17
+        ldy #9
+        jmp vb_str
+
+; boss_line_short: A = boss -> ptr0 = "3 MAYA"
+boss_line_short:
+        sta tmp6
+        clc
+        adc #1
+        jsr fmt_8
+        ldy #0
+        lda numbuf+6
+        cmp #' '
+        beq :+
+        sta linebuf,y
+        iny
+:       lda numbuf+7
+        sta linebuf,y
+        iny
+        lda #' '
+        sta linebuf,y
+        iny
+        sty tmp5
+        lda tmp6
+        jsr boss_name_ptr
+        ldy tmp5
+        jsr cat_ptr0
+        lda #0
+        sta linebuf,y
+        MOVI16 ptr0, linebuf
+        rts
+
+str_dbg:       .byte "DEBUG MENU", 0
+str_dbg0:      .byte "ADD CAR", 0
+str_dbg1:      .byte "BOSS RACE", 0
+str_dbg2:      .byte "ADD $100000", 0
+str_dbg3:      .byte "ADD 100 GEMS", 0
+str_dbg4:      .byte "BACK", 0
+str_dbg_help:  .byte "LEFT/RIGHT:PICK  A:DO IT", 0
+str_dbg_help2: .byte "B:BACK", 0
+str_dbg_added: .byte "CAR ADDED TO YOUR GARAGE", 0
+str_dbg_done:  .byte "DONE!", 0

@@ -105,6 +105,18 @@ tmp_rec:    .res 32         ; scratch car record (dealer, crates)
 .include "save.s"
 .include "cardata.s"
 
+; ---------------------------------------------------------------------------
+; Cheat switches at fixed addresses for Game Genie codes (see CHEATS.md).
+; The game always reads these bytes from ROM, so a Game Genie code that
+; changes one turns the cheat on.  Addresses must never move.
+; ---------------------------------------------------------------------------
+.segment "CHEATS"
+cheat_start_car: .byte 0        ; $FFC0  model of the new-game car
+cheat_money:     .byte 0        ; $FFC1  non-zero: cash refilled to $9,999,999
+cheat_debug:     .byte 0        ; $FFC2  non-zero: SELECT in the garage = debug menu
+.assert cheat_start_car = $FFC0, error, "cheat table moved"
+.assert cheat_debug = $FFC2, error, "cheat table moved"
+
 .segment "BANK0"
 .include "gfx.s"
 
