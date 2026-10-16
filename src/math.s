@@ -314,12 +314,26 @@ cash_add:
         lda SV_CASH+2
         adc m_a+2
         sta SV_CASH+2
-        bcc @ok
-        lda #$FF
+        bcs cash_max
+        ; fall through
+; cash_clamp: cash = min(cash, CASH_MAX)
+cash_clamp:
+        lda #<CASH_MAX
+        cmp SV_CASH
+        lda #>CASH_MAX
+        sbc SV_CASH+1
+        lda #^CASH_MAX
+        sbc SV_CASH+2
+        bcs cash_ok             ; CASH_MAX >= cash
+cash_max:
+        lda #<CASH_MAX
         sta SV_CASH
+        lda #>CASH_MAX
         sta SV_CASH+1
+        lda #^CASH_MAX
         sta SV_CASH+2
-@ok:    rts
+cash_ok:
+        rts
 
 ; fmt3w: A = low, spd_hi = high byte of a value 0-999 -> numbuf+5..7,
 ; three digits with leading spaces

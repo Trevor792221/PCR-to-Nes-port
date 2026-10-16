@@ -78,6 +78,11 @@ SV_LOSSES    = $6011            ; 2 bytes
 SV_CRATES    = $6013            ; crates opened (2 bytes)
 SV_SEED      = $6015            ; 2 bytes rng seed carried across power cycles
 SV_STREET    = $6017            ; street races won
+SV_SECRET    = $6018            ; secret boss beaten (0/1)
+SV_RACES     = $6019            ; races completed (2 bytes)
+SV_PBEST     = $601B            ; best 1/4 mile time in ms, any car (2 bytes)
+SV_PBCAR     = $601D            ; model that set it
+SV_TOPSPD    = $601E            ; top trap speed: mph (bits 0-9) | model << 12
 SV_CARS      = $6020            ; 8 slots x 32 bytes
 SV_END       = SV_CARS + 8*32   ; $6120
 SV_SUM       = SV_END           ; 2-byte checksum over $6004..SV_END-1
@@ -86,6 +91,8 @@ NSLOTS       = 8
 OPT_KMH      = $01
 OPT_NOMUSIC  = $02
 OPT_AUTO     = $04
+
+CASH_MAX     = 9999999          ; cash never goes past this (fits every display)
 
 ; --- car record (32 bytes, same layout in save slots and RAM records) --------
 CR_MODEL  = 0                   ; $FF = empty slot
@@ -122,6 +129,7 @@ RK_LADDER = 0
 RK_QUICK  = 1
 RK_STREET = 2
 RK_TEST   = 3
+RK_SECRET = 4                   ; hidden 12th boss (needs the Zenith X400)
 
 ; --- result flags ------------------------------------------------------------
 RF_WIN    = $01

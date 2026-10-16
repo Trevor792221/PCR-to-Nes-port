@@ -19,7 +19,8 @@ save_load:
         lda tmp1
         cmp SV_SUM+1
         bne new_game
-        rts
+        jsr cash_clamp          ; saves from before the cash cap
+        jmp save_write
 
 ; new_game: wipe the save and give the player a starter car
 new_game:

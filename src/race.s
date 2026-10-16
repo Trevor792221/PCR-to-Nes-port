@@ -144,6 +144,8 @@ race_setup:
         sta res_rt+1
         sta res_trap
         sta res_trap+1
+        sta res_mph
+        sta res_mph+1
         sta scroll_x
         sta scroll_nt
         lda #$FF
@@ -899,7 +901,7 @@ check_finish0:
         cmp race_dist
         lda ph_p2
         sbc race_dist+1
-        bcc @r
+        jcc @r
         lda #1
         sta rc_fin
         lda rc_t
@@ -911,6 +913,11 @@ check_finish0:
         sta res_trap
         lda spd_hi
         sta res_trap+1
+        ldx #0
+        jsr phys_mph
+        sta res_mph
+        lda spd_hi
+        sta res_mph+1
         lda rc_street
         bne :+
         ; win if the opponent hasn't finished (or there is none)

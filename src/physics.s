@@ -1125,18 +1125,21 @@ phys_nitrous:
 ; phys_speed: X = car -> speed in mph (or km/h if the option is set) as a
 ; 16-bit value: A = low byte, spd_hi = high byte (0-999).
 phys_speed:
+        lda SV_OPTIONS
+        and #OPT_KMH
+        beq phys_mph
+        lda #55
+        bne phys_spd_k
+; phys_mph: same, always in mph
+phys_mph:
+        lda #34
+phys_spd_k:
+        sta m_b
         stx cx
         lda ph_v1,x
         sta m_a
         lda ph_v2,x
         sta m_a+1
-        lda SV_OPTIONS
-        and #OPT_KMH
-        beq :+
-        lda #55-34
-:       clc
-        adc #34
-        sta m_b
         lda #0
         sta m_b+1
         jsr mul16

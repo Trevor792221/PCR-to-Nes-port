@@ -1828,18 +1828,19 @@ options_screen:
         PRINT str_op1, 4, 7
         PRINT str_op2, 4, 9
         PRINT str_op3, 4, 11
-        PRINT str_op4, 4, 13
-        BOX 1, 15, 30, 13
-        PRINT str_c0, 3, 16
-        PRINT str_c1, 3, 17
-        PRINT str_c2, 3, 18
-        PRINT str_c3, 3, 19
-        PRINT str_c4, 3, 20
-        PRINT str_c5, 3, 21
-        PRINT str_c6, 3, 22
-        PRINT str_c7, 3, 23
-        PRINT str_c8, 3, 25
-        PRINT str_c9, 3, 26
+        PRINT str_op5, 4, 13
+        PRINT str_op4, 4, 15
+        BOX 1, 17, 30, 12
+        PRINT str_c0, 3, 18
+        PRINT str_c1, 3, 19
+        PRINT str_c2, 3, 20
+        PRINT str_c3, 3, 21
+        PRINT str_c4, 3, 22
+        PRINT str_c5, 3, 23
+        PRINT str_c6, 3, 24
+        PRINT str_c7, 3, 25
+        PRINT str_c8, 3, 26
+        PRINT str_c9, 3, 27
         jsr attr_upload
         lda #0
         sta oam_idx
@@ -1847,7 +1848,7 @@ options_screen:
         jsr ppu_on
         lda #0
         sta ui_sel
-        lda #5
+        lda #6
         sta ui_count
         lda #2
         sta ui_x
@@ -1863,7 +1864,7 @@ options_screen:
         jsr list_cursor
         jsr list_select
         cmp #2
-        beq @back
+        jeq @back
         cmp #1
         beq @a
         cmp #6
@@ -1872,8 +1873,10 @@ options_screen:
         beq @toggle
         jmp @loop
 @a:     lda ui_sel
-        cmp #4
+        cmp #5
         beq @back
+        cmp #4
+        beq @title
         cmp #3
         beq @erase
 @toggle:
@@ -1897,8 +1900,12 @@ options_screen:
         jsr music_play
 :       jsr op_values
         jmp @loop
+@title: jsr save_write
+        lda #MODE_TITLE
+        sta next_mode
+        rts
 @erase: MOVI16 ptr0, str_op_sure
-        ldy #28
+        ldy #16
         jsr confirm
         bcs :+
         jsr new_game
@@ -1948,6 +1955,7 @@ str_op1:      .byte "MUSIC", 0
 str_op2:      .byte "GEAR SHIFTS", 0
 str_op3:      .byte "ERASE SAVE", 0
 str_op4:      .byte "BACK", 0
+str_op5:      .byte "QUIT TO TITLE", 0
 str_ov_mph:   .byte "< MPH  >", 0
 str_ov_kmh:   .byte "< KM/H >", 0
 str_ov_on:    .byte "< ON   >", 0

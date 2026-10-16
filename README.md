@@ -33,12 +33,13 @@ runs on real NES / Famicom hardware or any accurate emulator.
 | Drag racing with manual shifting | 1/4 and 1/2 mile drag races. Rev on the line, launch on green, shift by hand, fire nitrous. Shift feedback: Perfect, Good, Early or Late |
 | Launch / wheelspin | Clutch-dump launch model: too many revs spin the tires (with smoke), too few bog the engine |
 | Street racing | Half-mile street race on 3 lanes with traffic. Change lanes to dodge cars; crashing costs you your speed |
-| Story / ladder progression | Ladder of 10 street bosses, plus a final "Legend" boss |
+| Story / ladder progression | Ladder of 10 street bosses, plus a final "Legend" boss. A hidden 12th boss, **Eclipse**, appears in race select only while you drive the Zenith X400. Beating it pays $500,000 and, the first time, 25 gems |
 | Quick races with bets | Random rival on Easy, Medium or Hard, betting $300, $1,000 or $2,500 |
 | Practice / test runs | Solo test run with elapsed time, trap speed, reaction time and 0-60 time. The best 1/4-mile time is saved per car |
 | XP, levels and premium currency | XP from every race. Levelling up gives gems, and higher levels unlock better cars |
 | Auto-save | Battery-backed save with a checksum. It saves after purchases and races |
-| Options | MPH or km/h, music on/off, manual or automatic shifting |
+| Stats | Garage → STATS: races completed, wins and losses, your best 1/4-mile time and the car that set it, your fastest trap speed and car, a boss tracker (+ beaten, - not yet), and crates opened |
+| Options | MPH or km/h, music on/off, manual or automatic shifting, quit to title |
 
 Some features were left out or reduced to fit the NES. These include online
 multiplayer, the in-app shop, tournaments, the parts market, real car

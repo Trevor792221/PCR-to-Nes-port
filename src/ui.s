@@ -156,6 +156,8 @@ cash_text:
 ; money_text: m_a(24) -> ptr0 = "$1234" (left aligned, zero terminated)
 money_text:
         jsr fmt_u24
+        txa
+        beq num_ptr             ; 8 digits: no room for "$" (cash is capped below this)
         dex
         lda #'$'
         sta numbuf,x

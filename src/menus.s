@@ -233,7 +233,7 @@ garage_main:
 
 garage_jump:
         .word g_race-1, g_parts-1, g_mycars-1, g_tune-1, g_dealer-1
-        .word g_paint-1, g_crates-1, g_dyno-1, g_options-1, g_title-1
+        .word g_paint-1, g_crates-1, g_dyno-1, g_options-1, g_stats-1
 
 g_race: jsr race_select
         bcs :+
@@ -267,23 +267,16 @@ g_options:
         beq :+
         jmp garage_main
 :       rts
-g_title:
-        jsr save_write
-        lda #MODE_TITLE
-        sta next_mode
-        rts
+g_stats:
+        jsr stats_screen
+        jmp garage_main
 
 ; garage_draw: whole garage screen (PPU off -> on)
 garage_draw:
         ; money cheat (Game Genie): keep the cash topped up
         lda cheat_money
         beq :+
-        lda #$7F                ; 9,999,999 = $98967F
-        sta SV_CASH
-        lda #$96
-        sta SV_CASH+1
-        lda #$98
-        sta SV_CASH+2
+        jsr cash_max
         jsr save_write
 :       lda #0
         jsr screen_begin
@@ -465,7 +458,7 @@ str_g5: .byte "PAINT", 0
 str_g6: .byte "CRATES", 0
 str_g7: .byte "DYNO", 0
 str_g8: .byte "OPTIONS", 0
-str_g9: .byte "TITLE", 0
+str_g9: .byte "STATS", 0
 str_garage: .byte "GARAGE", 0
 str_notime: .byte "BEST 1/4: NO TIME YET", 0
 str_best:   .byte "BEST 1/4: ", 0
@@ -483,25 +476,38 @@ race_select:
         jsr use_menu_palette
         MOVI16 ptr0, str_rsel
         jsr draw_header
-        PRINT str_rs0, 4, 5
-        PRINT str_rs1, 4, 8
-        PRINT str_rs2, 4, 11
-        PRINT str_rs3, 4, 14
-        PRINT str_rs4, 4, 17
-        PRINT str_rs5, 4, 20
-        BOX 1, 22, 30, 7
+        PRINT str_rs0, 4, 4
+        PRINT str_rs1, 4, 7
+        PRINT str_rs2, 4, 10
+        PRINT str_rs3, 4, 13
+        PRINT str_rs4, 4, 16
+        PRINT str_rs5, 4, 19
+        lda #6
+        sta ui_count
+        jsr has_zenith
+        bne :+
+        lda #$20
+        sta text_attr
+        PRINT str_rs6, 4, 22
+        lda #0
+        sta text_attr
+        lda #7
+        sta ui_count
+:       BOX 1, 24, 30, 5
         jsr attr_upload
         lda #0
         sta oam_idx
         jsr oam_clear
         jsr ppu_on
         lda rs_sel
-        sta ui_sel
-        lda #6
-        sta ui_count
+        cmp ui_count
+        bcc :+
+        lda #0
+        sta rs_sel
+:       sta ui_sel
         lda #2
         sta ui_x
-        lda #5
+        lda #4
         sta ui_y0
         lda #3
         sta ui_dy
@@ -558,7 +564,12 @@ race_select:
         beq @back
         cmp #2
         beq @loop               ; distance row: use left/right
-        cmp #0
+        cmp #6
+        bne :+
+        jsr setup_secret
+        clc
+        rts
+:       cmp #0
         bne :+
         jsr setup_ladder
         clc
@@ -578,8 +589,11 @@ race_select:
         clc
         rts
 @poor:  MOVI16 ptr0, str_poor
-        ldy #27
-        jsr vb_msg
+        lda #28
+        jsr pad_ptr0
+        ldx #2
+        ldy #26
+        jsr vb_str
         lda #SFX_ERROR
         jsr sfx_play
         jmp @loop
@@ -595,7 +609,7 @@ rs_refresh:
         lda diff_names+1,x
         sta ptr0+1
         ldx #18
-        ldy #8
+        ldy #7
         jsr vb_str
         lda race_half
         asl a
@@ -605,9 +619,9 @@ rs_refresh:
         lda dist_names+1,x
         sta ptr0+1
         ldx #18
-        ldy #11
+        ldy #10
         jsr vb_str
-        ; info box rows 23..27
+        ; info box rows 25..26
         lda rs_sel
         asl a
         tax
@@ -618,7 +632,7 @@ rs_refresh:
         lda #28
         jsr pad_ptr0
         ldx #2
-        ldy #24
+        ldy #25
         jsr vb_str
         jsr wait_frame
         ; second info line
@@ -644,12 +658,22 @@ rs_refresh:
         sta linebuf,y
         MOVI16 ptr0, linebuf
         jmp @show
-@n1:    MOVI16 ptr0, str_blank
+@n1:    cmp #6
+        bne @n2
+        MOVI16 ptr0, str_i6b
+        jmp @show
+@n2:    MOVI16 ptr0, str_blank
 @show:  lda #28
         jsr pad_ptr0
         ldx #2
         ldy #26
         jmp vb_str
+
+; has_zenith: Z set if the car in use is the crate-only Zenith X400
+has_zenith:
+        jsr cur_car_ptr
+        cmp #CRATE_CAR
+        rts
 
 str_rsel:   .byte "RACE", 0
 str_rs0:    .byte "LADDER BOSS", 0
@@ -658,6 +682,7 @@ str_rs2:    .byte "DISTANCE", 0
 str_rs3:    .byte "STREET RACE", 0
 str_rs4:    .byte "TEST RUN", 0
 str_rs5:    .byte "BACK", 0
+str_rs6:    .byte "??? SECRET BOSS", 0
 str_poor:   .byte "NOT ENOUGH CASH FOR THE BET", 0
 str_bet:    .byte "BET ", 0
 diff_names: .word str_easy, str_med, str_hard
@@ -667,13 +692,15 @@ str_hard:   .byte "< HARD   >", 0
 dist_names: .word str_q, str_h
 str_q:      .byte "< 1/4 MILE >", 0
 str_h:      .byte "< 1/2 MILE >", 0
-rs_info:    .word str_i0, str_i1, str_i2, str_i3, str_i4, str_i5
+rs_info:    .word str_i0, str_i1, str_i2, str_i3, str_i4, str_i5, str_i6
 str_i0:     .byte "BEAT THE 10 STREET BOSSES", 0
 str_i1:     .byte "RANDOM RIVAL, WIN THE BET", 0
 str_i2:     .byte "LEFT/RIGHT: RACE LENGTH", 0
 str_i3:     .byte "1/2 MILE WITH TRAFFIC", 0
 str_i4:     .byte "SOLO RUN, TIME YOUR CAR", 0
 str_i5:     .byte "BACK TO THE GARAGE", 0
+str_i6:     .byte "ONLY AN X400 CAN TAKE IT ON", 0
+str_i6b:    .byte "ECLIPSE - WIN $500000", 0
 
 ; calc_bet: m_a = bet for race_diff
 calc_bet:
@@ -691,14 +718,15 @@ bet_hi: .byte >300, >1000, >2500
 ; ---------------------------------------------------------------------------
 ; Ladder bosses (all names made up)
 ; ---------------------------------------------------------------------------
-NBOSS = 11
-boss_model: .byte 0, 1, 2, 4, 3, 5, 6, 7, 8, 9, 11
-boss_level: .byte 0, 1, 1, 1, 2, 3, 3, 3, 4, 4, 4
-boss_paint: .byte $2A, $11, $30, $14, $12, $28, $07, $3C, $0F, $00, $25
-boss_skill: .byte 40, 70, 90, 110, 130, 150, 170, 190, 210, 230, 250
-boss_cash0: .byte <800, <1500, <2500, <4000, <6000, <9000, <12000, <18000, <26000, <40000, <(100000 & $FFFF)
-boss_cash1: .byte >800, >1500, >2500, >4000, >6000, >9000, >12000, >18000, >26000, >40000, >(100000 & $FFFF)
-boss_cash2: .byte 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, ^100000
+NBOSS = 11                      ; ladder bosses
+BOSS_SECRET = 11                ; the hidden 12th boss (table index)
+boss_model: .byte 0, 1, 2, 4, 3, 5, 6, 7, 8, 9, 11, CRATE_CAR
+boss_level: .byte 0, 1, 1, 1, 2, 3, 3, 3, 4, 4, 4, 4
+boss_paint: .byte $2A, $11, $30, $14, $12, $28, $07, $3C, $0F, $00, $25, $13
+boss_skill: .byte 40, 70, 90, 110, 130, 150, 170, 190, 210, 230, 250, 255
+boss_cash0: .byte <800, <1500, <2500, <4000, <6000, <9000, <12000, <18000, <26000, <40000, <(100000 & $FFFF), <(500000 & $FFFF)
+boss_cash1: .byte >800, >1500, >2500, >4000, >6000, >9000, >12000, >18000, >26000, >40000, >(100000 & $FFFF), >(500000 & $FFFF)
+boss_cash2: .byte 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, ^100000, ^500000
 boss_names:
         .byte "RIKU        ", 0
         .byte "DEX         ", 0
@@ -711,6 +739,7 @@ boss_names:
         .byte "IRON JO     ", 0
         .byte "PHANTOM     ", 0
         .byte "THE LEGEND  ", 0
+        .byte "ECLIPSE     ", 0
 
 ; boss_index: A = current boss (0-10)
 boss_index:
@@ -803,6 +832,21 @@ copy_opp_name:
 
 setup_ladder:
         jsr boss_index
+        jsr setup_boss
+        lda #RK_LADDER
+        sta race_kind
+        rts
+
+; setup_secret: the hidden 12th boss
+setup_secret:
+        lda #BOSS_SECRET
+        jsr setup_boss
+        lda #RK_SECRET
+        sta race_kind
+        rts
+
+; setup_boss: A = boss table index -> opponent, distance, no bet
+setup_boss:
         sta tmp7
         tax
         lda boss_level,x
@@ -817,8 +861,6 @@ setup_ladder:
         lda tmp7
         jsr boss_name_ptr
         jsr copy_opp_name
-        lda #RK_LADDER
-        sta race_kind
         lda #0
         sta race_bet
         sta race_bet+1
@@ -1802,6 +1844,10 @@ results_main:
         bne :+
         jsr setup_ladder
         jmp @go
+:       cmp #RK_SECRET
+        bne :+
+        jsr setup_secret
+        jmp @go
 :       cmp #RK_QUICK
         bne :+
         jsr setup_quick
@@ -1813,6 +1859,60 @@ results_main:
 @go:    lda #MODE_RACE
         sta next_mode
         rts
+
+; track_stats: race count, best 1/4 mile overall and top trap speed
+track_stats:
+        inc SV_RACES
+        bne :+
+        inc SV_RACES+1
+:       lda res_flags
+        and #RF_FOUL
+        bne @r
+        jsr cur_car_ptr
+        sta tmp4                ; model
+        ; best 1/4 mile, any car
+        lda race_dist+1
+        cmp #>1609
+        bne @spd
+        lda res_et
+        ora res_et+1
+        beq @spd
+        lda SV_PBEST
+        ora SV_PBEST+1
+        beq @pb
+        lda res_et
+        cmp SV_PBEST
+        lda res_et+1
+        sbc SV_PBEST+1
+        bcs @spd
+@pb:    lda res_et
+        sta SV_PBEST
+        lda res_et+1
+        sta SV_PBEST+1
+        lda tmp4
+        sta SV_PBCAR
+@spd:   ; top trap speed (mph, 10 bits) | model << 12
+        lda res_mph
+        ora res_mph+1
+        beq @r
+        lda SV_TOPSPD+1
+        and #$03
+        sta tmp1
+        lda SV_TOPSPD
+        cmp res_mph
+        lda tmp1
+        sbc res_mph+1
+        bcs @r                  ; old record >= this one
+        lda res_mph
+        sta SV_TOPSPD
+        lda tmp4
+        asl a
+        asl a
+        asl a
+        asl a
+        ora res_mph+1
+        sta SV_TOPSPD+1
+@r:     rts
 
 ; ms_or_dash: m_a = ms -> ptr0 text ("--.---" if 0)
 ms_or_dash:
@@ -1845,6 +1945,7 @@ apply_rewards:
         sta rw_best
         lda #5
         sta rw_xp
+        jsr track_stats
         ; best 1/4 mile time (test runs and races over 1/4 mile)
         lda race_dist+1
         cmp #>1609
@@ -1920,7 +2021,10 @@ apply_rewards:
 :       lda #100
         sta rw_xp
         lda race_kind
-        cmp #RK_LADDER
+        cmp #RK_SECRET
+        bne :+
+        jmp @secret
+:       cmp #RK_LADDER
         bne @nl
         jsr boss_index
         tax
@@ -1934,14 +2038,14 @@ apply_rewards:
         sta rw_xp
         lda SV_LADDER
         cmp #NBOSS
-        bcs @pay
+        jcs @pay
         inc SV_LADDER
         ; 3 gems for a new boss
         clc
         lda SV_GEMS
         adc #3
         sta SV_GEMS
-        bcc @pay
+        jcc @pay
         inc SV_GEMS+1
         jmp @pay
 @nl:    cmp #RK_QUICK
@@ -1977,6 +2081,30 @@ apply_rewards:
         inc SV_STREET
         lda #120
         sta rw_xp
+        jmp @pay
+@secret:
+        ; hidden boss: $500,000, 300 xp, 25 gems the first time
+        ldx #BOSS_SECRET
+        lda boss_cash0,x
+        sta rw_cash
+        lda boss_cash1,x
+        sta rw_cash+1
+        lda boss_cash2,x
+        sta rw_cash+2
+        lda #<300
+        sta rw_xp
+        lda #>300
+        sta rw_xp+1
+        lda SV_SECRET
+        bne @pay
+        lda #1
+        sta SV_SECRET
+        clc
+        lda SV_GEMS
+        adc #25
+        sta SV_GEMS
+        bcc @pay
+        inc SV_GEMS+1
 @pay:   lda rw_cash
         sta m_a
         lda rw_cash+1
@@ -2086,9 +2214,9 @@ debug_screen:
         jmp @chg
 :       cpx #1
         bne @loop
-        ldy dbg_boss            ; boss: 0 .. NBOSS-1
+        ldy dbg_boss            ; boss: 0 .. NBOSS (NBOSS = the secret boss)
         bne @bdec
-        ldy #NBOSS
+        ldy #NBOSS+1
 @bdec:  dey
         sty dbg_boss
         jmp @chg
@@ -2105,7 +2233,7 @@ debug_screen:
         bne @loop
         ldy dbg_boss
         iny
-        cpy #NBOSS
+        cpy #NBOSS+1
         bcc @bset
         ldy #0
 @bset:  sty dbg_boss
@@ -2129,7 +2257,12 @@ debug_screen:
         MOVI16 ptr0, str_full
         jmp @msg
 @boss:  lda dbg_boss            ; jump the ladder to this boss and race
-        sta SV_LADDER
+        cmp #BOSS_SECRET
+        bne :+
+        jsr setup_secret
+        clc
+        rts
+:       sta SV_LADDER
         jsr save_write
         jsr setup_ladder
         clc
@@ -2213,3 +2346,233 @@ str_dbg_help:  .byte "LEFT/RIGHT:PICK  A:DO IT", 0
 str_dbg_help2: .byte "B:BACK", 0
 str_dbg_added: .byte "CAR ADDED TO YOUR GARAGE", 0
 str_dbg_done:  .byte "DONE!", 0
+
+; ===========================================================================
+; STATS
+; ===========================================================================
+stats_screen:
+        lda #0
+        jsr screen_begin
+        jsr use_menu_palette
+        MOVI16 ptr0, str_stats
+        jsr draw_header
+        PRINT str_st_races, 3, 5
+        lda SV_RACES
+        sta m_a
+        lda SV_RACES+1
+        sta m_a+1
+        jsr num_text
+        ldx #21
+        ldy #5
+        jsr print
+        PRINT str_st_wins, 3, 6
+        lda SV_WINS
+        sta m_a
+        lda SV_WINS+1
+        sta m_a+1
+        jsr num_text
+        ldx #21
+        ldy #6
+        jsr print
+        PRINT str_st_loss, 3, 7
+        lda SV_LOSSES
+        sta m_a
+        lda SV_LOSSES+1
+        sta m_a+1
+        jsr num_text
+        ldx #21
+        ldy #7
+        jsr print
+        ; personal best
+        PRINT str_st_pb, 3, 9
+        lda SV_PBEST
+        sta m_a
+        lda SV_PBEST+1
+        sta m_a+1
+        ora m_a
+        beq @nopb
+        jsr fmt_ms
+        MOVI16 ptr0, numbuf
+        ldx #21
+        ldy #9
+        jsr print
+        lda SV_PBCAR
+        jsr st_car_name
+        ldx #5
+        ldy #10
+        jsr print
+        jmp @spd
+@nopb:  PRINT str_dash, 21, 9
+@spd:   ; fastest car (top trap speed)
+        PRINT str_st_top, 3, 12
+        lda SV_TOPSPD+1
+        and #$03
+        sta m_a+1
+        lda SV_TOPSPD
+        sta m_a
+        ora m_a+1
+        beq @nospd
+        lda SV_OPTIONS          ; mph -> km/h: * 413 >> 8
+        and #OPT_KMH
+        beq :+
+        lda #<413
+        sta m_b
+        lda #>413
+        sta m_b+1
+        jsr mul16
+        lda m_r+1
+        sta m_a
+        lda m_r+2
+        sta m_a+1
+:       jsr num_text
+        ldx #21
+        ldy #12
+        jsr print
+        jsr speed_unit
+        ldx #25
+        ldy #12
+        jsr print
+        lda SV_TOPSPD+1
+        lsr a
+        lsr a
+        lsr a
+        lsr a
+        jsr st_car_name
+        ldx #5
+        ldy #13
+        jsr print
+        jmp @boss
+@nospd: PRINT str_st_none, 21, 12
+@boss:  ; boss tracker
+        PRINT str_st_boss, 3, 15
+        lda SV_LADDER
+        cmp #NBOSS
+        bcc :+
+        lda #NBOSS
+:       clc
+        adc SV_SECRET
+        jsr fmt_8
+        jsr num_ptr
+        ldy #0
+        jsr cat_ptr0
+        sty tmp5
+        MOVI16 ptr0, str_st_of11  ; "/11", or "/12" once the secret is known
+        lda SV_SECRET
+        bne :+
+        jsr has_zenith
+        bne @of
+:       MOVI16 ptr0, str_st_of12
+@of:    ldy tmp5
+        jsr cat_ptr0
+        lda #0
+        sta linebuf,y
+        MOVI16 ptr0, linebuf
+        ldx #21
+        ldy #15
+        jsr print
+        BOX 1, 16, 30, 9
+        lda #0
+        sta st_i
+@b:     jsr st_boss_line
+        lda st_i
+        cmp #6
+        bcs :+
+        ldx #3                  ; left column: bosses 1-6
+        clc
+        adc #17
+        tay
+        jmp :++
+:       ldx #16                 ; right column: bosses 7-12
+        clc
+        adc #17-6               ; row 17 for boss 7
+        tay
+:       jsr print
+        inc st_i
+        lda st_i
+        cmp #NBOSS+1
+        bne @b
+        PRINT str_st_crates, 3, 26
+        lda SV_CRATES
+        sta m_a
+        lda SV_CRATES+1
+        sta m_a+1
+        jsr num_text
+        ldx #21
+        ldy #26
+        jsr print
+        PRINT str_r_help3, 2, 28
+        jsr attr_upload
+        lda #0
+        sta oam_idx
+        jsr oam_clear
+        jsr ppu_on
+@wait:  jsr wait_frame
+        jsr read_pad
+        lda pad_new
+        and #BTN_A|BTN_B|BTN_START
+        beq @wait
+        lda #SFX_BACK
+        jmp sfx_play
+
+.segment "BSS"
+st_i:       .res 1
+.segment "BANK1"
+
+; st_car_name: A = model -> ptr0 (car name, or "-" for a bad value)
+st_car_name:
+        cmp #NCARS
+        bcc :+
+        MOVI16 ptr0, str_dash
+        rts
+:       jmp car_name_ptr
+
+; st_boss_line: boss st_i -> ptr0 "+ RIKU" (beaten) / "- DEX" / "- ???"
+st_boss_line:
+        ldx st_i
+        cpx #BOSS_SECRET
+        beq @sec
+        lda #'-'
+        cpx SV_LADDER
+        bcs :+
+        lda #'+'
+:       sta linebuf
+        lda #' '
+        sta linebuf+1
+        txa
+        jsr boss_name_ptr
+        ldy #2
+        jsr cat_ptr0
+        lda #0
+        sta linebuf,y
+        MOVI16 ptr0, linebuf
+        rts
+@sec:   lda SV_SECRET
+        bne @won
+        MOVI16 ptr0, str_st_q
+        rts
+@won:   lda #'+'
+        sta linebuf
+        lda #' '
+        sta linebuf+1
+        txa
+        jsr boss_name_ptr
+        ldy #2
+        jsr cat_ptr0
+        lda #0
+        sta linebuf,y
+        MOVI16 ptr0, linebuf
+        rts
+
+str_stats:     .byte "STATS", 0
+str_st_races:  .byte "RACES COMPLETED", 0
+str_st_wins:   .byte "WINS", 0
+str_st_loss:   .byte "LOSSES", 0
+str_st_pb:     .byte "BEST 1/4 MILE", 0
+str_st_top:    .byte "FASTEST CAR", 0
+str_st_none:   .byte "---", 0
+str_st_boss:   .byte "BOSSES BEATEN", 0
+str_st_of11:   .byte "/11", 0
+str_st_of12:   .byte "/12", 0
+str_st_q:      .byte "- ???", 0
+str_st_crates: .byte "CRATES OPENED", 0
+str_r_help3:   .byte "B:BACK", 0

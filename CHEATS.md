@@ -9,7 +9,7 @@ change when the game is updated.
 
 | Code | Effect |
 |---|---|
-| `PEKYOYAA` | **Extra money.** Your cash is set to $9,999,999 every time you enter the garage. It works on new and existing saves. |
+| `PEKYOYAA` | **Extra money.** Your cash is set to $9,999,999 (the game's maximum) every time you enter the garage. It works on new and existing saves. |
 | `PEKYXYAA` | **Debug menu.** Press **SELECT** in the garage. |
 
 ### Start with any car
@@ -39,7 +39,7 @@ With `PEKYXYAA` entered, press **SELECT** on the garage screen:
 | Item | What it does |
 |---|---|
 | ADD CAR | LEFT/RIGHT picks any car, including the crate-only Zenith X400. **A** puts it in your first free garage slot. |
-| BOSS RACE | LEFT/RIGHT picks any of the 11 ladder bosses. **A** moves your ladder progress to that boss and starts the race. |
+| BOSS RACE | LEFT/RIGHT picks any of the 11 ladder bosses or the secret 12th boss. **A** starts the race; for a ladder boss it also moves your ladder progress to that boss. |
 | ADD $100000 | Adds $100,000. |
 | ADD 100 GEMS | Adds 100 gems. |
 

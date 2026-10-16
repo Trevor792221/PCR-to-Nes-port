@@ -90,6 +90,7 @@ res_trap:   .res 2          ; trap speed (mph or km/h)
 res_rt:     .res 2          ; reaction time ms
 res_opp_et: .res 2
 res_t60:    .res 2          ; 0-60 time ms
+res_mph:    .res 2          ; trap speed in mph (for the stats page)
 tmp_rec:    .res 32         ; scratch car record (dealer, crates)
 
 ; ---------------------------------------------------------------------------
