@@ -61,7 +61,7 @@ GEARSETS = {
 
 # name, shape, hp, kg, redline, curve, gears, final, drive, CdA, price, gems, level
 CARS = [
-    ('PUKKU MINI',  0,  72,  760, 6800, 0, 4, 4.10, FWD, .60,      0,  0,  1),
+    ('PUKKU MINI',  0,  72,  760, 6800, 0, 4, 4.10, FWD, .60,    400,  0,  1),
     ('KOMET 1.6',   0, 125, 1020, 7800, 0, 5, 4.25, FWD, .62,   7000,  0,  1),
     ('SAKURA S2',   1, 165, 1180, 8200, 0, 5, 4.30, RWD, .60,  14000,  0,  2),
     ('VANTRA RS',   2, 210, 1360, 7200, 2, 5, 4.10, AWD, .66,  22000,  0,  3),

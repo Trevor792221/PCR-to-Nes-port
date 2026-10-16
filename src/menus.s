@@ -1132,6 +1132,9 @@ sell_value:
         lda m_a+2
         ora m_a+1
         bne :+
+        lda m_a
+        cmp #200
+        bcs :+
         lda #200
         sta m_a
 :       rts
