@@ -62,6 +62,7 @@ sfx_req:    .res 1          ; sound effect request (0 = none)
 mul_x:      .res 1
 mul_y:      .res 1
 mul_r:      .res 2
+nmi_vlen:   .res 1          ; VRAM queue length this NMI ($FF = busy)
 zp_end:     .res 1
 
 ; ---------------------------------------------------------------------------

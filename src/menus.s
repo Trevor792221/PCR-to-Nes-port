@@ -1346,9 +1346,11 @@ dl_sprites:
         jmp oam_clear
 
 ; dl_info: rows 13-25 text for dl_model
+; (Spread over several frames: each NMI must finish its PPU writes in vblank)
 dl_info:
         MOVI16 ptr1, tmp_rec
         jsr set_car_palette
+        jsr wait_frame          ; palette upload gets a frame of its own
         lda dl_model
         jsr car_name_ptr
         lda #20
@@ -1385,6 +1387,7 @@ dl_info:
         ldx #23
         ldy #14
         jsr vb_str
+        jsr wait_frame
         MOVI16 ptr1, tmp_rec
         ldy #16
         jsr stats_line

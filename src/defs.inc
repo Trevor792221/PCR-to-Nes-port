@@ -131,6 +131,7 @@ RF_DONE   = $80
 
 ; --- misc ---------------------------------------------------------------------
 VBUF_MAX  = 104
+NMI_CHR_VLEN = 40            ; CHR streaming only if the queue is this short
 
 ; Write A to an MMC1 register (5 serial writes, LSB first).  Clobbers A.
 .macro MMC1_WRITE reg

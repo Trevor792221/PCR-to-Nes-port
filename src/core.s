@@ -128,6 +128,8 @@ nmi:
         bne @ppu
         jmp @scroll
 @ppu:
+        lda vbuf_len
+        sta nmi_vlen
         lda #0
         sta OAMADDR
         lda #>oam
@@ -150,6 +152,8 @@ nmi:
         bne @pal
         lda #0
         sta pal_dirty
+        lda #$FF                ; no time left for the CHR stream this frame
+        sta nmi_vlen
 @nopal:
         ; VRAM update list: hi, lo, count (bit 7 = step 32), data...
         ldx #0
@@ -185,9 +189,14 @@ nmi:
         sta vbuf
         sta vbuf_len
 
-        ; CHR stream: 32 bytes per frame from (chr_src) to chr_dst
+        ; CHR stream: 32 bytes per frame from (chr_src) to chr_dst.
+        ; Only on frames with a short VRAM queue and no palette upload,
+        ; so the NMI always finishes its PPU writes inside vblank.
         lda chr_cnt
         jeq @nochr
+        lda nmi_vlen
+        cmp #NMI_CHR_VLEN+1
+        jcs @nochr
         lda ppu_ctrl
         and #$FB
         sta PPUCTRL
@@ -228,7 +237,7 @@ nmi:
         sta PPUSCROLL
         lda scroll_y
         sta PPUSCROLL
-
+nmi_ppu_done:                   ; (tests time the NMI up to here)
         inc frame
         bne :+
         inc frame+1

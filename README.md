@@ -111,6 +111,12 @@ physics runs at 50 Hz.
   second split starts the road, which scrolls at full speed. The start and
   finish lines are streamed into the nametables as columns. Race logic is
   budgeted to fit in one frame, so races run at a steady 60 fps.
+* **Vblank budget.** The NMI uploads sprites, the palette, a VRAM update
+  queue and (for the menus' 2x car previews) 32 bytes of tile data per
+  frame. Tile streaming is skipped on frames that already upload the palette
+  or a long queue, so all PPU writes finish inside vblank on real hardware.
+  `tests/test_nmi.py` times the NMI on real game frames (including the
+  514-cycle sprite DMA) and fails if any frame would overrun.
 * **Sound** (`src/sound.s`). A 4-channel music player plays an original
   theme and jingles. In races, an engine synthesizer drives pulse 1 and the
   triangle from your rpm and pulse 2 from the rival's. The noise channel
@@ -121,10 +127,12 @@ physics runs at 50 Hz.
 
 ## Tests
 
-`make test` runs two suites:
+`make test` runs three suites:
 
 * `tests/test_physics.py` runs the physics on a 6502 emulator (py65) and
   checks it against the Python model, frame by frame.
+* `tests/test_nmi.py` checks that every NMI's PPU writes fit in vblank
+  (menus, dealer browsing, a street race).
 * `tests/test_game.py` plays the ROM in the cynes NES emulator. It covers new
   game, buying parts, save persistence across reset, a test run, beating the
   first ladder boss, foul starts, a street race with no dropped frames, the
