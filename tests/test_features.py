@@ -224,6 +224,31 @@ class Features(unittest.TestCase):
             s.step(1, b)
             self.assertEqual(sum(s.mem('tr_on', i) for i in range(3)), 0)
 
+    def test_traffic_variety(self):
+        s = new_game()
+        s.garage_goto(G_RACE)
+        s.press(A)
+        s.step(30)
+        s.list_goto('rs_sel', 5)
+        s.press(A)
+        s.step(40)
+        types, pals = set(), set()
+        for f in range(6000):                        # about 25 vehicles
+            b = A
+            if s.mem('ph_gear') == 0:
+                b |= RIGHT if f % 4 < 2 else 0
+            elif (rpm(s) >= redline(s) - 300 and s.mem('ph_shift_t') == 0
+                  and f % 4 < 2):
+                b |= RIGHT
+            s.step(1, b)
+            for i in range(3):
+                if s.mem('tr_on', i):
+                    types.add(s.mem('tr_type', i))
+                    pals.add(s.mem('tr_pal', i))
+        self.assertEqual(types, {0, 1, 2, 3, 4}, 'sedan, hatch, pickup, van, box truck')
+        self.assertEqual(pals, {2, 3}, 'two traffic colours when cruising')
+        self.assertEqual(s.mem('lag'), 0)
+
     def test_one_mile_race(self):
         s = new_game()
         s.garage_goto(G_RACE)

@@ -9,7 +9,7 @@ Writes:
                themes: 0 day, 1 sunset, 2 night
   menu.chr     BG tiles $80-$FF for menus (logo, garage)       2 KB
   sprites.chr  sprite tiles $00-$3F                            1 KB
-  cars.chr     6 car bodies x 12 tiles (top 4, wheels A, wheels B)
+  cars.chr     7 car bodies + 2 traffic vehicles x 12 tiles (top 4, wheels A, wheels B)
   bigcars.chr  6 car bodies x 32 tiles (2x scale, for menus)
   race_mapN.bin nametable rows 6-29 for race theme N (24x32)
   logo_map.bin title logo (2 rows x 22 tiles)
@@ -541,7 +541,7 @@ def main():
     w('garage_attr.bin', menu_sp['GARAGE'][1])
     w('logo_map.bin', logo_map)
     w('sprites.chr', build_sprites())
-    w('cars.chr', b''.join(b''.join(car_tiles(n)) for n in art.SHAPE_ORDER))
+    w('cars.chr', b''.join(b''.join(car_tiles(n)) for n in art.SHAPE_ORDER + art.TRAFFIC_ORDER))
     w('bigcars.chr', b''.join(b''.join(big_car_tiles(n)) for n in art.SHAPE_ORDER))
     # tile ids the code needs
     with open(os.path.join(out, 'tiles.inc'), 'w') as f:

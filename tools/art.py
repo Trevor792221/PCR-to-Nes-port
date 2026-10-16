@@ -150,9 +150,47 @@ BODIES = {
         '................................',
         '................................',
     ], [8, 25]),
+    # traffic-only vehicles (never sold): minivan and box truck
+    'VAN': ([
+        '................................',
+        '................................',
+        '...kkkkkkkkkkkkkkkkkkkk.........',
+        '..kpppppppppppppppppppkk........',
+        '..kpwwwwwkwwwwwwkwwwwwkpk.......',
+        '..kpwwwwwkwwwwwwkwwwwwwkpk......',
+        '..kpwwwwwkwwwwwwkwwwwwwwkpk.....',
+        '..kpkkkkkkkkkkkkkkkkkkkkkkpkkk..',
+        '..kpppppppppppppkppppppppppppppk',
+        '..kwppppppppppppkpppppppppppppwk',
+        '..kpppp.......ppkppppp.......ppk',
+        '..kppp.........pkpppp.........pk',
+        '..kkkk..........kkkkk.........kk',
+        '................................',
+        '................................',
+        '................................',
+    ], [8, 24]),
+    'BOX': ([
+        '................................',
+        '.kkkkkkkkkkkkkkkkkkkk...........',
+        '.kppppppppppppppppppk...........',
+        '.kppppppppppppppppppk.kkkkkk....',
+        '.kpkkkkkkkkkkkkkkkkpk.kpwwwwk...',
+        '.kppppppppppppppppppkkkpwwwwwk..',
+        '.kpkkkkkkkkkkkkkkkkpkppkwwwwwwk.',
+        '.kppppppppppppppppppkpppkkkkkkpk',
+        '.kkkkkkkkkkkkkkkkkkkkpppppppppwk',
+        '.kpppppppppppppppppppkpppppppppk',
+        '.kppp.........pppppppkppp.....pk',
+        '.kpp...........ppppppkpp.......k',
+        '.kkk............kkkkkkkk.....kk.',
+        '................................',
+        '................................',
+        '................................',
+    ], [8, 26]),
 }
 
 SHAPE_ORDER = ['HATCH', 'COUPE', 'SEDAN', 'MUSCLE', 'TRUCK', 'SUPER', 'PROTO']
+TRAFFIC_ORDER = ['VAN', 'BOX']            # appended to cars.chr as shapes 7, 8
 
 
 def car_pixels(name, frame=0):

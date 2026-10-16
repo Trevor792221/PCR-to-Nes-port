@@ -62,6 +62,8 @@ tr_x_f:     .res NTRAFFIC
 tr_lane:    .res NTRAFFIC
 tr_spd:     .res NTRAFFIC   ; px/frame * 64
 tr_on:      .res NTRAFFIC
+tr_type:    .res NTRAFFIC   ; vehicle type 0-4 (see tr_shape)
+tr_pal:     .res NTRAFFIC   ; sprite palette (3, or 2 when cruising)
 tr_spawn:   .res 1
 hud_gear:   .res 1
 mark_x:     .res 2
@@ -217,14 +219,38 @@ race_setup:
         lda car_shape,x
         ldx #$1C
         jsr load_car_chr
-        lda #2                  ; sedan for traffic
-        ldx #$28
+        ; traffic vehicles: sprite tiles $40, $4C, $58, $64, $70
+        ldx #NTRTYPE-1
+:       stx tmp7
+        lda tr_tile,x
+        pha
+        lda tr_shape,x
+        tay
+        pla
+        tax
+        tya
         jsr load_car_chr
+        ldx tmp7
+        dex
+        bpl :-
         ; palettes
         jsr cur_car_ptr
         jsr set_car_palette
         lda opp_rec+CR_PAINT
         sta palette+$1A
+        lda race_kind           ; cruise: no rival, so palette 2 is a
+        cmp #RK_CRUISE          ; second traffic colour
+        bne :+
+        lda #NTRCOL
+        jsr rand_below
+        tax
+        lda tr_colours,x
+        sta palette+$1A
+:       lda #NTRGREY            ; traffic grey/silver/white for this race
+        jsr rand_below
+        tax
+        lda tr_greys,x
+        sta palette+$1E
         ; physics
         jsr cur_car_ptr
         lda ptr1
@@ -540,6 +566,17 @@ speed_unit_r:
         rts
 :       MOVI16 ptr0, str_h_mph
         rts
+
+; traffic vehicle types: body shape, sprite tile, speed range (px/frame*64)
+NTRTYPE = 5
+tr_shape:   .byte 2, 0, 4, 7, 8         ; sedan, hatch, pickup, van, box truck
+tr_tile:    .byte $40, $4C, $58, $64, $70
+tr_smin:    .byte 56, 60, 48, 48, 36    ; box trucks crawl, hatches nip along
+tr_srng:    .byte 44, 48, 40, 32, 28
+NTRCOL = 8
+tr_colours: .byte $16, $12, $1A, $28, $14, $27, $21, $06
+NTRGREY = 4
+tr_greys:   .byte $10, $10, $3D, $30
 
 str_h_quart: .byte "1/4", 0
 str_h_cruise: .byte "CRUISE   START:PAUSE", 0
@@ -1269,12 +1306,12 @@ traffic_update:
         ; spawn
         lda rc_state
         cmp #RS_RUN
-        bne @move
+        jne @move
         lda race_kind           ; empty-road cruise: no traffic
         cmp #RK_CRUISE
         bne :+
         lda cruise_empty
-        bne @move
+        jne @move
 :       dec tr_spawn
         bpl @move
         lda #40
@@ -1308,12 +1345,28 @@ traffic_update:
         jsr rand_below
         ldx tmp7
         sta tr_lane,x
-        lda #48                 ; 0.75 .. 1.5 px/frame (*64)
+        lda #NTRTYPE            ; vehicle type sets the speed range
         jsr rand_below
-        clc
-        adc #48
         ldx tmp7
+        sta tr_type,x
+        tay
+        lda tr_srng,y           ; px/frame (*64)
+        jsr rand_below
+        ldx tmp7
+        ldy tr_type,x
+        clc
+        adc tr_smin,y
         sta tr_spd,x
+        lda #3                  ; colour: palette 3, or 2 when cruising
+        sta tr_pal,x
+        lda race_kind
+        cmp #RK_CRUISE
+        bne @move
+        jsr rand
+        and #1
+        ldx tmp7
+        ora #2
+        sta tr_pal,x
 @move:  ldx #NTRAFFIC-1
 @m:     lda tr_on,x
         beq @mn
@@ -2012,9 +2065,10 @@ spr_traffic:
         ldy tr_lane,x
         lda lane_y,y
         sta sp_y
-        lda #$28
+        ldy tr_type,x
+        lda tr_tile,y
         sta sp_tile
-        lda #3
+        lda tr_pal,x
         sta sp_attr
         lda #0
         sta tmp0
