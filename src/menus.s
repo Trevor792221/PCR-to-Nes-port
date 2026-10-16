@@ -1639,8 +1639,10 @@ results_main:
         jsr print
         PRINT str_r_trap, 4, 10
         lda res_trap
-        jsr fmt_8
-        jsr num_ptr
+        sta m_a
+        lda res_trap+1
+        sta m_a+1
+        jsr num_text
         ldx #19
         ldy #10
         jsr print

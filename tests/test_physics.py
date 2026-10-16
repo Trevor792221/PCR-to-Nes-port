@@ -101,6 +101,25 @@ class Physics(unittest.TestCase):
         self.run_race(8, [4] * 10, launch=3000, x=1)
         self.run_race(11, [4, 4, 4, 4, 4, 4, 4, 0, 0, 4], launch=7000)   # wheelspin
 
+    def test_speed_readout_goes_past_255(self):
+        cpu = CPU()
+        opts = 0x600E
+        for v_raw, unit_kmh, expect in ((2150, 0, 285), (2150, 1, 461), (1000, 0, 132),
+                                        (9000, 0, 999), (0, 0, 0)):
+            cpu.mem[opts] = unit_kmh
+            cpu.put('ph_v1', v_raw & 0xFF)
+            cpu.put('ph_v2', v_raw >> 8)
+            lo = cpu.call('phys_speed', x=0)
+            self.assertEqual(lo | cpu.get('spd_hi') << 8, expect)
+            cpu.call('fmt3w', a=lo)
+            self.assertEqual(bytes(cpu.mem[cpu.sym['numbuf'] + 5:cpu.sym['numbuf'] + 8]).decode(),
+                             '%3d' % expect)
+
+    def test_maxed_hypercar_tops_255_mph(self):
+        car = gd.Car(11, [4] * 10)
+        _, trap, _ = gd.run(car, dist=gd.HALF)
+        self.assertGreater(trap, 255)
+
     def test_step_is_fast_enough(self):
         cpu = self.run_race(10, [3] * 10, launch=5000, frames=300)
         cpu.call('phys_step', x=0)

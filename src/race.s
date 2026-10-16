@@ -143,6 +143,7 @@ race_setup:
         sta res_rt
         sta res_rt+1
         sta res_trap
+        sta res_trap+1
         sta scroll_x
         sta scroll_nt
         lda #$FF
@@ -779,34 +780,6 @@ clk_add:
         bne @c
         rts
 
-; fmt3: A -> numbuf+5..7, three digits with leading spaces
-fmt3:
-        ldx #'0'-1
-        sec
-:       inx
-        sbc #100
-        bcs :-
-        adc #100
-        stx numbuf+5
-        ldx #'0'-1
-        sec
-:       inx
-        sbc #10
-        bcs :-
-        adc #10+'0'
-        sta numbuf+7
-        stx numbuf+6
-        lda numbuf+5
-        cmp #'0'
-        bne @r
-        lda #' '
-        sta numbuf+5
-        lda numbuf+6
-        cmp #'0'
-        bne @r
-        lda #' '
-        sta numbuf+6
-@r:     rts
 
 ; mph_raw: X = car -> A = mph (ignores the km/h option)
 mph_raw:
@@ -936,6 +909,8 @@ check_finish0:
         ldx #0
         jsr phys_speed
         sta res_trap
+        lda spd_hi
+        sta res_trap+1
         lda rc_street
         bne :+
         ; win if the opponent hasn't finished (or there is none)
@@ -1647,7 +1622,7 @@ hud_update:
         jmp @nos
 @speed: ldx #0
         jsr phys_speed
-        jsr fmt3
+        jsr fmt3w
         lda #3
         sta tmp2
         ldx #5

@@ -320,3 +320,42 @@ cash_add:
         sta SV_CASH+1
         sta SV_CASH+2
 @ok:    rts
+
+; fmt3w: A = low, spd_hi = high byte of a value 0-999 -> numbuf+5..7,
+; three digits with leading spaces
+fmt3w:
+        sta tmp0
+        lda spd_hi
+        sta tmp1
+        ldx #'0'-1
+@h:     inx
+        sec
+        lda tmp0
+        sbc #100
+        sta tmp0
+        lda tmp1
+        sbc #0
+        sta tmp1
+        bcs @h
+        lda tmp0
+        adc #100                ; carry clear: undo the last subtraction
+        stx numbuf+5
+        ldx #'0'-1
+        sec
+:       inx
+        sbc #10
+        bcs :-
+        adc #10+'0'
+        sta numbuf+7
+        stx numbuf+6
+        lda numbuf+5
+        cmp #'0'
+        bne @r
+        lda #' '
+        sta numbuf+5
+        lda numbuf+6
+        cmp #'0'
+        bne @r
+        lda #' '
+        sta numbuf+6
+@r:     rts

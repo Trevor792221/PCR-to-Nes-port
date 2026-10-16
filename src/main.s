@@ -86,7 +86,7 @@ opp_name:   .res 13
 opp_skill:  .res 1
 res_flags:  .res 1          ; RF_* bits
 res_et:     .res 2          ; ms
-res_trap:   .res 1
+res_trap:   .res 2          ; trap speed (mph or km/h)
 res_rt:     .res 2          ; reaction time ms
 res_opp_et: .res 2
 res_t60:    .res 2          ; 0-60 time ms

@@ -275,7 +275,7 @@ class Car:
                     self.rpm -= 24 if self.throttle else 80
             if not self.slip:
                 drive = tq * kg >> 8
-        resist = ROLL + (((self.v >> 12) & 0xFF) ** 2 * self.dk >> 16)
+        resist = ROLL + (min(255, self.v >> 12) ** 2 * self.dk >> 16)
         if not self.throttle and self.gear:
             resist += 20
         # traction

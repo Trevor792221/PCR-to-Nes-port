@@ -53,6 +53,7 @@ ph_nos_add: .res 2
 ph_nos_fr:  .res 2
 ph_shf_fr:  .res 2
 ph_tl:      .res 2          ; turbo level
+spd_hi:     .res 1          ; high byte of the last phys_speed result
 ph_rs_l:    .res 16         ; [car*8 + gear]
 ph_rs_h:    .res 16
 ph_kg_l:    .res 16
@@ -755,9 +756,13 @@ phys_step:
 
         ; --- resistance -------------------------------------------------------
 @resist:
-        ; s = (v >> 12) & $FF
+        ; s = min(255, v >> 12)
         lda ph_v2,x
-        asl a
+        cmp #$10
+        bcc :+
+        lda #$FF
+        bne @sat
+:       asl a
         asl a
         asl a
         asl a
@@ -768,7 +773,7 @@ phys_step:
         lsr a
         lsr a
         ora tmp0
-        sta m_a
+@sat:   sta m_a
         sta m_b
         jsr mul8
         lda m_r
@@ -1122,7 +1127,8 @@ phys_nitrous:
 ; ---------------------------------------------------------------------------
 ; Readouts
 ; ---------------------------------------------------------------------------
-; phys_speed: X = car -> A = mph (or km/h if the option is set)
+; phys_speed: X = car -> speed in mph (or km/h if the option is set) as a
+; 16-bit value: A = low byte, spd_hi = high byte (0-999).
 phys_speed:
         stx cx
         lda ph_v1,x
@@ -1140,11 +1146,20 @@ phys_speed:
         sta m_b+1
         jsr mul16
         ldx cx
-        lda m_r+2
+        lda m_r+3
         bne @max
         lda m_r+1
+        cmp #<1000
+        lda m_r+2
+        sbc #>1000
+        bcs @max
+        lda m_r+2
+        sta spd_hi
+        lda m_r+1
         rts
-@max:   lda #255
+@max:   lda #>999
+        sta spd_hi
+        lda #<999
         rts
 
 ; phys_best_launch: X = car -> tmp2/tmp3 = launch rpm for the AI

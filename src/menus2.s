@@ -469,7 +469,7 @@ tn_row:
         lda tn_sel
         beq @done
         jsr gear_top
-        jsr fmt_8
+        jsr fmt3w
         lda numbuf+5
         sta linebuf
         lda numbuf+6
@@ -567,6 +567,7 @@ gear_top:
         ldx #1
         jmp phys_speed
 @z:     lda #0
+        sta spd_hi
         rts
 
 str_tune:     .byte "TUNE", 0
