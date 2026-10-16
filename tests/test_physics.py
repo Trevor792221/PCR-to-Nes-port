@@ -20,7 +20,7 @@ def record(model, parts, final=None, gears=None):
     rec[0] = model
     rec[CR_PARTS:CR_PARTS + 10] = parts
     final = final if final is not None else gd.gear_raw(c[7])
-    gears = gears or [gd.gear_raw(g) for g in gd.GEARSETS[c[6]]]
+    gears = gears or [gd.gear_raw(g) for g in gd.car_gears(model)]
     rec[CR_FINAL] = final & 0xFF
     rec[CR_FINAL + 1] = final >> 8
     for i, g in enumerate(gears):
@@ -100,6 +100,21 @@ class Physics(unittest.TestCase):
         self.run_race(2, [2, 2, 2, 2, 2, 2, 2, 2, 2, 2], launch=6000)
         self.run_race(8, [4] * 10, launch=3000, x=1)
         self.run_race(11, [4, 4, 4, 4, 4, 4, 4, 0, 0, 4], launch=7000)   # wheelspin
+
+    def test_crate_car_never_spins_and_does_400(self):
+        for parts in ([0] * 10, [4] * 10):
+            cpu = self.run_race(gd.CRATE_CAR, parts, launch=9000, frames=900)
+            car = gd.Car(gd.CRATE_CAR, parts)
+            spun = []
+            orig = car.step
+
+            def step():
+                orig()
+                spun.append(car.spin)
+            car.step = step
+            gd.run(car, dist=30000)
+            self.assertFalse(any(spun), 'wheelspin with parts %r' % parts)
+            self.assertGreaterEqual(car.mph(), 400)
 
     def test_speed_readout_goes_past_255(self):
         cpu = CPU()

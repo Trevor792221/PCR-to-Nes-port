@@ -23,7 +23,7 @@ level_names:
         .byte "RACE  ", 0
         .byte "PRO   ", 0
 drive_names:
-        .byte "FWD", 0, "RWD", 0, "AWD", 0
+        .byte "FWD", 0, "RWD", 0, "AWD", 0, "AWD", 0
 
 ; car_name_ptr: A = model -> ptr0 = name (13 bytes per entry)
 car_name_ptr:

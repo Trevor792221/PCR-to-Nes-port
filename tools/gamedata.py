@@ -46,9 +46,12 @@ CURVES = [
 # ---------------------------------------------------------------------------
 # Cars.  All names are made up.
 # ---------------------------------------------------------------------------
-FWD, RWD, AWD = 0, 1, 2
-DRIVE_NAMES = ['FWD', 'RWD', 'AWD']
-DRIVE_FACTOR = [180, 225, 290]          # share of weight usable for launch *256
+FWD, RWD, AWD, AWDX = 0, 1, 2, 3
+DRIVE_NAMES = ['FWD', 'RWD', 'AWD', 'AWD']
+# share of weight usable for launch *256.  AWDX (crate car only) has
+# ground-effect grip far above anything its engine can put down: no wheelspin.
+DRIVE_FACTOR = [180, 225, 290, 8000]
+DRIVE_K = [df * 457 >> 6 for df in DRIVE_FACTOR]   # traction per grip point *256
 
 SHAPES = ['HATCH', 'COUPE', 'SEDAN', 'MUSCLE', 'TRUCK', 'SUPER']
 
@@ -73,8 +76,20 @@ CARS = [
     ('RAIJIN R',    1, 410, 1440, 8000, 2, 6, 3.80, AWD, .61,  98000,  0, 10),
     ('VELOCE V12',  5, 620, 1420, 8800, 2, 6, 3.60, RWD, .57, 190000,  0, 12),
     ('NOVA HYPER',  5, 950, 1520, 9200, 2, 7, 3.40, AWD, .55, 450000, 25, 15),
+    # crate-only, ultra rare: 400 mph, never spins its tyres
+    ('ZENITH X400', 6, 2300, 1150, 9500, 2, 7, 3.00, AWDX, .40, 600000, 0, 1),
 ]
 NCARS = len(CARS)
+NDEALER = 12                     # the dealer sells cars 0..NDEALER-1
+CRATE_CAR = 12
+
+# gear sets that differ from the default for their gear count
+CUSTOM_GEARS = {12: [1.80, 1.45, 1.20, 1.00, 0.85, 0.72, 0.60]}
+
+
+def car_gears(model):
+    c = CARS[model]
+    return CUSTOM_GEARS.get(model, GEARSETS[c[6]])
 
 # ---------------------------------------------------------------------------
 # Parts: 10 categories x 5 levels (0 = stock)
@@ -143,7 +158,7 @@ class Car:
         self.model = model
         self.ngears = c[6]
         final = final if final is not None else gear_raw(c[7])
-        gears = gears or [gear_raw(g) for g in GEARSETS[c[6]]]
+        gears = gears or [gear_raw(g) for g in car_gears(model)]
         # --- engine ---------------------------------------------------------
         hpm = 256 + sum(HP_BONUS.get(p, 0) * parts[p] for p in range(10))
         self.hpmult = hpm
@@ -152,8 +167,7 @@ class Car:
         self.limiter = self.redline + REDLINE_PAD
         m = c[3] * (256 - WEIGHT_CUT * parts[P_WEIGHT]) >> 8
         self.mass = m
-        k0h = teff * KC_HALF // m
-        self.k0h = u16(k0h)
+        self.k0h = min(65535, teff * KC_HALF // m)
         # curve stretched over this redline: idx = rpm*32/redline
         shape = CURVES[c[5]]
         tl = parts[P_TURBO]
@@ -184,7 +198,7 @@ class Car:
             self.kg.append(u16(self.k0h * r >> 15))
         # --- grip / aero ----------------------------------------------------
         grip = TIRE_GRIP[parts[P_TIRES]] + SUSP_GRIP * parts[P_SUSP]
-        self.trac = u16(grip * DRIVE_FACTOR[c[8]] * TRAC_K >> 14)
+        self.trac = u16(grip * DRIVE_K[c[8]] >> 8)
         self.trac_k = self.trac - (self.trac >> 2) - (self.trac >> 4)
         self.dk = u16(DKC * int(round(c[9] * 256)) // m)
         self.reset()

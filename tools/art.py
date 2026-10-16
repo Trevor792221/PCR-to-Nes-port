@@ -132,9 +132,27 @@ BODIES = {
         '................................',
         '................................',
     ], [8, 24]),
+    'PROTO': ([
+        '................................',
+        '................................',
+        '................................',
+        '................................',
+        'kkkkkk..........................',
+        'kppppk..........................',
+        '.kpk.........kkkkkkk............',
+        '.kpk......kkkpwwwwwwkkk.........',
+        'kkpkkkkkkkppkwwwwwwwwwwkkkkk....',
+        'kwpppppppppppkkkkkkkkkkppppppkkk',
+        'kpppp.......ppppppppppp......pwk',
+        'kppp.........ppppppppp........pk',
+        '.kkk..........kkkkkkkk.......kk.',
+        '................................',
+        '................................',
+        '................................',
+    ], [8, 25]),
 }
 
-SHAPE_ORDER = ['HATCH', 'COUPE', 'SEDAN', 'MUSCLE', 'TRUCK', 'SUPER']
+SHAPE_ORDER = ['HATCH', 'COUPE', 'SEDAN', 'MUSCLE', 'TRUCK', 'SUPER', 'PROTO']
 
 
 def car_pixels(name, frame=0):

@@ -989,6 +989,16 @@ crate_buy:
 
 ; crate_reward: roll and give the reward, message on rows 22-23
 crate_reward:
+        ; ultra rare: the crate-only car (standard 1/256, premium 5/256).
+        ; Needs a free garage slot, otherwise roll a normal reward.
+        jsr rand
+        ldx cr_sel
+        cmp ultra_odds,x
+        bcs @normal
+        jsr free_slot
+        bcs @normal
+        jmp give_ultra
+@normal:
         lda #100
         jsr rand_below
         sta tmp5
@@ -1197,7 +1207,8 @@ give_car:
         lda paint_list,x
         ldy #CR_PAINT
         sta (ptr1),y
-        lda tmp6
+        ldy #CR_MODEL           ; (rand_below used tmp6)
+        lda (ptr1),y
         jsr car_name_ptr
         ldy #0
 :       lda str_cr_car,y
@@ -1220,6 +1231,31 @@ give_car:
         jmp give_cash
 
 crate_map:    .byte T_CRATE_MAP
+ultra_odds:   .byte 1, 5
+
+; give_ultra: the crate-only car, gold, with a fanfare
+give_ultra:
+        lda #CRATE_CAR
+        jsr give_car
+        ldx #NSLOTS-1           ; find the new car and paint it gold
+@find:  txa
+        jsr slot_ptr
+        ldy #CR_MODEL
+        lda (ptr1),y
+        cmp #CRATE_CAR
+        beq @gold
+        dex
+        bpl @find
+        rts
+@gold:  ldy #CR_PAINT
+        lda #$28
+        sta (ptr1),y
+        jsr wait_frame
+        MOVI16 ptr0, str_cr_ultra
+        ldy #23
+        jmp vb_msg
+
+str_cr_ultra: .byte "*** ULTRA RARE - 400 MPH! ***", 0
 str_crates:   .byte "CRATES", 0
 str_cr0:      .byte "STANDARD CRATE    $2500", 0
 str_cr1:      .byte "PREMIUM CRATE   10 GEMS", 0

@@ -206,7 +206,13 @@ phys_setup:
         sta m_b+1
         jsr div32
         ldx cx
-        lda m_r
+        lda m_r+2               ; saturate at 65535 (only the crate car gets there)
+        ora m_r+3
+        beq :+
+        lda #$FF
+        sta m_r
+        sta m_r+1
+:       lda m_r
         sta ph_k0h_l,x
         lda m_r+1
         sta ph_k0h_h,x
@@ -402,7 +408,7 @@ phys_setup:
         inc tmp5
         jcc @gear
 
-        ; traction = (grip * df) * 457 >> 14
+        ; traction = grip * drive_k >> 8   (drive_k = df * 457 >> 6)
         ldy #CR_PARTS+P_SUSP
         lda (ptr0),y
         asl a
@@ -421,26 +427,15 @@ phys_setup:
         ldy ph_model,x
         lda car_drive,y
         tay
-        lda drive_factor_l,y
+        lda drive_k_l,y
         sta m_b
-        lda drive_factor_h,y
+        lda drive_k_h,y
         sta m_b+1
         jsr mul16
-        lda m_r
-        sta m_a
+        lda m_r+2               ; bytes 1..2 = >> 8
+        sta m_r+3
         lda m_r+1
-        sta m_a+1
-        lda #<457
-        sta m_b
-        lda #>457
-        sta m_b+1
-        jsr mul16
-        asl m_r+1               ; >> 14 = << 2, bytes 2..3
-        rol m_r+2
-        rol m_r+3
-        asl m_r+1
-        rol m_r+2
-        rol m_r+3
+        sta m_r+2
         ldx cx
         lda m_r+2
         sta ph_trac_l,x

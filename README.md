@@ -29,7 +29,7 @@ runs on real NES / Famicom hardware or any accurate emulator.
 | Tuning | Final-drive and individual gear ratios. Each gear shows its top speed. Gear tuning unlocks with a Race gearbox |
 | Dyno | Live dyno run that plots horsepower and torque curves, with peak HP and Nm |
 | Paint shop | Body, rim and window colours (24 colours each) with a live preview |
-| Crates | Standard (cash) and Premium (gems) crates. Rewards are cash, gems, free part upgrades or a whole car |
+| Crates | Standard (cash) and Premium (gems) crates. Rewards are cash, gems, free part upgrades or a whole car. Very rarely (1 in 256 standard, 5 in 256 premium) they hold the **Zenith X400**, a crate-only prototype racer that never spins its tires and tops out over 400 mph. Keep a garage slot free, or the roll goes to a normal reward |
 | Drag racing with manual shifting | 1/4 and 1/2 mile drag races. Rev on the line, launch on green, shift by hand, fire nitrous. Shift feedback: Perfect, Good, Early or Late |
 | Launch / wheelspin | Clutch-dump launch model: too many revs spin the tires (with smoke), too few bog the engine |
 | Street racing | Half-mile street race on 3 lanes with traffic. Change lanes to dodge cars; crashing costs you your speed |

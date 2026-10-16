@@ -127,6 +127,52 @@ class Game(unittest.TestCase):
         self.assertNotEqual(s.wram(SV_CASH, 3), cash)
         self.assertEqual(s.wram(0x6013), 1)          # crates opened
 
+    def test_ultra_rare_crate_car(self):
+        s = new_game()
+        s.nes[SV_GEMS] = 20                          # premium crate costs 10
+        s.garage_goto(G_CRATES)
+        s.press(A)
+        s.step(40)
+        s.press(DOWN)                                # premium crate
+        # seed the RNG so the crate's first roll is a hit (< 5 of 256)
+        lo, hi = seed_for(lambda r: r < 5)
+        s.nes[s.sym['rng']] = lo
+        s.nes[s.sym['rng'] + 1] = hi
+        s.press(A)
+        s.step(80)
+        self.assertEqual(s.wram(SV_CARS + 32), 12, 'crate car in slot 1')
+        self.assertEqual(s.wram(SV_CARS + 32 + 11), 0x28, 'painted gold')
+        # the dealer never sells it: browsing left from the first car wraps to 11
+        s.press(B, hold=12)
+        s.step(40)
+        s.garage_goto(G_DEALER)
+        s.press(A)
+        s.step(40)
+        s.press(LEFT)
+        s.step(30)
+        self.assertEqual(s.mem('dl_model'), 11)
+
+
+def rand_step(lo, hi):
+    """One call of the ROM's rand (8-step Galois LFSR) -> (result, hi)."""
+    a = lo
+    for _ in range(8):
+        c = a >> 7
+        a = (a << 1) & 0xFF
+        c2 = hi >> 7
+        hi = ((hi << 1) | c) & 0xFF
+        if c2:
+            a ^= 0x2D
+    return a, hi
+
+
+def seed_for(want):
+    for hi in range(1, 256):
+        for lo in range(256):
+            if want(rand_step(lo, hi)[0]):
+                return lo, hi
+    raise AssertionError('no seed')
+
 
 if __name__ == '__main__':
     unittest.main()

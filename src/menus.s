@@ -907,9 +907,9 @@ make_rival:
         sbc #2
         bpl :+
         lda #0
-:       cmp #NCARS-1            ; the hypercar only appears as a boss
+:       cmp #NDEALER-1          ; the hypercar only appears as a boss
         bcc :+
-        lda #NCARS-2
+        lda #NDEALER-2
 :       pha
         jsr opp_from_model
         ; random paint from the paint list
@@ -1271,7 +1271,7 @@ dealer_screen:
         beq :+
         ldx dl_model
         bne @dec
-        ldx #NCARS
+        ldx #NDEALER
 @dec:   dex
         stx dl_model
         jmp @chg
@@ -1280,7 +1280,7 @@ dealer_screen:
         beq :+
         ldx dl_model
         inx
-        cpx #NCARS
+        cpx #NDEALER
         bcc @inc
         ldx #0
 @inc:   stx dl_model
