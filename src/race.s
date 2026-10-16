@@ -763,7 +763,13 @@ race_run:
         bcc @nl
         lda #SFX_SHIFT
         jsr sfx_play
-@nl:    lda pad_new
+@nl:    lda race_kind           ; cruise: unlimited nitrous, the bottle
+        cmp #RK_CRUISE          ; refills as soon as a shot ends
+        bne @nf
+        lda ph_nos_on
+        bne @nf
+        sta ph_nos_t
+@nf:    lda pad_new
         and #BTN_B
         beq @nb
         ldx #0

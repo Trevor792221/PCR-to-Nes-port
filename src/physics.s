@@ -54,6 +54,13 @@ ph_nos_fr:  .res 2
 ph_shf_fr:  .res 2
 ph_tl:      .res 2          ; turbo level
 spd_hi:     .res 1          ; high byte of the last phys_speed result
+ep_hp:      .res 2          ; phys_peak_hp results
+ep_hp_rpm:  .res 2
+ep_tq:      .res 2
+ep_tq_rpm:  .res 2
+ep_nm:      .res 2
+ep_top:     .res 2
+ep_b:       .res 1
 ph_rs_l:    .res 16         ; [car*8 + gear]
 ph_rs_h:    .res 16
 ph_kg_l:    .res 16
@@ -1278,27 +1285,121 @@ phys_best_launch:
         jmp @l
 @done:  rts
 
-; phys_peak_hp: X = car -> m_a(16) = displayed peak horsepower
-;   hp * (hpm + boost_peak) >> 8 where boost adds turbo_boost[level]
+; phys_peak_hp: X = car -> m_a = peak horsepower, measured from the
+; engine's own torque curve (the one the race physics uses), at full boost.
+; Also sets ep_tq / ep_tq_rpm (peak Nm) and ep_hp / ep_hp_rpm.  Menus and
+; the dyno both use this, so they always agree.
+;   torque(b) = teff * (curve[b] + bcurve[b]) >> 8   (Nm, constant per
+;   256-rpm bucket b, as in phys_step); power is highest at the top of each
+;   bucket, or just under the limiter: hp = Nm * rpm / 7121.
 phys_peak_hp:
         stx cx
-        ldy ph_tl,x
-        clc
-        lda ph_hpm_l,x
-        adc turbo_boost,y
-        sta m_b
-        lda ph_hpm_h,x
-        adc #0
-        sta m_b+1
-        ldy ph_model,x
-        lda car_hp_l,y
-        sta m_a
-        lda car_hp_h,y
-        sta m_a+1
-        jsr mul16
+        txa
+        beq :+
+        lda #48
+:       sta ph_cb
+        lda #0
+        sta ep_hp
+        sta ep_hp+1
+        sta ep_tq
+        sta ep_tq+1
+        sta ep_b
+@b:     ; stop once the bucket starts at or past the limiter
         ldx cx
-        lda m_r+1
+        lda ep_b
+        cmp ph_lim_h,x
+        bcc @in
+        jne @done
+        lda ph_lim_l,x
+        jeq @done               ; bucket starts exactly at the limiter
+@in:    ; top rpm of this bucket, capped at limiter - 1
+        lda #$FF
+        sta ep_top
+        lda ep_b
+        sta ep_top+1
+        lda ep_top
+        cmp ph_lim_l,x
+        lda ep_top+1
+        sbc ph_lim_h,x
+        bcc :+
+        sec
+        lda ph_lim_l,x
+        sbc #1
+        sta ep_top
+        lda ph_lim_h,x
+        sbc #0
+        sta ep_top+1
+:       ; Nm = teff * (curve + bcurve) >> 8
+        lda ep_b
+        clc
+        adc ph_cb
+        tay
+        clc
+        lda ph_curve,y
+        adc ph_bcurve,y
         sta m_a
+        lda #0
+        adc #0
+        sta m_a+1
+        lda ph_teff_l,x
+        sta m_b
+        lda ph_teff_h,x
+        sta m_b+1
+        jsr mul16
+        lda m_r+1
+        sta ep_nm
         lda m_r+2
+        sta ep_nm+1
+        ; peak torque (rpm: middle of the bucket)
+        lda ep_tq
+        cmp ep_nm
+        lda ep_tq+1
+        sbc ep_nm+1
+        bcs :+
+        lda ep_nm
+        sta ep_tq
+        lda ep_nm+1
+        sta ep_tq+1
+        lda #128
+        sta ep_tq_rpm
+        lda ep_b
+        sta ep_tq_rpm+1
+:       ; hp = Nm * top / 7121
+        lda ep_nm
+        sta m_a
+        lda ep_nm+1
+        sta m_a+1
+        lda ep_top
+        sta m_b
+        lda ep_top+1
+        sta m_b+1
+        jsr mul16
+        lda #<7121
+        sta m_b
+        lda #>7121
+        sta m_b+1
+        jsr div32
+        lda ep_hp
+        cmp m_r
+        lda ep_hp+1
+        sbc m_r+1
+        bcs :+
+        lda m_r
+        sta ep_hp
+        lda m_r+1
+        sta ep_hp+1
+        lda ep_top
+        sta ep_hp_rpm
+        lda ep_top+1
+        sta ep_hp_rpm+1
+:       inc ep_b
+        lda ep_b
+        cmp #48
+        beq @done
+        jmp @b
+@done:  ldx cx
+        lda ep_hp
+        sta m_a
+        lda ep_hp+1
         sta m_a+1
         rts

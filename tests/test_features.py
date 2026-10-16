@@ -6,7 +6,7 @@ import unittest
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 from harness import *          # noqa: F401,F403
-from test_game import new_game, start_race, SV_CASH, SV_GEMS, SV_CARS, G_RACE
+from test_game import new_game, start_race, SV_CASH, SV_GEMS, SV_CARS, G_RACE, G_TUNE, G_DYNO
 from test_physics import record
 
 SV_SECRET, SV_RACES, SV_PBEST, SV_PBCAR, SV_TOPSPD = 0x6018, 0x6019, 0x601B, 0x601D, 0x601E
@@ -177,6 +177,65 @@ class Features(unittest.TestCase):
         s.press(SELECT)
         s.step(2)
         self.assertEqual(s.mem('game_mode'), 1, 'quit straight to the garage')
+
+    def test_cruise_nitrous_is_unlimited(self):
+        s = new_game()
+        give_car(s, 0, 2, 2)                         # sport nitrous
+        s.garage_goto(G_RACE)
+        s.press(A)
+        s.step(30)
+        s.list_goto('rs_sel', 5)
+        s.press(A)
+        s.step(40)
+        shots = 0
+        for f in range(3000):
+            b = A
+            if s.mem('ph_gear') == 0:
+                b |= RIGHT if f % 4 < 2 else 0
+            elif (rpm(s) >= redline(s) - 300 and s.mem('ph_shift_t') == 0
+                  and s.mem('ph_slip') == 0 and f % 4 < 2):
+                b |= RIGHT
+            if s.mem('ph_gear') >= 2 and f % 8 < 2:
+                b |= B
+            was = s.mem('ph_nos_on')
+            s.step(1, b)
+            shots += not was and s.mem('ph_nos_on')
+        self.assertGreaterEqual(shots, 3, 'bottle refills while cruising')
+
+    def test_seven_gear_tune_menu(self):
+        s = new_game()
+        give_car(s, 0, 11, 4)                        # Nova Hyper, race gearbox
+        s.garage_goto(G_TUNE)
+        s.press(A)
+        s.step(40)
+        self.assertEqual(s.mem('ui_count'), 10, 'final, 7 gears, reset, back')
+        rec = SV_CARS
+        g1 = s.wram(rec + 16, 2)
+        s.list_goto('ui_sel', 1)
+        s.press(RIGHT)
+        s.step(5)
+        self.assertNotEqual(s.wram(rec + 16, 2), g1)
+        s.list_goto('ui_sel', 8)                     # RESET TO STOCK
+        s.press(A)
+        s.step(10)
+        self.assertEqual(s.wram(rec + 16, 2), g1)
+
+    def test_dyno_hp_matches_the_garage(self):
+        for model, lvl in ((0, 0), (5, 2), (11, 4)):
+            s = new_game()
+            give_car(s, 0, model, lvl)
+            s.garage_goto(G_DYNO)
+            s.press(A)
+            s.step(30)
+            s.press(B)
+            s.step(40)
+            garage = s.mem16('ep_hp')
+            s.garage_goto(G_DYNO)
+            s.press(A)
+            s.step(30)
+            s.press(A)
+            s.step(400)
+            self.assertEqual(s.mem16('ep_hp'), garage)
 
     def test_quit_to_title_from_options(self):
         s = new_game()

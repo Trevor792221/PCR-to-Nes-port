@@ -241,9 +241,9 @@ tune_screen:
         jsr print
         lda #0
         sta text_attr
-        PRINT str_tn_head, 3, 6
-        PRINT str_tn_help, 2, 26
-        PRINT str_tn_help2, 2, 27
+        PRINT str_tn_head, 3, 5
+        PRINT str_tn_help, 2, 27
+        PRINT str_tn_help2, 2, 28
         jsr attr_upload
         lda #0
         sta oam_idx
@@ -261,7 +261,7 @@ tune_screen:
         sta ui_sel
         lda #1
         sta ui_x
-        lda #8
+        lda #7                  ; up to 10 rows: 7..25
         sta ui_y0
         lda #2
         sta ui_dy
@@ -329,7 +329,7 @@ tune_screen:
         cmp #3
         bcs @ok
         MOVI16 ptr0, str_tn_lock
-        ldy #24
+        ldy #26
         jsr vb_msg
         lda #SFX_ERROR
         jsr sfx_play
@@ -412,7 +412,7 @@ tn_all:
         pla
         sta tn_sel
         MOVI16 ptr0, str_blank2
-        ldy #24
+        ldy #26
         jmp vb_msg
 
 
@@ -421,7 +421,7 @@ tn_row:
         lda tn_sel
         asl a
         clc
-        adc #8
+        adc #7
         sta tn_row_y            ; screen row
         jsr cur_car_ptr
         tax
@@ -1697,24 +1697,26 @@ dyno_run:
 
 ; dyno_text: peak figures on rows 18-21
 dyno_text:
-        lda dy_peak_hp
+        ldx #1                  ; same peak figures as the menus
+        jsr phys_peak_hp
+        lda ep_hp
         sta m_a
-        lda dy_peak_hp+1
+        lda ep_hp+1
         sta m_a+1
-        lda dy_peak_hr
+        lda ep_hp_rpm
         sta tmp2
-        lda dy_peak_hr+1
+        lda ep_hp_rpm+1
         sta tmp3
         MOVI16 ptr2, str_dy_php
         ldy #18
         jsr dyno_line
-        lda dy_peak_tq
+        lda ep_tq
         sta m_a
-        lda dy_peak_tq+1
+        lda ep_tq+1
         sta m_a+1
-        lda dy_peak_tr
+        lda ep_tq_rpm
         sta tmp2
-        lda dy_peak_tr+1
+        lda ep_tq_rpm+1
         sta tmp3
         MOVI16 ptr2, str_dy_ptq
         ldy #20
