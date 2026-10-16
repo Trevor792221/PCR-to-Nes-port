@@ -132,6 +132,7 @@ RK_QUICK  = 1
 RK_STREET = 2
 RK_TEST   = 3
 RK_SECRET = 4                   ; hidden 12th boss (needs the Zenith X400)
+RK_CRUISE = 5                   ; endless driving with traffic, quit from pause
 
 ; --- result flags ------------------------------------------------------------
 RF_WIN    = $01

@@ -58,13 +58,13 @@ class Features(unittest.TestCase):
 
     def test_secret_boss_hidden_without_zenith(self):
         s = new_game()
-        self.assertEqual(self.race_select_count(s), 6)
+        self.assertEqual(self.race_select_count(s), 7)
 
     def test_secret_boss_race_and_reward(self):
         s = new_game()
         give_car(s, 0, 12, 4)
-        self.assertEqual(self.race_select_count(s), 7)
-        s.list_goto('rs_sel', 6)
+        self.assertEqual(self.race_select_count(s), 8)
+        s.list_goto('rs_sel', 7)
         s.press(A)
         s.step(5)
         self.assertEqual(s.mem('race_kind'), 4)
@@ -146,6 +146,37 @@ class Features(unittest.TestCase):
         s.step(10)
         self.assertEqual(s.wram(SV_CARS + 32), 12, 'bought the Zenith')
         self.assertEqual(s.wram(SV_CASH, 3), 100000)
+
+    def test_cruise_mode(self):
+        s = new_game()
+        s.garage_goto(G_RACE)
+        s.press(A)
+        s.step(30)
+        s.list_goto('rs_sel', 5)
+        s.press(A)
+        s.step(40)
+        self.assertEqual(s.mem('race_kind'), 5)
+        self.assertEqual(s.mem('rc_opp'), 0, 'no rival')
+        self.assertEqual(s.mem('rc_state'), 1, 'no start lights')
+        traffic = 0
+        for f in range(4000):                        # past the 60 s race limit
+            b = A
+            if s.mem('ph_gear') == 0:
+                b |= RIGHT if f % 4 < 2 else 0
+            elif (rpm(s) >= redline(s) - 300 and s.mem('ph_shift_t') == 0
+                  and s.mem('ph_slip') == 0 and f % 4 < 2):
+                b |= RIGHT
+            s.step(1, b)
+            traffic = max(traffic, sum(s.mem('tr_on', i) for i in range(3)))
+        self.assertEqual(s.mem('game_mode'), 2, 'still cruising')
+        self.assertEqual(s.mem('lag'), 0)
+        self.assertGreater(traffic, 0)
+        self.assertEqual(s.wram(SV_RACES, 2), 0, 'cruising is not a race')
+        s.press(START)
+        s.step(10)
+        s.press(SELECT)
+        s.step(2)
+        self.assertEqual(s.mem('game_mode'), 1, 'quit straight to the garage')
 
     def test_quit_to_title_from_options(self):
         s = new_game()

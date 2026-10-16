@@ -445,21 +445,22 @@ race_select:
         MOVI16 ptr0, str_rsel
         jsr draw_header
         PRINT str_rs0, 4, 4
-        PRINT str_rs1, 4, 7
-        PRINT str_rs2, 4, 10
-        PRINT str_rs3, 4, 13
-        PRINT str_rs4, 4, 16
-        PRINT str_rs5, 4, 19
-        lda #6
+        PRINT str_rs1, 4, 6
+        PRINT str_rs2, 4, 8
+        PRINT str_rs3, 4, 10
+        PRINT str_rs4, 4, 12
+        PRINT str_rs7, 4, 14
+        PRINT str_rs5, 4, 16
+        lda #7
         sta ui_count
         jsr has_zenith
         bne :+
         lda #$20
         sta text_attr
-        PRINT str_rs6, 4, 22
+        PRINT str_rs6, 4, 18
         lda #0
         sta text_attr
-        lda #7
+        lda #8
         sta ui_count
 :       BOX 1, 24, 30, 5
         jsr attr_upload
@@ -477,7 +478,7 @@ race_select:
         sta ui_x
         lda #4
         sta ui_y0
-        lda #3
+        lda #2
         sta ui_dy
         lda #1
         sta ui_cols
@@ -528,11 +529,16 @@ race_select:
 @back:  sec
         rts
 @pick:  lda ui_sel
-        cmp #5
+        cmp #6
         beq @back
         cmp #2
         beq @loop               ; distance row: use left/right
-        cmp #6
+        cmp #5
+        bne :+
+        jsr setup_cruise
+        clc
+        rts
+:       cmp #7
         bne :+
         jsr setup_secret
         clc
@@ -577,7 +583,7 @@ rs_refresh:
         lda diff_names+1,x
         sta ptr0+1
         ldx #18
-        ldy #7
+        ldy #6
         jsr vb_str
         lda race_half
         asl a
@@ -587,7 +593,7 @@ rs_refresh:
         lda dist_names+1,x
         sta ptr0+1
         ldx #18
-        ldy #10
+        ldy #8
         jsr vb_str
         ; info box rows 25..26
         lda rs_sel
@@ -610,7 +616,11 @@ rs_refresh:
         jsr boss_index
         jsr boss_line
         jmp @show
-@n0:    cmp #1
+@n0:    cmp #5
+        bne :+
+        MOVI16 ptr0, str_i7b
+        jmp @show
+:       cmp #1
         bne @n1
         ; bet
         jsr calc_bet
@@ -626,7 +636,7 @@ rs_refresh:
         sta linebuf,y
         MOVI16 ptr0, linebuf
         jmp @show
-@n1:    cmp #6
+@n1:    cmp #7
         bne @n2
         MOVI16 ptr0, str_i6b
         jmp @show
@@ -651,6 +661,7 @@ str_rs3:    .byte "STREET RACE", 0
 str_rs4:    .byte "TEST RUN", 0
 str_rs5:    .byte "BACK", 0
 str_rs6:    .byte "??? SECRET BOSS", 0
+str_rs7:    .byte "CRUISE", 0
 str_poor:   .byte "NOT ENOUGH CASH FOR THE BET", 0
 str_bet:    .byte "BET ", 0
 diff_names: .word str_easy, str_med, str_hard
@@ -660,7 +671,7 @@ str_hard:   .byte "< HARD   >", 0
 dist_names: .word str_q, str_h
 str_q:      .byte "< 1/4 MILE >", 0
 str_h:      .byte "< 1/2 MILE >", 0
-rs_info:    .word str_i0, str_i1, str_i2, str_i3, str_i4, str_i5, str_i6
+rs_info:    .word str_i0, str_i1, str_i2, str_i3, str_i4, str_i7, str_i5, str_i6
 str_i0:     .byte "BEAT THE 10 STREET BOSSES", 0
 str_i1:     .byte "RANDOM RIVAL, WIN THE BET", 0
 str_i2:     .byte "LEFT/RIGHT: RACE LENGTH", 0
@@ -669,6 +680,8 @@ str_i4:     .byte "SOLO RUN, TIME YOUR CAR", 0
 str_i5:     .byte "BACK TO THE GARAGE", 0
 str_i6:     .byte "ONLY AN X400 CAN TAKE IT ON", 0
 str_i6b:    .byte "ECLIPSE - WIN $500000", 0
+str_i7:     .byte "ENDLESS ROAD WITH TRAFFIC", 0
+str_i7b:    .byte "START, THEN SELECT: EXIT", 0
 
 ; calc_bet: m_a = bet for race_diff
 calc_bet:
@@ -868,6 +881,18 @@ setup_street:
         sta race_kind
         lda #1
         jmp set_dist
+
+setup_cruise:
+        lda #RK_CRUISE
+        sta race_kind
+        lda #0
+        sta race_bet
+        sta race_bet+1
+        sta race_bet+2
+        lda #$FF                ; no finish line
+        sta race_dist
+        sta race_dist+1
+        rts
 
 setup_test:
         lda #RK_TEST

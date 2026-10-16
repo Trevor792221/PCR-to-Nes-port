@@ -169,12 +169,16 @@ race_setup:
         lda race_kind
         cmp #RK_TEST
         beq :+
+        cmp #RK_CRUISE
+        beq :+
         lda #1
         sta rc_opp
 :       lda race_kind
         cmp #RK_STREET
-        bne :+
-        lda #1
+        beq :+
+        cmp #RK_CRUISE
+        bne :++
+:       lda #1
         sta rc_street
 :
         ; copy the map to WRAM, then draw it in both nametables
@@ -320,6 +324,18 @@ race_setup:
         lda #1
         sta msg_dirty
         sta tree_dirty
+        lda race_kind           ; cruise: no lights, no finish line
+        cmp #RK_CRUISE
+        bne :+
+        lda #RS_RUN
+        sta rc_state
+        lda #4
+        sta rc_tree
+        sta rc_green
+        lda #2
+        sta fin_done
+        MOVI16 msg_ptr, str_m_cruise
+:
         jsr hud_update
         lda frame
         sta last_fr
@@ -452,7 +468,12 @@ race_attrs:
 
 ; draw_hud: static HUD text (PPU off)
 draw_hud:
-        ; row 1: progress track
+        lda race_kind
+        cmp #RK_CRUISE
+        bne @track
+        PRINT str_h_cruise, 1, 1
+        jmp @rest
+@track: ; row 1: progress track
         lda #$20
         ldx #$21
         jsr vram_addr
@@ -471,7 +492,8 @@ draw_hud:
         PRINT str_h_half, 29, 1
         jmp :++
 :       PRINT str_h_quart, 29, 1
-:       PRINT str_h_rpm, 1, 2
+:
+@rest:  PRINT str_h_rpm, 1, 2
         PRINT str_h_g, 25, 2
         jsr speed_unit_r
         ldx #1
@@ -516,6 +538,7 @@ speed_unit_r:
         rts
 
 str_h_quart: .byte "1/4", 0
+str_h_cruise: .byte "CRUISE   START:PAUSE", 0
 str_h_half:  .byte "1/2", 0
 str_h_rpm:   .byte "RPM", 0
 str_h_g:     .byte "G", 0
@@ -598,7 +621,11 @@ race_frame:
         sta ph_thr+1
 @phys:  ldx #0
         jsr phys_step
+        lda race_kind
+        cmp #RK_CRUISE
+        beq :+                  ; endless: no finish
         jsr check_finish0
+:
         lda rc_opp
         beq :+
         ldx #1
@@ -704,7 +731,10 @@ race_run:
         bcc :+
         ldx #0
 :       stx rc_ms3
-        ; time limit 60 s -> end
+        ; time limit 60 s -> end (not when cruising)
+        lda race_kind
+        cmp #RK_CRUISE
+        beq :+
         lda rc_t+1
         cmp #>3600
         bcc :+
@@ -808,7 +838,12 @@ clk_add:
         inc clk-1,x
 @ok:    dex
         bne @c
-        rts
+        lda clk                 ; wrap 99.999 -> 00.000 (cruising)
+        cmp #10
+        bcc :+
+        lda #0
+        sta clk
+:       rts
 
 
 ; mph_raw: X = car -> A = mph (ignores the km/h option)
@@ -1804,7 +1839,10 @@ light_tile:
 race_sprites:
         lda #4
         sta oam_idx
-        ; progress markers on row 1
+        ; progress markers on row 1 (not when cruising)
+        lda race_kind
+        cmp #RK_CRUISE
+        beq :+
         ldx #0
         jsr marker
         lda rc_opp
@@ -2116,8 +2154,9 @@ race_pause:
         sta quit
         lda #RS_END
         sta rc_state
-        lda #0
+        lda #1                  ; ends on the next frame (race_frame counts it down)
         sta rc_endt
+        lda #0
         sta paused
 @r:     jmp hud_update
 
@@ -2195,6 +2234,7 @@ frames_ms:
         rts
 
 str_m_rev:   .byte "HOLD A TO REV", 0
+str_m_cruise: .byte "RIGHT: DRIVE", 0
 str_m_go:    .byte "GO! PRESS RIGHT", 0
 str_m_foul:  .byte "FOUL START!", 0
 str_m_perf:  .byte "PERFECT SHIFT!", 0
