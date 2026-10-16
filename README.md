@@ -1,5 +1,10 @@
 # Pixel Racer NES
 
+[![Download ROM](https://img.shields.io/badge/Download-Pixel%20Racer%20ROM%20(.nes)-2ea44f?style=for-the-badge&logo=github)](https://github.com/Trevor792221/PCR-to-Nes-port/releases/latest/download/pxracer.nes)
+[![Download soundtrack](https://img.shields.io/badge/Download-Soundtrack%20(.zip)-1f6feb?style=for-the-badge&logo=github)](https://github.com/Trevor792221/PCR-to-Nes-port/releases/latest/download/pixel-racer-soundtrack.zip)
+
+Every version is on the [Releases page](https://github.com/Trevor792221/PCR-to-Nes-port/releases).
+
 An NES demake of the drag-racing and car-building game style made popular by
 **Pixel Car Racer** on Android. It's written from scratch in 6502 assembly and
 runs on real NES / Famicom hardware or any accurate emulator.
@@ -69,7 +74,12 @@ make            # -> build/pxracer.nes
 make test       # needs: pip install cynes py65 numpy pillow
 ```
 
-A prebuilt ROM is at [`release/pxracer.nes`](release/pxracer.nes).
+A prebuilt ROM is also in the repo at [`release/pxracer.nes`](release/pxracer.nes).
+
+To publish a new release, push a version tag (`git tag v1.1 && git push
+origin v1.1`), or run the **release** workflow from the Actions tab. It
+builds and tests the ROM, then attaches it and the soundtrack to a GitHub
+Release, which is where the download buttons point.
 
 ## Soundtrack
 

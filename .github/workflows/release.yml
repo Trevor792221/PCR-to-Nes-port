@@ -1,0 +1,48 @@
+name: release
+# Publishes a GitHub Release with the ROM and the soundtrack attached.
+# Push a v* tag, or run it from the Actions tab ("Run workflow") with a
+# version such as v1.1.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Version tag to publish, e.g. v1.1
+        required: true
+        default: v1.0
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cc65 zip
+          pip install cynes py65 numpy pillow
+      - name: Build and test
+        run: |
+          make
+          make test
+      - name: Package
+        run: |
+          mkdir -p dist
+          cp build/pxracer.nes dist/pxracer.nes
+          python3 tools/render_wav.py dist/soundtrack
+          (cd dist && zip -r pixel-racer-soundtrack.zip soundtrack)
+          cp dist/soundtrack/*.wav dist/
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.tag || github.ref_name }}
+          target_commitish: ${{ github.sha }}
+          name: Pixel Racer NES ${{ inputs.tag || github.ref_name }}
+          body_path: release/RELEASE_NOTES.md
+          files: |
+            dist/pxracer.nes
+            dist/pixel-racer-soundtrack.zip
+            dist/01-midnight-garage.wav
+            dist/02-win.wav
+            dist/03-lose.wav
