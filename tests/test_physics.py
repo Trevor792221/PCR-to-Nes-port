@@ -1,0 +1,111 @@
+"""The 6502 physics must match the Python reference model in
+tools/gamedata.py exactly, frame by frame."""
+import os
+import sys
+import unittest
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
+sys.path.insert(0, os.path.join(os.path.dirname(HERE), 'tools'))
+
+import gamedata as gd
+from cpu import CPU
+
+CR_PARTS, CR_FINAL, CR_GEARS = 1, 14, 16
+
+
+def record(model, parts, final=None, gears=None):
+    c = gd.CARS[model]
+    rec = [0] * 32
+    rec[0] = model
+    rec[CR_PARTS:CR_PARTS + 10] = parts
+    final = final if final is not None else gd.gear_raw(c[7])
+    gears = gears or [gd.gear_raw(g) for g in gd.GEARSETS[c[6]]]
+    rec[CR_FINAL] = final & 0xFF
+    rec[CR_FINAL + 1] = final >> 8
+    for i, g in enumerate(gears):
+        rec[CR_GEARS + 2 * i] = g & 0xFF
+        rec[CR_GEARS + 2 * i + 1] = g >> 8
+    return rec
+
+
+class Physics(unittest.TestCase):
+    def setup_car(self, cpu, slot, model, parts):
+        rec = record(model, parts)
+        base = cpu.sym['tmp_rec']
+        cpu.mem[base:base + 32] = bytes(rec)
+        cpu.put('ptr0', base, size=2)
+        cpu.call('phys_setup', x=slot)
+        return gd.Car(model, parts)
+
+    def state(self, cpu, x):
+        g = lambda n: cpu.get(n, x)
+        return dict(v=g('ph_v0') | g('ph_v1') << 8 | g('ph_v2') << 16,
+                    wv=g('ph_w0') | g('ph_w1') << 8 | g('ph_w2') << 16,
+                    pos=g('ph_p0') | g('ph_p1') << 8 | g('ph_p2') << 16,
+                    rpm=g('ph_rpm_l') | g('ph_rpm_h') << 8,
+                    gear=g('ph_gear'), spool=g('ph_spool'),
+                    spin=g('ph_spin'), slip=g('ph_slip'))
+
+    def py_state(self, car):
+        return dict(v=car.v, wv=car.wv, pos=car.pos, rpm=car.rpm, gear=car.gear,
+                    spool=car.spool, spin=int(car.spin), slip=int(car.slip))
+
+    def check_setup(self, cpu, x, car):
+        self.assertEqual(cpu.get('ph_k0h_l', x) | cpu.get('ph_k0h_h', x) << 8, car.k0h)
+        self.assertEqual(cpu.get('ph_trac_l', x) | cpu.get('ph_trac_h', x) << 8, car.trac)
+        self.assertEqual(cpu.get('ph_dk_l', x) | cpu.get('ph_dk_h', x) << 8, car.dk)
+        for gi in range(1, car.ngears + 1):
+            i = x * 8 + gi
+            self.assertEqual(cpu.get('ph_rs_l', i) | cpu.get('ph_rs_h', i) << 8, car.rs[gi])
+            self.assertEqual(cpu.get('ph_kg_l', i) | cpu.get('ph_kg_h', i) << 8, car.kg[gi])
+        for b in range(48):
+            self.assertEqual(cpu.get('ph_curve', x * 48 + b), car.curve[b], 'curve %d' % b)
+            self.assertEqual(cpu.get('ph_bcurve', x * 48 + b), car.bcurve[b], 'bcurve %d' % b)
+
+    def run_race(self, model, parts, launch, x=0, frames=900):
+        cpu = CPU()
+        car = self.setup_car(cpu, x, model, parts)
+        self.check_setup(cpu, x, car)
+        car.reset()
+        # rev up, launch, shift near the redline, nitrous from 2nd gear
+        for f in range(frames):
+            if f < 120:
+                thr = car.rpm < launch
+            else:
+                thr = True
+            car.throttle = thr
+            cpu.put('ph_thr', int(thr), x)
+            if f == 120:
+                car.shift_up()
+                cpu.call('phys_shift_up', x=x)
+            elif f > 120 and car.gear < car.ngears and car.rpm >= car.redline - 250 \
+                    and not car.shift_t and not car.slip:
+                car.shift_up()
+                cpu.call('phys_shift_up', x=x)
+            if car.gear >= 2 and f % 7 == 0:
+                car.nitrous()
+                cpu.call('phys_nitrous', x=x)
+            car.step()
+            cpu.call('phys_step', x=x)
+            self.assertEqual(self.state(cpu, x), self.py_state(car),
+                             'model %d frame %d' % (model, f))
+        return cpu
+
+    def test_every_car_stock(self):
+        for m in range(gd.NCARS):
+            self.run_race(m, [0] * 10, launch=4500, frames=600)
+
+    def test_upgraded_cars(self):
+        self.run_race(2, [2, 2, 2, 2, 2, 2, 2, 2, 2, 2], launch=6000)
+        self.run_race(8, [4] * 10, launch=3000, x=1)
+        self.run_race(11, [4, 4, 4, 4, 4, 4, 4, 0, 0, 4], launch=7000)   # wheelspin
+
+    def test_step_is_fast_enough(self):
+        cpu = self.run_race(10, [3] * 10, launch=5000, frames=300)
+        cpu.call('phys_step', x=0)
+        self.assertLess(cpu.cycles, 3500)
+
+
+if __name__ == '__main__':
+    unittest.main()

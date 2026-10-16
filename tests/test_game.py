@@ -1,0 +1,132 @@
+"""Play the ROM in the cynes emulator: menus, races, saving."""
+import os
+import sys
+import unittest
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
+from harness import *          # noqa: F401,F403
+
+SV_CASH, SV_GEMS, SV_LEVEL, SV_LADDER = 0x6004, 0x6007, 0x600B, 0x600C
+SV_CARS = 0x6020
+G_RACE, G_PARTS, G_MYCARS, G_TUNE, G_DEALER, G_PAINT, G_CRATES, G_DYNO, G_OPTIONS = range(9)
+
+
+def new_game():
+    s = Sim(boot=120)
+    s.press(DOWN)
+    s.press(A)                  # NEW GAME
+    s.step(10)
+    s.press(A)                  # confirm
+    s.step(40)
+    assert s.mem('game_mode') == 1
+    return s
+
+
+def start_race(s, item):
+    s.garage_goto(G_RACE)
+    s.press(A)
+    s.step(30)
+    s.list_goto('rs_sel', item)
+    s.press(A)
+    s.step(5)
+
+
+class Game(unittest.TestCase):
+    def test_boot_title(self):
+        s = Sim(boot=120)
+        self.assertEqual(s.mem('game_mode'), 0)
+        self.assertGreater(s.mem16('frame'), 50)     # NMI running
+
+    def test_new_game_state(self):
+        s = new_game()
+        self.assertEqual(s.wram(SV_CASH, 3), 3000)
+        self.assertEqual(s.wram(SV_CARS), 0)         # starter car
+        self.assertEqual(s.wram(SV_CARS + 32), 0xFF)  # rest empty
+
+    def test_buy_part_and_save(self):
+        s = new_game()
+        s.garage_goto(G_PARTS)
+        s.press(A)
+        s.step(30)
+        s.press(A)                                   # intake level 1 ($600)
+        s.step(10)
+        self.assertEqual(s.wram(SV_CARS + 1), 1)
+        self.assertEqual(s.wram(SV_CASH, 3), 2400)
+        # soft reset keeps battery RAM: the save must still be valid
+        s.nes.reset()
+        s.step(120)
+        s.press(A)                                   # CONTINUE
+        s.step(40)
+        self.assertEqual(s.wram(SV_CARS + 1), 1)
+        self.assertEqual(s.wram(SV_CASH, 3), 2400)
+
+    def test_test_run(self):
+        s = new_game()
+        start_race(s, 4)
+        frames = drive_race(s, launch=6600, shift_margin=200)
+        self.assertEqual(s.mem('game_mode'), 3, 'results screen')
+        et = s.mem16('res_et')
+        self.assertTrue(16500 < et < 19000, et)       # stock mini: ~17.5 s
+        self.assertLessEqual(s.mem('lag'), 1)
+        s.step(30)
+        self.assertNotEqual(s.wram(SV_CARS + 30, 2), 0, 'best time saved')
+
+    def test_ladder_win(self):
+        s = new_game()
+        start_race(s, 0)
+        drive_race(s, launch=6600, shift_margin=200)
+        self.assertEqual(s.mem('game_mode'), 3)
+        self.assertTrue(s.mem('res_flags') & 1, 'should beat the first boss')
+        s.step(30)
+        self.assertEqual(s.wram(SV_LADDER), 1)
+        self.assertEqual(s.wram(SV_CASH, 3), 3800)
+        self.assertEqual(s.wram(SV_LEVEL), 2)
+
+    def test_jump_start_is_a_foul(self):
+        s = new_game()
+        start_race(s, 0)
+        s.step(20)
+        s.press(RIGHT)
+        s.step(200)
+        self.assertEqual(s.mem('game_mode'), 3)
+        self.assertTrue(s.mem('res_flags') & 2)
+
+    def test_street_race_runs_at_full_speed(self):
+        s = new_game()
+        start_race(s, 3)
+        drive_race(s, launch=5000, shift_margin=300)
+        self.assertEqual(s.mem('game_mode'), 3)
+        self.assertLessEqual(s.mem('lag'), 1)
+
+    def test_dealer_and_crate(self):
+        s = new_game()
+        # give the player money through WRAM, then fix the checksum by
+        # letting the game save after a purchase
+        s.nes[SV_CASH] = 0x50
+        s.nes[SV_CASH + 1] = 0xC3                    # $50000
+        s.garage_goto(G_DEALER)
+        s.press(A)
+        s.step(40)
+        s.press(RIGHT)                               # KOMET 1.6 ($7000)
+        s.step(30)
+        s.press(A)
+        s.step(5)
+        s.press(A)                                   # confirm
+        s.step(10)
+        self.assertEqual(s.wram(SV_CARS + 32), 1)
+        self.assertEqual(s.wram(0x600D), 1)          # now driving it
+        s.press(B)
+        s.step(40)
+        s.garage_goto(G_CRATES)
+        s.press(A)
+        s.step(40)
+        cash = s.wram(SV_CASH, 3)
+        s.press(A)                                   # standard crate
+        s.step(60)
+        self.assertNotEqual(s.wram(SV_CASH, 3), cash)
+        self.assertEqual(s.wram(0x6013), 1)          # crates opened
+
+
+if __name__ == '__main__':
+    unittest.main()

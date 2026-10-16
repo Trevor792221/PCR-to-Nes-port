@@ -1,0 +1,20 @@
+name: build
+on: [push, pull_request]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cc65
+          pip install cynes py65 numpy pillow
+      - name: Build ROM
+        run: make
+      - name: Test
+        run: make test
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pxracer-rom
+          path: build/pxracer.nes
