@@ -231,6 +231,31 @@ phys_setup:
         tay
         lda turbo_boost,y
         sta ph_boost
+        beq @noic
+        ; intercooler: boost += boost * level >> 4 (max 255)
+        ldy #CR_PARTS+P_ICOOL
+        lda (ptr0),y
+        beq @noic
+        sta m_a
+        lda ph_boost
+        sta m_b
+        jsr mul8
+        lsr m_r+1
+        ror m_r
+        lsr m_r+1
+        ror m_r
+        lsr m_r+1
+        ror m_r
+        lsr m_r+1
+        ror m_r
+        clc
+        lda ph_boost
+        adc m_r
+        bcc :+
+        lda #255
+:       sta ph_boost
+@noic:  ldx cx                  ; Y = turbo level again
+        ldy ph_tl,x
         lda turbo_start,y
         sta ph_tstart
         lda turbo_rate,y
@@ -416,10 +441,17 @@ phys_setup:
         jcc @gear
 
         ; traction = grip * drive_k >> 8   (drive_k = df * 457 >> 6)
+        ldy #CR_PARTS+P_AERO     ; downforce: +3 grip per aero level
+        lda (ptr0),y
+        sta tmp2
+        asl a
+        adc tmp2
+        sta tmp2
         ldy #CR_PARTS+P_SUSP
         lda (ptr0),y
         asl a
         asl a
+        adc tmp2
         sta tmp2
         ldy #CR_PARTS+P_TIRES
         lda (ptr0),y
@@ -476,11 +508,30 @@ phys_setup:
         sbc tmp3
         sta ph_tk_h,x
 
-        ; dk = 9828 * cda / mass
+        ; cda' = cda * (256 - 12*aero) >> 8 ; dk = 9828 * cda' / mass
+        ldy #CR_PARTS+P_AERO
+        lda (ptr0),y
+        sta m_a
+        lda #12
+        sta m_b
+        jsr mul8
+        sec
+        lda #0
+        sbc m_r
+        sta m_b
+        lda #1
+        sbc m_r+1
+        sta m_b+1
+        ldx cx
         ldy ph_model,x
         lda car_cda,y
         sta m_a
         lda #0
+        sta m_a+1
+        jsr mul16
+        lda m_r+1
+        sta m_a
+        lda m_r+2
         sta m_a+1
         lda #<9828
         sta m_b

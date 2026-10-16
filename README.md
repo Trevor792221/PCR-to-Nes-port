@@ -25,10 +25,10 @@ runs on real NES / Famicom hardware or any accurate emulator.
 | Garage as the game hub, with your car on display | Garage screen: your car shown 2x size in a workshop (ceiling lamps, roll-up door, pegboard, tire stack, tool chest), plus cash, gems and level. The game boots to a splash screen: an original 90s-style sports coupe in front of a neon sunset |
 | Car dealership | 12 original cars from hatchbacks to a hypercar, each with its own shape, power, weight, redline, gear count, drivetrain (FWD/RWD/AWD) and level requirement |
 | Owning several cars | 8 garage slots. Switch cars, or sell them for half the car's price plus part value |
-| Engine and performance parts | 10 parts at 5 levels each (Stock, Street, Sport, Race, Pro): intake, exhaust, ECU tune (also raises the redline), turbo (with boost lag and spool), internals, nitrous, gearbox (faster shifts), tires, suspension, weight reduction |
-| Tuning | Final-drive and individual gear ratios. Each gear shows its top speed. Gear tuning unlocks with a Race gearbox |
+| Engine and performance parts | 12 parts at 5 levels each (Stock, Street, Sport, Race, Pro), on two pages (Left/Right to switch). **Engine:** intake, exhaust, ECU tune (also raises the redline), turbo (with boost lag and spool), intercooler (a little power on its own, more boost with a turbo), internals, nitrous. **Chassis:** gearbox (faster shifts), tires, suspension, weight reduction, aero kit (less drag for a higher top speed, plus downforce grip) |
+| Tuning | Final-drive and individual gear ratios. Each gear shows its top speed. Gear tuning unlocks with any gearbox upgrade |
 | Dyno | Live dyno run that plots horsepower and torque curves, with peak HP and Nm and the rpm where each peaks. The peak HP is the same figure shown in the garage and dealer |
-| Paint shop | Body, rim and window colours (24 colours each) with a live preview |
+| Paint shop | Body, rim and window colours (24 colours each) with a live preview. Painting is free |
 | Crates | Standard (cash) and Premium (gems) crates. Rewards are cash, gems, free part upgrades or a whole car. Very rarely (1 in 256 standard, 5 in 256 premium) they hold the **Zenith X400**, a crate-only prototype racer that never spins its tires and tops out over 400 mph. Keep a garage slot free, or the roll goes to a normal reward. Once you beat The Legend (the last ladder boss), the dealer also sells it for $600,000 |
 | Drag racing with manual shifting | 1/4 mile, 1/2 mile and full-mile drag races (set the distance in race select). Rev on the line, launch on green, shift by hand, fire nitrous. Shift feedback: Perfect, Good, Early or Late |
 | Launch / wheelspin | Clutch-dump launch model: too many revs spin the tires (with smoke), too few bog the engine |
@@ -45,7 +45,7 @@ runs on real NES / Famicom hardware or any accurate emulator.
 
 Some features were left out or reduced to fit the NES. These include online
 multiplayer, the in-app shop, tournaments, the parts market, real car
-brands, and engine swaps. The hundreds of parts are condensed into 10
+brands, and engine swaps. The hundreds of parts are condensed into 12
 categories. Sprites are 32x16 pixels in races and 64x32 in menus.
 
 ## Game Genie codes

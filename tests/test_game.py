@@ -9,6 +9,7 @@ from harness import *          # noqa: F401,F403
 
 SV_CASH, SV_GEMS, SV_LEVEL, SV_LADDER = 0x6004, 0x6007, 0x600B, 0x600C
 SV_CARS = 0x6020
+SV_BESTS = 0x6120
 G_RACE, G_PARTS, G_MYCARS, G_TUNE, G_DEALER, G_PAINT, G_CRATES, G_DYNO, G_OPTIONS = range(9)
 
 
@@ -81,7 +82,7 @@ class Game(unittest.TestCase):
         self.assertTrue(16500 < et < 19000, et)       # stock mini: ~17.5 s
         self.assertLessEqual(s.mem('lag'), 1)
         s.step(30)
-        self.assertNotEqual(s.wram(SV_CARS + 30, 2), 0, 'best time saved')
+        self.assertNotEqual(s.wram(SV_BESTS, 2), 0, 'best time saved')
 
     def test_ladder_win(self):
         s = new_game()
@@ -172,7 +173,7 @@ class Game(unittest.TestCase):
         s.press(A)
         s.step(80)
         self.assertEqual(s.wram(SV_CARS + 32), 12, 'crate car in slot 1')
-        self.assertEqual(s.wram(SV_CARS + 32 + 11), 0x28, 'painted gold')
+        self.assertEqual(s.wram(SV_CARS + 32 + 13), 0x28, 'painted gold')
         # the dealer never sells it: browsing left from the first car wraps to 11
         s.press(B, hold=12)
         s.step(40)

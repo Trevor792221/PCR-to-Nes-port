@@ -86,8 +86,10 @@ SV_PBEST     = $601B            ; best 1/4 mile time in ms, any car (2 bytes)
 SV_PBCAR     = $601D            ; model that set it
 SV_TOPSPD    = $601E            ; top trap speed: mph (bits 0-9) | model << 12
 SV_CARS      = $6020            ; 8 slots x 32 bytes
-SV_END       = SV_CARS + 8*32   ; $6120
+SV_BESTS     = SV_CARS + 8*32   ; $6120: best 1/4 mile ET per slot in ms (8 x 2)
+SV_END       = SV_BESTS + 16    ; $6130
 SV_SUM       = SV_END           ; 2-byte checksum over $6004..SV_END-1
+SV_END_V1    = $6120            ; "PXR1" saves: 10 parts, best time in the record
 NSLOTS       = 8
 
 OPT_KMH      = $01
@@ -98,16 +100,15 @@ CASH_MAX     = 9999999          ; cash never goes past this (fits every display)
 
 ; --- car record (32 bytes, same layout in save slots and RAM records) --------
 CR_MODEL  = 0                   ; $FF = empty slot
-CR_PARTS  = 1                   ; 10 bytes
-CR_PAINT  = 11
-CR_RIM    = 12
-CR_GLASS  = 13
-CR_FINAL  = 14                  ; 2 bytes 8.8
-CR_GEARS  = 16                  ; 7 x 2 bytes 8.8
-CR_BEST   = 30                  ; best 1/4 mile ET in ms (2 bytes, 0 = none)
+CR_PARTS  = 1                   ; 12 bytes
+CR_PAINT  = 13
+CR_RIM    = 14
+CR_GLASS  = 15
+CR_FINAL  = 16                  ; 2 bytes 8.8
+CR_GEARS  = 18                  ; 7 x 2 bytes 8.8
 CR_SIZE   = 32
 
-NPARTS     = 10
+NPARTS     = 12
 P_INTAKE   = 0
 P_EXHAUST  = 1
 P_ECU      = 2
@@ -118,6 +119,8 @@ P_GEARBOX  = 6
 P_TIRES    = 7
 P_SUSP     = 8
 P_WEIGHT   = 9
+P_ICOOL    = 10                 ; intercooler
+P_AERO     = 11
 
 ; --- WRAM work areas -------------------------------------------------------
 WBUF      = $6400               ; 1 KB general buffer (big car tiles etc.)

@@ -65,7 +65,7 @@ def main():
     for cv in gd.CURVES:
         o(bytes_line(cv))
     o('hp_bonus:')
-    o(bytes_line([gd.HP_BONUS.get(p, 0) for p in range(10)]))
+    o(bytes_line([gd.HP_BONUS.get(p, 0) for p in range(gd.NPARTS)]))
     o('turbo_boost:')
     o(bytes_line(gd.TURBO_BOOST))
     o('turbo_start:')

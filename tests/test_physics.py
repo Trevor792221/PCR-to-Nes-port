@@ -11,14 +11,15 @@ sys.path.insert(0, os.path.join(os.path.dirname(HERE), 'tools'))
 import gamedata as gd
 from cpu import CPU
 
-CR_PARTS, CR_FINAL, CR_GEARS = 1, 14, 16
+CR_PARTS, CR_FINAL, CR_GEARS = 1, 16, 18
 
 
 def record(model, parts, final=None, gears=None):
     c = gd.CARS[model]
     rec = [0] * 32
     rec[0] = model
-    rec[CR_PARTS:CR_PARTS + 10] = parts
+    parts = list(parts) + [0] * (gd.NPARTS - len(parts))
+    rec[CR_PARTS:CR_PARTS + gd.NPARTS] = parts
     final = final if final is not None else gd.gear_raw(c[7])
     gears = gears or [gd.gear_raw(g) for g in gd.car_gears(model)]
     rec[CR_FINAL] = final & 0xFF
@@ -94,15 +95,29 @@ class Physics(unittest.TestCase):
 
     def test_every_car_stock(self):
         for m in range(gd.NCARS):
-            self.run_race(m, [0] * 10, launch=4500, frames=600)
+            self.run_race(m, [0] * 12, launch=4500, frames=600)
 
     def test_upgraded_cars(self):
         self.run_race(2, [2, 2, 2, 2, 2, 2, 2, 2, 2, 2], launch=6000)
-        self.run_race(8, [4] * 10, launch=3000, x=1)
+        self.run_race(8, [4] * 12, launch=3000, x=1)
         self.run_race(11, [4, 4, 4, 4, 4, 4, 4, 0, 0, 4], launch=7000)   # wheelspin
+        self.run_race(9, [3, 3, 3, 3, 3, 0, 3, 3, 3, 3, 4, 4], launch=6000)  # intercooler, aero
+        self.run_race(4, [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 3], launch=4000)  # no turbo
+
+    def test_intercooler_and_aero_help(self):
+        base = gd.Car(9, [0, 0, 0, 4] + [0] * 8)
+        ic = gd.Car(9, [0, 0, 0, 4] + [0] * 6 + [4, 0])
+        aero = gd.Car(9, [0, 0, 0, 4] + [0] * 7 + [4])
+        self.assertGreater(ic.hpmult, base.hpmult)
+        self.assertGreater(max(ic.bcurve), max(base.bcurve))
+        self.assertLess(aero.dk, base.dk)
+        self.assertGreater(aero.trac, base.trac)
+        t0 = gd.run(base, dist=gd.HALF)[1]
+        self.assertGreater(gd.run(aero, dist=gd.HALF)[1], t0, 'aero: higher trap speed')
+        self.assertGreater(gd.run(ic, dist=gd.HALF)[1], t0, 'intercooler: higher trap speed')
 
     def test_crate_car_never_spins_and_does_400(self):
-        for parts in ([0] * 10, [4] * 10):
+        for parts in ([0] * 12, [4] * 12):
             cpu = self.run_race(gd.CRATE_CAR, parts, launch=9000, frames=900)
             car = gd.Car(gd.CRATE_CAR, parts)
             spun = []
@@ -131,12 +146,12 @@ class Physics(unittest.TestCase):
                              '%3d' % expect)
 
     def test_maxed_hypercar_tops_255_mph(self):
-        car = gd.Car(11, [4] * 10)
+        car = gd.Car(11, [4] * 12)
         _, trap, _ = gd.run(car, dist=gd.HALF)
         self.assertGreater(trap, 255)
 
     def test_step_is_fast_enough(self):
-        cpu = self.run_race(10, [3] * 10, launch=5000, frames=300)
+        cpu = self.run_race(10, [3] * 12, launch=5000, frames=300)
         cpu.call('phys_step', x=0)
         self.assertLess(cpu.cycles, 3500)
 

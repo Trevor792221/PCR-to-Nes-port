@@ -15,10 +15,25 @@ CASH_MAX = 9999999
 
 
 def give_car(s, slot, model, level):
-    rec = record(model, [level] * 10)
-    rec[11:14] = [0x28, 0x10, 0x21]
-    for i, b in enumerate(rec[:30]):
+    rec = record(model, [level] * 12)
+    rec[13:16] = [0x28, 0x10, 0x21]
+    for i, b in enumerate(rec):
         s.nes[SV_CARS + slot * 32 + i] = b
+
+
+def save_sum(s, end):
+    """The game's rotating checksum of $6004..end-1."""
+    t0 = t1 = 0
+    for addr in range(0x6004, end):
+        v = s.wram(addr) + t0
+        t0, a = v & 0xFF, t1 + (v >> 8)
+        c = t0 >> 7
+        t0 = (t0 << 1) & 0xFF
+        c2 = (a >> 7) & 1
+        t1 = ((a << 1) | c) & 0xFF
+        if c2:
+            t0 = (t0 + 1) & 0xFF
+    return t0, t1
 
 
 def set_cash(s, value):
@@ -48,6 +63,34 @@ class Features(unittest.TestCase):
         s.nes.reset()
         s.step(120)
         self.assertEqual(s.wram(SV_CASH, 3), CASH_MAX)
+
+    def test_old_save_is_converted(self):
+        """A v1 save (10 parts, best time in the record) loads with its cars,
+        paint, gearing and best times intact."""
+        s = new_game()
+        old = [3, 1, 2, 3, 4, 0, 1, 2, 3, 4, 0,      # model + 10 parts
+               0x16, 0x10, 0x21, 0x20, 0x03] + list(range(100, 114)) + [0x34, 0x12]
+        for i, b in enumerate(old):
+            s.nes[SV_CARS + i] = b
+        s.nes[SV_CARS + 32] = 0xFF                   # slot 1 empty but has junk
+        s.nes[SV_CARS + 32 + 30] = 0x99
+        for i, c in enumerate(b'PXR1'):
+            s.nes[0x6000 + i] = c
+        t0, t1 = save_sum(s, 0x6120)
+        s.nes[0x6120], s.nes[0x6121] = t0, t1
+        s.nes.reset()
+        s.step(120)
+        self.assertEqual(bytes(s.wram(0x6000 + i) for i in range(4)), b'PXR2')
+        rec = [s.wram(SV_CARS + i) for i in range(32)]
+        self.assertEqual(rec[:11], old[:11])
+        self.assertEqual(rec[11:13], [0, 0], 'new parts start stock')
+        self.assertEqual(rec[13:16], [0x16, 0x10, 0x21])
+        self.assertEqual(rec[16:18], [0x20, 0x03])
+        self.assertEqual(rec[18:32], list(range(100, 114)))
+        self.assertEqual(s.wram(0x6120, 2), 0x1234)
+        self.assertEqual(s.wram(0x6122, 2), 0, 'empty slot: no best')
+        self.assertEqual(s.wram(SV_CASH, 3), 3000, 'kept, not a new game')
+        self.assertEqual(save_sum(s, 0x6130), (s.wram(0x6130), s.wram(0x6131)))
 
     # --- secret boss ----------------------------------------------------------
     def race_select_count(self, s):
@@ -277,25 +320,26 @@ class Features(unittest.TestCase):
         s.step(40)
         self.assertEqual(s.mem('ui_count'), 10, 'final, 7 gears, reset, back')
         rec = SV_CARS
-        g1 = s.wram(rec + 16, 2)
+        g1 = s.wram(rec + 18, 2)
         s.list_goto('ui_sel', 1)
         s.press(RIGHT)
         s.step(5)
-        self.assertNotEqual(s.wram(rec + 16, 2), g1)
+        self.assertNotEqual(s.wram(rec + 18, 2), g1)
         s.list_goto('ui_sel', 8)                     # RESET TO STOCK
         s.press(A)
         s.step(10)
-        self.assertEqual(s.wram(rec + 16, 2), g1)
+        self.assertEqual(s.wram(rec + 18, 2), g1)
 
     def test_dyno_hp_matches_the_garage(self):
         for model, lvl in ((0, 0), (5, 2), (11, 4)):
             s = new_game()
             give_car(s, 0, model, lvl)
-            s.garage_goto(G_DYNO)
+            s.garage_goto(G_OPTIONS)                 # back out: the garage redraws
             s.press(A)
             s.step(30)
-            s.press(B)
-            s.step(40)
+            s.press(B, hold=12)
+            s.step(60)
+            self.assertEqual(s.mem('cur_bank'), 1)
             garage = s.mem16('ep_hp')
             s.garage_goto(G_DYNO)
             s.press(A)

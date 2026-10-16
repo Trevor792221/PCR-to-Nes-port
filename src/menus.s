@@ -367,12 +367,12 @@ garage_draw:
 
 ; best_line: ptr0 = "BEST 1/4  12.345" for the current car (or "NO TIME")
 best_line:
-        jsr cur_car_ptr
-        ldy #CR_BEST
-        lda (ptr1),y
+        lda SV_CURCAR
+        asl a
+        tax
+        lda SV_BESTS,x
         sta m_a
-        iny
-        lda (ptr1),y
+        lda SV_BESTS+1,x
         sta m_a+1
         ora m_a
         bne :+
@@ -961,7 +961,7 @@ set_dist:
 make_rival:
         jsr cur_car_ptr
         sta tmp7                ; player model
-        ; average part level (sum of 8 power parts / 8 rounded)
+        ; average part level (sum of all parts / NPARTS, rounded)
         lda #0
         sta tmp5
         ldy #CR_PARTS
@@ -974,11 +974,11 @@ make_rival:
         bne :-
         lda tmp5
         clc
-        adc #5
+        adc #NPARTS/2
         sta m_r
         lda #0
         sta m_r+1
-        lda #10
+        lda #NPARTS
         jsr div16_8
         lda m_r
         clc
@@ -1165,6 +1165,12 @@ mycars_screen:
         ldy #CR_MODEL
         lda #$FF
         sta (ptr1),y
+        lda mc_sel              ; an empty slot has no best time
+        asl a
+        tax
+        lda #0
+        sta SV_BESTS,x
+        sta SV_BESTS+1,x
         ; keep SV_CURCAR pointing at the same car (slots don't move)
         jsr save_write
         lda #SFX_BUY
@@ -2004,25 +2010,22 @@ apply_rewards:
         lda res_et
         ora res_et+1
         beq @nobest
-        jsr cur_car_ptr
-        ldy #CR_BEST+1
-        lda (ptr1),y
-        dey
-        ora (ptr1),y
+        lda SV_CURCAR
+        asl a
+        tax
+        lda SV_BESTS,x
+        ora SV_BESTS+1,x
         beq @newbest
         lda res_et
-        cmp (ptr1),y
-        iny
+        cmp SV_BESTS,x
         lda res_et+1
-        sbc (ptr1),y
+        sbc SV_BESTS+1,x
         bcs @nobest
 @newbest:
-        ldy #CR_BEST
         lda res_et
-        sta (ptr1),y
-        iny
+        sta SV_BESTS,x
         lda res_et+1
-        sta (ptr1),y
+        sta SV_BESTS+1,x
         lda #1
         sta rw_best
 @nobest:

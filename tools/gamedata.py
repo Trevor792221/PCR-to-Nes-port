@@ -92,17 +92,20 @@ def car_gears(model):
     return CUSTOM_GEARS.get(model, GEARSETS[c[6]])
 
 # ---------------------------------------------------------------------------
-# Parts: 10 categories x 5 levels (0 = stock)
+# Parts: 12 categories x 5 levels (0 = stock)
 # ---------------------------------------------------------------------------
 PARTS = ['INTAKE', 'EXHAUST', 'ECU TUNE', 'TURBO', 'INTERNALS',
-         'NITROUS', 'GEARBOX', 'TIRES', 'SUSPENSION', 'WEIGHT RED.']
+         'NITROUS', 'GEARBOX', 'TIRES', 'SUSPENSION', 'WEIGHT RED.',
+         'INTERCOOLER', 'AERO KIT']
+NPARTS = len(PARTS)
 P_INTAKE, P_EXHAUST, P_ECU, P_TURBO, P_INTERNALS, P_NITROUS, P_GEARBOX, \
-    P_TIRES, P_SUSP, P_WEIGHT = range(10)
+    P_TIRES, P_SUSP, P_WEIGHT, P_ICOOL, P_AERO = range(12)
 LEVEL_NAMES = ['STOCK', 'STREET', 'SPORT', 'RACE', 'PRO']
 PART_PRICE = [0, 600, 1800, 4500, 11000]           # times tier multiplier
 TIER_MULT = [2, 3, 4, 6, 9, 14]                    # /2
 
-HP_BONUS = {P_INTAKE: 10, P_EXHAUST: 10, P_ECU: 8, P_INTERNALS: 13}   # *256ths per level
+HP_BONUS = {P_INTAKE: 10, P_EXHAUST: 10, P_ECU: 8, P_INTERNALS: 13,
+            P_ICOOL: 5}                                       # *256ths per level
 TURBO_BOOST = [0, 72, 128, 184, 240]
 TURBO_START = [0, 8, 12, 15, 18]       # curve index (of 32) where boost starts
 TURBO_RATE = [0, 9, 7, 5, 4]           # spool per frame
@@ -111,6 +114,8 @@ NOS_FRAMES = [0, 150, 180, 210, 240]
 SHIFT_FRAMES = [24, 18, 13, 9, 5]
 TIRE_GRIP = [100, 112, 126, 142, 165]
 SUSP_GRIP = 4
+AERO_GRIP = 3                # downforce, per aero level
+AERO_CUT = 12                # drag: CdA * (256 - AERO_CUT*level) >> 8
 WEIGHT_CUT = 10
 ECU_RPM = 200
 
@@ -154,13 +159,14 @@ class Car:
 
     def __init__(self, model, parts=None, final=None, gears=None):
         c = CARS[model]
-        parts = parts or [0] * 10
+        parts = list(parts or [])
+        parts += [0] * (NPARTS - len(parts))
         self.model = model
         self.ngears = c[6]
         final = final if final is not None else gear_raw(c[7])
         gears = gears or [gear_raw(g) for g in car_gears(model)]
         # --- engine ---------------------------------------------------------
-        hpm = 256 + sum(HP_BONUS.get(p, 0) * parts[p] for p in range(10))
+        hpm = 256 + sum(HP_BONUS.get(p, 0) * parts[p] for p in range(NPARTS))
         self.hpmult = hpm
         teff = car_torque(model) * hpm >> 8
         self.redline = c[4] + ECU_RPM * parts[P_ECU]
@@ -172,6 +178,8 @@ class Car:
         shape = CURVES[c[5]]
         tl = parts[P_TURBO]
         boost, start = TURBO_BOOST[tl], TURBO_START[tl]
+        if boost:                        # intercooler: +1/16 boost per level
+            boost = min(255, boost + (boost * parts[P_ICOOL] >> 4))
         self.curve, self.bcurve = [], []
         for b in range(48):
             rpm = b * 256 + 128
@@ -197,10 +205,12 @@ class Car:
             self.rs.append(u16(r * RPM_K >> 8))
             self.kg.append(u16(self.k0h * r >> 15))
         # --- grip / aero ----------------------------------------------------
-        grip = TIRE_GRIP[parts[P_TIRES]] + SUSP_GRIP * parts[P_SUSP]
+        grip = (TIRE_GRIP[parts[P_TIRES]] + SUSP_GRIP * parts[P_SUSP]
+                + AERO_GRIP * parts[P_AERO])
         self.trac = u16(grip * DRIVE_K[c[8]] >> 8)
         self.trac_k = self.trac - (self.trac >> 2) - (self.trac >> 4)
-        self.dk = u16(DKC * int(round(c[9] * 256)) // m)
+        cda = int(round(c[9] * 256)) * (256 - AERO_CUT * parts[P_AERO]) >> 8
+        self.dk = u16(DKC * cda // m)
         self.reset()
 
     def reset(self):

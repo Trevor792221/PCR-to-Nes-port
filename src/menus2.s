@@ -5,6 +5,9 @@
 
 .segment "BSS"
 pt_sel:     .res 1
+pt_page:    .res 1          ; 0 engine, 1 chassis
+pt_part:    .res 1
+pt_count:   .res 1
 tn_row_y:   .res 1
 tn_sel:     .res 1
 pn_sel:     .res 1
@@ -41,21 +44,33 @@ parts_screen:
         ldx #2
         ldy #4
         jsr print
+        ldx pt_page             ; page title and size
+        lda pt_sizes,x
+        sta pt_count
+        lda pt_titles_lo,x
+        sta ptr0
+        lda pt_titles_hi,x
+        sta ptr0+1
+        ldx #2
+        ldy #6
+        jsr print
         lda #0
         sta text_attr
         ldx #0
 @row:   stx tmp7
+        jsr pt_index
+        tax
         jsr part_line
         lda tmp7
         asl a
         clc
-        adc #6
+        adc #PT_ROW0
         tay
         ldx #3
         jsr print
         ldx tmp7
         inx
-        cpx #NPARTS
+        cpx pt_count
         bne @row
         PRINT str_pt_help, 2, 28
         jsr attr_upload
@@ -63,13 +78,18 @@ parts_screen:
         sta oam_idx
         jsr oam_clear
         jsr ppu_on
+        jsr pt_stats
         lda pt_sel
-        sta ui_sel
-        lda #NPARTS
+        cmp pt_count
+        bcc :+
+        lda #0
+        sta pt_sel
+:       sta ui_sel
+        lda pt_count
         sta ui_count
         lda #1
         sta ui_x
-        lda #6
+        lda #PT_ROW0
         sta ui_y0
         lda #2
         sta ui_dy
@@ -86,13 +106,41 @@ parts_screen:
         bne :+
         jsr pt_info
         jmp @loop
-:       cmp #2
+:       cmp #6                  ; left / right: other page
+        beq @page
+        cmp #7
+        beq @page
+        cmp #2
         bne :+
         rts
 :       cmp #1
         bne @loop
         jsr pt_buy
         jmp @loop
+@page:  lda pt_page
+        eor #1
+        sta pt_page
+        lda #SFX_MOVE
+        jsr sfx_play
+        jmp parts_screen
+
+; pt_index: X = row on the current page -> A = part
+pt_index:
+        lda pt_page
+        beq :+
+        lda pt_chassis,x
+        rts
+:       lda pt_engine,x
+        rts
+
+PT_ROW0 = 8                     ; first part row (two apart)
+pt_engine:   .byte P_INTAKE, P_EXHAUST, P_ECU, P_TURBO, P_ICOOL, P_INTERNAL, P_NITROUS
+pt_chassis:  .byte P_GEARBOX, P_TIRES, P_SUSP, P_WEIGHT, P_AERO
+pt_sizes:    .byte 7, 5
+pt_titles_lo: .byte <str_pt_eng, <str_pt_chs
+pt_titles_hi: .byte >str_pt_eng, >str_pt_chs
+str_pt_eng:  .byte "< ENGINE >", 0
+str_pt_chs:  .byte "< CHASSIS >", 0
 
 ; part_line: X = part -> ptr0 "INTAKE     SPORT  $1800"
 part_line:
@@ -101,6 +149,9 @@ part_line:
         jsr part_name_ptr
         ldy #0
         jsr cat_ptr0
+        lda #' '
+        sta linebuf,y
+        iny
         sty tmp5
         jsr cur_car_ptr
         lda tmp6
@@ -137,9 +188,10 @@ part_line:
         lda #27
         jmp pad_ptr0
 
-; pt_info: description of the selected part + current stats
+; pt_info: description of the selected part
 pt_info:
-        lda pt_sel
+        ldx pt_sel
+        jsr pt_index
         asl a
         tax
         lda part_desc,x
@@ -147,7 +199,11 @@ pt_info:
         lda part_desc+1,x
         sta ptr0+1
         ldy #26
-        jsr vb_msg
+        jmp vb_msg
+
+; pt_stats: HP / weight / drive line for the car (only changes on a purchase:
+; measuring peak HP takes a few frames, so cursor moves don't redo it)
+pt_stats:
         jsr cur_car_ptr
         ldy #4
         jsr stats_line
@@ -158,8 +214,11 @@ pt_info:
         jmp vb_str
 
 pt_buy:
+        ldx pt_sel
+        jsr pt_index
+        sta pt_part
         jsr cur_car_ptr
-        lda pt_sel
+        lda pt_part
         clc
         adc #CR_PARTS
         tay
@@ -178,7 +237,7 @@ pt_buy:
         bcc @fail
         jsr cash_sub
         jsr cur_car_ptr
-        lda pt_sel
+        lda pt_part
         clc
         adc #CR_PARTS
         tay
@@ -191,16 +250,17 @@ pt_buy:
         jsr sfx_play
         jsr header_update
         jsr wait_frame
-        ldx pt_sel
-        stx tmp7
+        ldx pt_part
         jsr part_line
         lda pt_sel
         asl a
         clc
-        adc #6
+        adc #PT_ROW0
         tay
         ldx #3
         jsr vb_str
+        jsr wait_frame
+        jsr pt_stats
         jsr wait_frame
         jmp pt_info
 @fail:  lda #SFX_ERROR
@@ -208,20 +268,23 @@ pt_buy:
 
 str_parts:   .byte "PARTS", 0
 str_maxed:   .byte "MAXED", 0
-str_pt_help: .byte "A:BUY UPGRADE  B:BACK", 0
+str_pt_help: .byte "A:BUY  B:BACK  L/R:PAGE", 0
 part_desc:
         .word str_pd0, str_pd1, str_pd2, str_pd3, str_pd4
         .word str_pd5, str_pd6, str_pd7, str_pd8, str_pd9
+        .word str_pd10, str_pd11
 str_pd0: .byte "COLD AIR: +4% POWER/LEVEL", 0
 str_pd1: .byte "FREE FLOW: +4% POWER/LEVEL", 0
 str_pd2: .byte "+3% POWER, +200 RPM REDLINE", 0
 str_pd3: .byte "BIG POWER, NEEDS RPM TO SPOOL", 0
 str_pd4: .byte "FORGED PARTS: +5% POWER", 0
 str_pd5: .byte "B BUTTON: A SHOT OF POWER", 0
-str_pd6: .byte "FASTER SHIFTS. RACE: TUNABLE", 0
+str_pd6: .byte "FASTER SHIFTS, TUNABLE GEARS", 0
 str_pd7: .byte "MORE GRIP OFF THE LINE", 0
 str_pd8: .byte "+4 GRIP AT LAUNCH PER LEVEL", 0
 str_pd9: .byte "-4% WEIGHT PER LEVEL", 0
+str_pd10: .byte "+2% POWER, MUCH MORE W/ TURBO", 0
+str_pd11: .byte "LESS DRAG, +3 GRIP PER LEVEL", 0
 
 ; ===========================================================================
 ; TUNE
@@ -325,9 +388,8 @@ tune_screen:
         beq :+
         bcs @loop2              ; reset / back rows
 :       ldy #CR_PARTS+P_GEARBOX
-        lda (ptr1),y
-        cmp #3
-        bcs @ok
+        lda (ptr1),y            ; any gearbox upgrade unlocks the gears
+        bne @ok
         MOVI16 ptr0, str_tn_lock
         ldy #26
         jsr vb_msg
@@ -398,7 +460,7 @@ tn_offset:
 ; tn_all: refresh every row (ratios and top speeds)
 tn_all:
         jsr cur_car_ptr
-        jsr car_stats           ; physics slot 1 holds this car
+        jsr car_setup           ; physics slot 1 holds this car
         lda tn_sel
         pha
         lda #0
@@ -578,7 +640,7 @@ str_tn_reset: .byte "RESET TO STOCK", 0
 str_tn_back:  .byte "BACK", 0
 str_tn_help:  .byte "LEFT/RIGHT:CHANGE RATIO", 0
 str_tn_help2: .byte "LOWER = FASTER ACCELERATION", 0
-str_tn_lock:  .byte "GEARS NEED A RACE GEARBOX", 0
+str_tn_lock:  .byte "UPGRADE THE GEARBOX FIRST", 0
 str_blank2:   .byte 0
 
 ; ===========================================================================
@@ -705,28 +767,13 @@ paint_screen:
         dex
         bpl @cmp
         rts                     ; nothing to pay for
-@changed:
-        lda #<400
-        sta m_a
-        lda #>400
-        sta m_a+1
-        lda #0
-        sta m_a+2
-        jsr cash_cmp
-        bcc @poor
-        jsr cash_sub
+@changed:                       ; painting is free
         jsr save_write
         lda #SFX_BUY
         jsr sfx_play
         lda #30
         jsr wait_frames
         rts
-@poor:  lda #SFX_ERROR
-        jsr sfx_play
-        MOVI16 ptr0, str_pn_poor
-        ldy #22
-        jsr vb_msg
-        jmp @loop
 @cancel:
         jsr cur_car_ptr
         ldx #2
@@ -808,9 +855,8 @@ str_pn0:      .byte "BODY", 0
 str_pn1:      .byte "RIMS", 0
 str_pn2:      .byte "GLASS", 0
 str_pn_help:  .byte "LEFT/RIGHT:PICK COLOUR", 0
-str_pn_help2: .byte "A:PAY $400 AND KEEP", 0
+str_pn_help2: .byte "A:KEEP (FREE)", 0
 str_pn_help3: .byte "B:CANCEL", 0
-str_pn_poor:  .byte "NOT ENOUGH CASH", 0
 
 ; ===========================================================================
 ; CRATES
@@ -1332,7 +1378,7 @@ dyno_screen:
 ; dyno_compute: torque and power for 128 columns from 1000 rpm to the limiter
 dyno_compute:
         jsr cur_car_ptr
-        jsr car_stats           ; slot 1
+        jsr car_setup           ; slot 1 (dyno_text measures the peak)
         lda #0
         sta dy_peak_hp
         sta dy_peak_hp+1

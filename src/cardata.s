@@ -16,6 +16,8 @@ part_names:
         .byte "TIRES      ", 0
         .byte "SUSPENSION ", 0
         .byte "WEIGHT CUT ", 0
+        .byte "INTERCOOLER", 0
+        .byte "AERO KIT   ", 0
 level_names:
         .byte "STOCK ", 0
         .byte "STREET", 0

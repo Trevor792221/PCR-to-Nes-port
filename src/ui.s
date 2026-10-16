@@ -530,7 +530,17 @@ xp_needed:
 ; Car stats for the menus: car_stats: ptr1 = record -> phys slot 1 set up,
 ; m_a = peak hp.  (Uses physics slot 1; harmless outside races.)
 ; ---------------------------------------------------------------------------
+; car_setup: the same without the peak HP measurement (a few frames' work),
+; for screens that only need the gearing
+.segment "BSS"
+cs_hp:      .res 1
+.segment "FIXED"
+car_setup:
+        lda #0
+        beq :+
 car_stats:
+        lda #1
+:       sta cs_hp
         ldx #7
 @sv:    lda tmp0,x              ; phys_setup uses tmp0-tmp7: keep the caller's
         pha
@@ -550,9 +560,11 @@ car_stats:
         sta ptr0+1
         ldx #1
         jsr phys_setup
+        lda cs_hp
+        beq :+
         ldx #1
         jsr phys_peak_hp
-        pla
+:       pla
         sta ptr2+1
         pla
         sta ptr2
