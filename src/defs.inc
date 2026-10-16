@@ -64,6 +64,7 @@ MODE_TITLE   = 0
 MODE_GARAGE  = 1
 MODE_RACE    = 2
 MODE_RESULTS = 3
+MODE_SPLASH  = 4
 
 ; --- save layout (WRAM $6000) ----------------------------------------------
 SAVE_MAGIC   = $6000            ; 4 bytes "PXR1"

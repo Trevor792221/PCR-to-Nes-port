@@ -131,6 +131,7 @@ cheat_debug:     .byte 0        ; $FFC2  non-zero: SELECT in the garage = debug 
 
 .segment "BANK4"
 .include "scenes.s"
+.include "splash.s"
 
 .segment "BANK2"
 .include "race.s"

@@ -85,7 +85,7 @@ reset:
         sta ppu_ctrl
         bit PPUSTATUS
         sta PPUCTRL             ; NMI on (rendering stays off for now)
-        lda #MODE_TITLE
+        lda #MODE_SPLASH
         sta next_mode
         ; fall through
 ; ---------------------------------------------------------------------------
@@ -108,9 +108,9 @@ main_loop:
 @go:    jmp (fc_ptr)
 
 mode_bank:
-        .byte BANK_MENU, BANK_MENU, BANK_RACE, BANK_MENU
+        .byte BANK_MENU, BANK_MENU, BANK_RACE, BANK_MENU, BANK_SCENE
 mode_addr:
-        .word title_main, garage_main, race_main, results_main
+        .word title_main, garage_main, race_main, results_main, splash_main
 
 irq:
         rti

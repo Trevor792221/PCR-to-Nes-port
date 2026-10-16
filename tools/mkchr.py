@@ -299,6 +299,123 @@ def big_letter(ch):
     return [''.join(r) for r in pix]
 
 
+def build_garage(ts):
+    """Garage backdrop behind the showroom car: nametable rows 4-12.
+    Palettes (menu): 0 = black/white/grey/yellow (ceiling and lamps),
+    2 = reds (tool chest), 3 = greys (walls, door, floor).
+    Returns (map bytes 9x32, palette per 16x16 block, 5 block rows x 16)."""
+    W, H = 256, 72
+    pix = [['0'] * W for _ in range(H)]
+    # --- ceiling (rows 4-5, palette 0): steel beam, two hanging lamps
+    for x in range(W):
+        for y in (1, 2, 3, 4, 5):
+            pix[y][x] = '2'
+        if x % 16 == 4:
+            pix[3][x] = '1'                       # rivets
+    for lx in (48, 208):
+        for y in range(6, 9):
+            pix[y][lx] = '2'                      # cord
+        for y, half in ((9, 3), (10, 5), (11, 6), (12, 7)):
+            for x in range(lx - half, lx + half + 1):
+                pix[y][x] = '2'                   # shade
+        for y in (13, 14):
+            for x in range(lx - 3, lx + 4):
+                pix[y][x] = '3'                   # bulb glow
+        pix[15][lx - 1] = pix[15][lx] = pix[15][lx + 1] = '3'
+    # --- walls (rows 6-10, palette 3): bricks
+    for y in range(16, 56):
+        for x in range(W):
+            ly = (y - 16) % 8
+            off = 0 if ((y - 16) // 8) % 2 == 0 else 4
+            if ly == 3 or ly == 7:
+                pix[y][x] = '0'
+            elif ly < 3 and (x + off) % 8 == 4 and ((y - 16) // 8) % 2:
+                pix[y][x] = '0'
+            elif ly > 3 and (x + off) % 8 == 2 and ((y - 16) // 8) % 2:
+                pix[y][x] = '0'
+            else:
+                pix[y][x] = '1'
+    # roll-up door behind the car (cols 10-21)
+    for y in range(16, 56):
+        for x in range(80, 176):
+            if x < 84 or x >= 172 or y < 20:
+                pix[y][x] = '3'                   # frame and header
+            else:
+                pix[y][x] = '2' if (y - 20) % 4 < 2 else ('1' if (y - 20) % 4 == 2 else '3')
+    for x in range(120, 136):
+        pix[52][x] = pix[53][x] = '3'             # handle
+    # pegboard with tools (cols 1-6, rows 6-7)
+    for y in range(17, 31):
+        for x in range(9, 55):
+            pix[y][x] = '0' if (x % 4 == 1 and y % 4 == 1) else '3'
+    for y in range(19, 29):                       # wrench
+        pix[y][16] = pix[y][17] = '2'
+    for x in range(14, 20):
+        pix[19][x] = '2'
+    pix[20][14] = pix[20][19] = '2'
+    for y in range(20, 29):                       # hammer
+        pix[y][29] = pix[y][30] = '1'
+    for x in range(25, 35):
+        pix[20][x] = pix[21][x] = '2'
+    for y in range(21, 29):                       # screwdriver
+        pix[y][42] = '2'
+    for y in range(19, 23):
+        pix[y][41] = pix[y][42] = pix[y][43] = '1'
+    for y in range(19, 28):                       # saw
+        for x in range(48, 53):
+            if x - 48 <= (y - 19) // 2:
+                pix[y][x] = '2'
+    # tyre stack (cols 2-5, rows 8-10)
+    for t in range(3):                            # three tyres seen side-on
+        y0 = 32 + t * 8
+        for y in range(y0, y0 + 8):
+            for x in range(17, 47):
+                ly, corner = y - y0, x in (17, 46)
+                if ly in (0, 7) or (corner and ly in (1, 6)):
+                    pix[y][x] = '0'               # rounded black edge
+                elif ly in (1, 6):
+                    pix[y][x] = '2' if x % 3 else '0'   # tread blocks
+                elif ly in (3, 4):
+                    pix[y][x] = '1'               # sidewall stripe
+                else:
+                    pix[y][x] = '3'               # sidewall
+    # tool chest (cols 24-27, rows 6-9, palette 2) with casters on row 10
+    for y in range(16, 48):
+        for x in range(192, 224):
+            if x in (192, 223) or y in (16, 47):
+                pix[y][x] = '0'
+            elif (y - 16) % 8 == 0 and y > 22:
+                pix[y][x] = '1'                   # drawer seams
+            elif (y - 16) % 8 == 4 and 202 <= x < 214:
+                pix[y][x] = '3'                   # handles
+            else:
+                pix[y][x] = '2'
+    for cx in (196, 219):
+        for y in range(48, 54):
+            for x in range(cx - 2, cx + 3):
+                pix[y][x] = '0'
+    # --- floor (rows 11-12): same tiles as before
+    rows = [''.join(r) for r in pix]
+    gmap = []
+    for ty in range(7):
+        for tx in range(32):
+            gmap.append(ts.add(tile([rows[ty * 8 + y][tx * 8:tx * 8 + 8] for y in range(8)])))
+    floor_a = tile(['33333333', '22222222', '22222222', '22222222', '11111111', '11111111', '11111111', '11111111'])
+    floor_b = tile(['11111111', '11111111', '11111111', '11111111', '22222222', '22222222', '22222222', '22222222'])
+    gmap += [ts.add(floor_a)] * 32 + [ts.add(floor_b)] * 32
+    # palettes per 16x16 block: block rows 2..6 (nametable rows 4-13)
+    attr = []
+    for by in range(5):
+        for bx in range(16):
+            if by == 0:
+                attr.append(0)                    # ceiling
+            elif by in (1, 2) and bx in (12, 13):
+                attr.append(2)                    # tool chest
+            else:
+                attr.append(3)
+    return bytes(gmap), bytes(attr)
+
+
 def build_menu():
     ts = TileSet(0x80)
     ts.add(solid(0))
@@ -323,6 +440,9 @@ def build_menu():
     specials['WALL'] = ts.add(tile(['11111111', '11111111', '11111111', '00000000', '11111111', '11111111', '11111111', '00000000']))
     specials['WALL2'] = ts.add(tile(['1111.111', '1111.111', '1111.111', '00000000', '11.11111', '11.11111', '11.11111', '00000000']))
     specials['STRIPE'] = ts.add(tile(['22....22', '2....222', '....2222', '...2222.', '..2222..', '.2222...', '2222....', '222....2']))
+    # garage backdrop, rows 4-12 (see build_garage)
+    gmap, gattr = build_garage(ts)
+    specials['GARAGE'] = (gmap, gattr)
     # crate 4x4 (32x32)
     crate = [
         '11111111111111111111111111111111',
@@ -392,7 +512,12 @@ def car_tiles(name):
 
 
 def big_car_tiles(name):
-    return grid_tiles(art.big_car_pixels(name), 8, 4)
+    a = art.car_pixels(name, 0)
+    big = []
+    for r in a:
+        rr = ''.join(c * 2 for c in r)
+        big += [rr, rr]
+    return grid_tiles(big, 8, 4)
 
 
 def main():
@@ -412,6 +537,8 @@ def main():
     nrace = ', '.join(counts)
     menu, logo_map, menu_sp, nmenu = build_menu()
     w('menu.chr', menu)
+    w('garage_map.bin', menu_sp['GARAGE'][0])
+    w('garage_attr.bin', menu_sp['GARAGE'][1])
     w('logo_map.bin', logo_map)
     w('sprites.chr', build_sprites())
     w('cars.chr', b''.join(b''.join(car_tiles(n)) for n in art.SHAPE_ORDER))
@@ -422,6 +549,8 @@ def main():
         for k, v in race_sp.items():
             f.write('T_%s = $%02X\n' % (k, v))
         for k, v in menu_sp.items():
+            if k == 'GARAGE':
+                continue
             if isinstance(v, list):
                 f.write('.define T_%s_MAP %s\n' % (k, ', '.join('$%02X' % x for x in v)))
             else:

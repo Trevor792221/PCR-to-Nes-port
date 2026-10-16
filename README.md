@@ -15,14 +15,14 @@ runs on real NES / Famicom hardware or any accurate emulator.
 > features are reimplemented, and every car sprite, background, tune and car
 > name in this ROM is original.
 
-![Title](docs/title.png) ![Garage](docs/garage.png)
+![Splash](docs/splash.png) ![Title](docs/title.png) ![Garage](docs/garage.png)
 ![Race](docs/race.png) ![Dyno](docs/dyno.png)
 
 ## What carried over from the Android game
 
 | Pixel Car Racer feature | NES version |
 |---|---|
-| Garage as the game hub, with your car on display | Garage screen: your car shown 2x size, plus cash, gems and level |
+| Garage as the game hub, with your car on display | Garage screen: your car shown 2x size in a workshop (ceiling lamps, roll-up door, pegboard, tire stack, tool chest), plus cash, gems and level. The game boots to a splash screen: an original 90s-style sports coupe in front of a neon sunset |
 | Car dealership | 12 original cars from hatchbacks to a hypercar, each with its own shape, power, weight, redline, gear count, drivetrain (FWD/RWD/AWD) and level requirement |
 | Owning several cars | 8 garage slots. Switch cars, or sell them for half the car's price plus part value |
 | Engine and performance parts | 10 parts at 5 levels each (Stock, Street, Sport, Race, Pro): intake, exhaust, ECU tune (also raises the redline), turbo (with boost lag and spool), internals, nitrous, gearbox (faster shifts), tires, suspension, weight reduction |
@@ -124,7 +124,7 @@ physics runs at 50 Hz.
 | 1 | Title, garage, race select, my cars, dealer, results |
 | 2 | Race engine (drag, street, test), HUD, AI, traffic |
 | 3 | Parts, tune, paint, crates, dyno, options |
-| 4 | Race scenery: day, sunset and night tile sets and maps |
+| 4 | Race scenery (day, sunset, night) and the boot splash screen |
 | 7 (fixed) | Reset/NMI, PPU helpers, math, physics, sound, save, car data |
 
 ## How it works

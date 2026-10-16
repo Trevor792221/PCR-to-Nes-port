@@ -678,3 +678,47 @@ bank0_copy:
         sta copy_bank
         pla
         jmp set_bank
+
+; ---------------------------------------------------------------------------
+; draw_garage_bg: garage backdrop on nametable rows 4-12 with its palettes
+; (ceiling and lamps, brick walls, roll-up door, pegboard, tyres, tool
+; chest, floor).  PPU off.  Used by the garage, dealer and paint shop.
+; ---------------------------------------------------------------------------
+draw_garage_bg:
+        MOVI16 ptr0, gfx_garage_map
+        lda #<288
+        sta tmp0
+        lda #>288
+        sta tmp1
+        lda #$20
+        ldx #$80                ; row 4
+        jsr chr_copy
+        lda #0
+        sta gb_i                ; table index
+        lda #2                  ; block rows 2-6
+        sta gb_y
+@row:   lda #0
+        sta gb_x
+@col:   ldx gb_i
+        lda garage_attr,x
+        ldx gb_x
+        ldy gb_y
+        jsr set_attr            ; (uses tmp4-tmp6)
+        inc gb_i
+        inc gb_x
+        lda gb_x
+        cmp #16
+        bne @col
+        inc gb_y
+        lda gb_y
+        cmp #7
+        bne @row
+        rts
+
+.segment "BSS"
+gb_x:       .res 1
+gb_y:       .res 1
+gb_i:       .res 1
+.segment "FIXED"
+
+garage_attr: .incbin "build/garage_attr.bin"

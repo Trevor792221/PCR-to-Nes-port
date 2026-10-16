@@ -396,41 +396,7 @@ best_line:
 
 ; draw_showroom: wall rows 4-10, floor rows 11-12 (PPU off)
 draw_showroom:
-        lda #32
-        sta tmp2
-        ldy #4
-@w:     tya
-        pha
-        and #1
-        beq :+
-        lda #T_WALL2
-        bne :++
-:       lda #T_WALL
-:       ldx #0
-        jsr fill_row
-        pla
-        tay
-        iny
-        cpy #11
-        bne @w
-        ldx #0
-        ldy #11
-        lda #T_FLOOR_A
-        jsr fill_row
-        ldx #0
-        ldy #12
-        lda #T_FLOOR_B
-        jsr fill_row
-        lda #0
-        sta tmp0
-        lda #2
-        sta tmp1
-        lda #16
-        sta tmp2
-        lda #5
-        sta tmp3
-        lda #3
-        jmp attr_rect
+        jmp draw_garage_bg
 
 ; garage_sprites: cursor + the big car on the showroom floor
 garage_sprites:

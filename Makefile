@@ -5,13 +5,17 @@ PYTHON  = python3
 
 ROM     = build/pxracer.nes
 SRCS    = $(wildcard src/*.s) src/defs.inc
-GEN     = build/tiles.inc build/cardata.inc build/music.inc
+GEN     = build/tiles.inc build/cardata.inc build/music.inc build/splash.nam
 
 all: $(ROM)
 
 build/tiles.inc: tools/mkchr.py tools/art.py tools/font.py
 	@mkdir -p build
 	$(PYTHON) tools/mkchr.py build
+
+build/splash.nam: tools/mksplash.py tools/mkchr.py tools/font.py
+	@mkdir -p build
+	$(PYTHON) tools/mksplash.py build
 
 build/cardata.inc: tools/mkdata.py tools/gamedata.py
 	@mkdir -p build

@@ -38,6 +38,17 @@ class Game(unittest.TestCase):
         self.assertEqual(s.mem('game_mode'), 0)
         self.assertGreater(s.mem16('frame'), 50)     # NMI running
 
+    def test_splash_screen(self):
+        s = Sim(boot=30, skip_splash=False)
+        self.assertEqual(s.mem('game_mode'), 4, 'splash on boot')
+        self.assertEqual(s.mem('cur_bank'), 4)
+        s.step(400)                                  # times out to the title
+        self.assertEqual(s.mem('game_mode'), 0)
+        s = Sim(boot=60, skip_splash=False)
+        s.press(START)                               # or skip it with START
+        s.step(40)
+        self.assertEqual(s.mem('game_mode'), 0)
+
     def test_new_game_state(self):
         s = new_game()
         self.assertEqual(s.wram(SV_CASH, 3), 3000)

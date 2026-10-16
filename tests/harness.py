@@ -24,11 +24,18 @@ def labels():
 
 
 class Sim:
-    def __init__(self, rom=ROM, boot=60):
+    def __init__(self, rom=ROM, boot=60, skip_splash=True):
         self.nes = NES(rom)
         self.sym = labels()
         self.frame = None
         self.step(boot)
+        if skip_splash and self.mem('game_mode') == 4:
+            self.press(START)
+            for _ in range(200):
+                if self.mem('game_mode') == 0:
+                    break
+                self.step(1)
+            self.step(60)
 
     def step(self, n=1, hold=0):
         self.nes.controller = hold
