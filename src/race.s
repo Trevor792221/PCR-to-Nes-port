@@ -487,7 +487,11 @@ draw_hud:
         lda #$1A
         sta PPUDATA
         lda race_dist+1
-        cmp #>3218
+        cmp #>6436
+        bne :+
+        PRINT str_h_mile, 29, 1
+        jmp :+++
+:       cmp #>3218
         bne :+
         PRINT str_h_half, 29, 1
         jmp :++
@@ -540,6 +544,7 @@ speed_unit_r:
 str_h_quart: .byte "1/4", 0
 str_h_cruise: .byte "CRUISE   START:PAUSE", 0
 str_h_half:  .byte "1/2", 0
+str_h_mile:  .byte "1MI", 0
 str_h_rpm:   .byte "RPM", 0
 str_h_g:     .byte "G", 0
 str_h_mph:   .byte "MPH", 0
@@ -735,9 +740,16 @@ race_run:
         lda race_kind
         cmp #RK_CRUISE
         beq :+
-        lda rc_t+1
-        cmp #>3600
-        bcc :+
+        ldy #>3600              ; 60 s, or 64 s for a mile (ms clock limit)
+        lda race_dist+1
+        cmp #>6436
+        bne @lim
+        ldy #>3840
+@lim:   tya
+        cmp rc_t+1
+        beq @end
+        bcs :+
+@end:
         lda #RS_END
         sta rc_state
         lda #30
@@ -1258,7 +1270,12 @@ traffic_update:
         lda rc_state
         cmp #RS_RUN
         bne @move
-        dec tr_spawn
+        lda race_kind           ; empty-road cruise: no traffic
+        cmp #RK_CRUISE
+        bne :+
+        lda cruise_empty
+        bne @move
+:       dec tr_spawn
         bpl @move
         lda #40
         jsr rand_below

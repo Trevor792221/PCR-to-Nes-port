@@ -80,7 +80,8 @@ race_kind:  .res 1          ; RK_*
 race_dist:  .res 2          ; pixels (1609 = 1/4 mile)
 race_diff:  .res 1          ; quick race difficulty 0-2
 race_bet:   .res 3
-race_half:  .res 1          ; 0 = 1/4 mile, 1 = 1/2 mile (menu setting)
+race_half:  .res 1          ; 0 = 1/4 mile, 1 = 1/2 mile, 2 = 1 mile (menu setting)
+cruise_empty: .res 1        ; cruise mode: 1 = no traffic
 opp_rec:    .res 32         ; opponent car record
 opp_name:   .res 13
 opp_skill:  .res 1

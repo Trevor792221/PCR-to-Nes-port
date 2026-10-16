@@ -202,6 +202,48 @@ class Features(unittest.TestCase):
             shots += not was and s.mem('ph_nos_on')
         self.assertGreaterEqual(shots, 3, 'bottle refills while cruising')
 
+    def test_cruise_without_traffic(self):
+        s = new_game()
+        s.garage_goto(G_RACE)
+        s.press(A)
+        s.step(30)
+        s.list_goto('rs_sel', 5)
+        s.press(RIGHT)                               # traffic off
+        s.step(5)
+        self.assertEqual(s.mem('cruise_empty'), 1)
+        s.press(A)
+        s.step(40)
+        self.assertEqual(s.mem('race_kind'), 5)
+        for f in range(1500):
+            b = A
+            if s.mem('ph_gear') == 0:
+                b |= RIGHT if f % 4 < 2 else 0
+            elif (rpm(s) >= redline(s) - 300 and s.mem('ph_shift_t') == 0
+                  and f % 4 < 2):
+                b |= RIGHT
+            s.step(1, b)
+            self.assertEqual(sum(s.mem('tr_on', i) for i in range(3)), 0)
+
+    def test_one_mile_race(self):
+        s = new_game()
+        s.garage_goto(G_RACE)
+        s.press(A)
+        s.step(30)
+        s.list_goto('rs_sel', 2)
+        s.press(LEFT)                                # 1/4 -> 1 mile
+        s.step(5)
+        self.assertEqual(s.mem('race_half'), 2)
+        s.list_goto('rs_sel', 4)                     # test run
+        s.press(A)
+        s.step(40)
+        self.assertEqual(s.mem16('race_dist'), 6436)
+        drive_race(s, launch=4500, shift_margin=300, max_frames=4500)
+        s.step(60)
+        self.assertEqual(s.mem('game_mode'), 3)
+        et = s.mem16('res_et')
+        self.assertTrue(40000 < et < 55000, et)      # model: 46.9 s
+        self.assertEqual(s.wram(SV_PBEST, 2), 0, 'not a 1/4 mile time')
+
     def test_seven_gear_tune_menu(self):
         s = new_game()
         give_car(s, 0, 11, 4)                        # Nova Hyper, race gearbox

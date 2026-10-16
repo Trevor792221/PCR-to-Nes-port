@@ -30,13 +30,13 @@ runs on real NES / Famicom hardware or any accurate emulator.
 | Dyno | Live dyno run that plots horsepower and torque curves, with peak HP and Nm and the rpm where each peaks. The peak HP is the same figure shown in the garage and dealer |
 | Paint shop | Body, rim and window colours (24 colours each) with a live preview |
 | Crates | Standard (cash) and Premium (gems) crates. Rewards are cash, gems, free part upgrades or a whole car. Very rarely (1 in 256 standard, 5 in 256 premium) they hold the **Zenith X400**, a crate-only prototype racer that never spins its tires and tops out over 400 mph. Keep a garage slot free, or the roll goes to a normal reward. Once you beat The Legend (the last ladder boss), the dealer also sells it for $600,000 |
-| Drag racing with manual shifting | 1/4 and 1/2 mile drag races. Rev on the line, launch on green, shift by hand, fire nitrous. Shift feedback: Perfect, Good, Early or Late |
+| Drag racing with manual shifting | 1/4 mile, 1/2 mile and full-mile drag races (set the distance in race select). Rev on the line, launch on green, shift by hand, fire nitrous. Shift feedback: Perfect, Good, Early or Late |
 | Launch / wheelspin | Clutch-dump launch model: too many revs spin the tires (with smoke), too few bog the engine |
 | Street racing | Half-mile street race on 3 lanes with traffic. Change lanes to dodge cars; crashing costs you your speed |
 | Race scenery | Every race picks one of three backgrounds at random: **day** (pale sky, clouds, grey city), **sunset** (purple-to-orange sky, low sun, black skyline) or **night** (navy sky, moon, lit windows) |
 | Story / ladder progression | Ladder of 10 street bosses, plus a final "Legend" boss. A hidden 12th boss, **Eclipse**, appears in race select only while you drive the Zenith X400. Beating it pays $500,000 and, the first time, 25 gems |
 | Quick races with bets | Random rival on Easy, Medium or Hard, betting $300, $1,000 or $2,500 |
-| Free roam | **Cruise**: endless driving on the 3-lane road with traffic, no rival and no finish line. Nitrous is unlimited: the bottle refills as soon as a shot ends. START pauses, then SELECT returns to the garage |
+| Free roam | **Cruise**: endless driving on the 3-lane road, no rival and no finish line. Press Left/Right on CRUISE to turn traffic on or off. Nitrous is unlimited: the bottle refills as soon as a shot ends. START pauses, then SELECT returns to the garage |
 | Practice / test runs | Solo test run with elapsed time, trap speed, reaction time and 0-60 time. The best 1/4-mile time is saved per car |
 | XP, levels and premium currency | XP from every race. Levelling up gives gems, and higher levels unlock better cars |
 | Auto-save | Battery-backed save with a checksum. It saves after purchases and races |

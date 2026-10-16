@@ -509,16 +509,28 @@ race_select:
         beq @loop
         dec race_diff
         jmp @chg
-@dl:    cmp #2
-        bne @loop
-        lda race_half
+@dl:    cmp #5
+        bne :+
+        lda cruise_empty        ; cruise: traffic on/off
         eor #1
+        sta cruise_empty
+        jmp @chg
+:       cmp #2
+        bne @loop
+        ldx race_half           ; 1/4 -> 1 mile -> 1/2 -> 1/4
+        lda dist_prev,x
         sta race_half
         jmp @chg
 @right: lda ui_sel
         cmp #1
+        beq :+
+        cmp #2
         bne @dl
-        lda race_diff
+        ldx race_half           ; 1/4 -> 1/2 -> 1 mile -> 1/4
+        lda dist_next,x
+        sta race_half
+        jmp @chg
+:       lda race_diff
         cmp #2
         bcs @loop
         inc race_diff
@@ -532,7 +544,7 @@ race_select:
         cmp #6
         beq @back
         cmp #2
-        beq @loop               ; distance row: use left/right
+        jeq @loop               ; distance row: use left/right
         cmp #5
         bne :+
         jsr setup_cruise
@@ -595,6 +607,18 @@ rs_refresh:
         ldx #18
         ldy #8
         jsr vb_str
+        ldx #MOVI_TRAF
+        lda cruise_empty
+        beq :+
+        ldx #MOVI_EMPTY
+:       lda traf_names,x
+        sta ptr0
+        lda traf_names+1,x
+        sta ptr0+1
+        ldx #18
+        ldy #14
+        jsr vb_str
+        jsr wait_frame
         ; info box rows 25..26
         lda rs_sel
         asl a
@@ -668,9 +692,17 @@ diff_names: .word str_easy, str_med, str_hard
 str_easy:   .byte "< EASY   >", 0
 str_med:    .byte "< MEDIUM >", 0
 str_hard:   .byte "< HARD   >", 0
-dist_names: .word str_q, str_h
+dist_names: .word str_q, str_h, str_m
+dist_next:  .byte 1, 2, 0
+dist_prev:  .byte 2, 0, 1
 str_q:      .byte "< 1/4 MILE >", 0
 str_h:      .byte "< 1/2 MILE >", 0
+str_m:      .byte "<  1 MILE  >", 0
+MOVI_TRAF  = 0
+MOVI_EMPTY = 2
+traf_names: .word str_traf, str_notraf
+str_traf:   .byte "< TRAFFIC >", 0
+str_notraf: .byte "< NO CARS >", 0
 rs_info:    .word str_i0, str_i1, str_i2, str_i3, str_i4, str_i7, str_i5, str_i6
 str_i0:     .byte "BEAT THE 10 STREET BOSSES", 0
 str_i1:     .byte "RANDOM RIVAL, WIN THE BET", 0
@@ -680,7 +712,7 @@ str_i4:     .byte "SOLO RUN, TIME YOUR CAR", 0
 str_i5:     .byte "BACK TO THE GARAGE", 0
 str_i6:     .byte "ONLY AN X400 CAN TAKE IT ON", 0
 str_i6b:    .byte "ECLIPSE - WIN $500000", 0
-str_i7:     .byte "ENDLESS ROAD WITH TRAFFIC", 0
+str_i7:     .byte "ENDLESS ROAD, L/R: TRAFFIC", 0
 str_i7b:    .byte "START, THEN SELECT: EXIT", 0
 
 ; calc_bet: m_a = bet for race_diff
@@ -905,6 +937,14 @@ setup_test:
         jmp set_dist
 
 set_dist:
+        cmp #2
+        bne :+
+        lda #<6436              ; 1 mile
+        sta race_dist
+        lda #>6436
+        sta race_dist+1
+        rts
+:       cmp #0
         beq :+
         lda #<3218
         sta race_dist
