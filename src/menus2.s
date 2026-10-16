@@ -1918,18 +1918,8 @@ options_screen:
         lda #MODE_TITLE
         sta next_mode
         rts
-@erase: MOVI16 ptr0, str_op_sure
-        ldy #16
-        jsr confirm
-        bcs :+
-        jsr new_game
-        lda #MODE_TITLE
-        sta next_mode
-        rts
-:       MOVI16 ptr0, str_blank2
-        ldy #28
-        jsr vb_msg
-        jmp @loop
+@erase: FARCALL BANK_PW, pw_show
+        jmp options_screen
 @back:  rts
 
 op_bits: .byte OPT_KMH, OPT_NOMUSIC, OPT_AUTO
@@ -1967,7 +1957,7 @@ str_options:  .byte "OPTIONS", 0
 str_op0:      .byte "SPEED UNITS", 0
 str_op1:      .byte "MUSIC", 0
 str_op2:      .byte "GEAR SHIFTS", 0
-str_op3:      .byte "ERASE SAVE", 0
+str_op3:      .byte "PASSWORD", 0
 str_op4:      .byte "BACK", 0
 str_op5:      .byte "QUIT TO TITLE", 0
 str_ov_mph:   .byte "< MPH  >", 0
@@ -1976,7 +1966,6 @@ str_ov_on:    .byte "< ON   >", 0
 str_ov_off:   .byte "< OFF  >", 0
 str_ov_man:   .byte "< MANUAL >", 0
 str_ov_auto:  .byte "< AUTO   >", 0
-str_op_sure:  .byte "REALLY ERASE EVERYTHING?", 0
 str_c0:       .byte "RACE CONTROLS", 0
 str_c1:       .byte "A      GAS (HOLD TO REV)", 0
 str_c2:       .byte "RIGHT  SHIFT UP / LAUNCH", 0

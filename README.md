@@ -37,9 +37,9 @@ runs on real NES / Famicom hardware or any accurate emulator.
 | Story / ladder progression | Ladder of 10 street bosses, plus a final "Legend" boss. A hidden 12th boss, **Eclipse**, appears in race select only while you drive the Zenith X400. Beating it pays $500,000 and, the first time, 25 gems |
 | Quick races with bets | Random rival on Easy, Medium or Hard, betting $300, $1,000 or $2,500 |
 | Free roam | **Cruise**: endless driving on the 3-lane road, no rival and no finish line. Press Left/Right on CRUISE to turn traffic on or off. Nitrous is unlimited: the bottle refills as soon as a shot ends. START pauses, then SELECT returns to the garage |
-| Practice / test runs | Solo test run with elapsed time, trap speed, reaction time and 0-60 time. The best 1/4-mile time is saved per car |
+| Practice / test runs | Solo test run with elapsed time, trap speed, reaction time and 0-60 time. The best 1/4-mile time is kept per car |
 | XP, levels and premium currency | XP from every race. Levelling up gives gems, and higher levels unlock better cars |
-| Auto-save | Battery-backed save with a checksum. It saves after purchases and races |
+| Saving | **Passwords**, like classic NES games. OPTIONS → PASSWORD shows two: a 15-letter **player** password (cash, gems, level, XP, bosses beaten, options) and a **garage** password (every car with all its parts and body colour, and the car you drive) that is 11 letters for one car and grows by about 8 letters per car, up to 66. Enter them from TITLE → PASSWORD. Gear tunes, rim and glass colours, best times and the stats page start fresh after a password. The letters skip I, O, 0 and 1 so nothing looks alike, and a checksum catches typos |
 | Stats | Garage → STATS: races completed, wins and losses, your best 1/4-mile time and the car that set it, your fastest trap speed and car, a boss tracker (+ beaten, - not yet), and crates opened |
 | Options | MPH or km/h, music on/off, manual or automatic shifting, quit to title |
 
@@ -113,7 +113,7 @@ the way the console mixes them.
 | Mapper | MMC1 (SNROM), iNES mapper 1 | NES 2.0 header |
 | PRG-ROM | 128 KB | 8 x 16 KB banks. Bank 7 is fixed at `$C000` |
 | CHR-RAM | 8 KB | Tiles are uploaded or generated at run time (dyno graph, 2x cars) |
-| PRG-RAM | 8 KB, battery | Save game plus work buffers |
+| PRG-RAM | 8 KB, no battery | Game state plus work buffers. Progress is saved with passwords |
 
 It runs on flash carts (EverDrive N8, PowerPak and similar) or on any SNROM
 board. Timing is tuned for **NTSC**. PAL consoles get the same game, but the
@@ -126,7 +126,8 @@ physics runs at 50 Hz.
 | 2 | Race engine (drag, street, test), HUD, AI, traffic |
 | 3 | Parts, tune, paint, crates, dyno, options |
 | 4 | Race scenery (day, sunset, night) and the boot splash screen |
-| 7 (fixed) | Reset/NMI, PPU helpers, math, physics, sound, save, car data |
+| 5 | Passwords (encode, decode, entry and display screens) |
+| 7 (fixed) | Reset/NMI, PPU helpers, math, physics, sound, game state, car data |
 
 ## How it works
 
@@ -169,11 +170,14 @@ physics runs at 50 Hz.
   checks it against the Python model, frame by frame.
 * `tests/test_nmi.py` checks that every NMI's PPU writes fit in vblank
   (menus, dealer browsing, a street race).
+* `tests/test_password.py` checks the passwords: the reference encoder in
+  `tools/password.py` round-trips, the ROM's passwords match it, both typed
+  into a fresh console restore the game, and wrong passwords are refused.
 * `tests/test_cheats.py` runs the game with each Game Genie code applied
   and checks that the cheat works, and that the debug menu stays hidden
   without the code.
 * `tests/test_game.py` plays the ROM in the cynes NES emulator. It covers new
-  game, buying parts, save persistence across reset, a test run, beating the
+  game, buying parts, state kept across a reset, a test run, beating the
   first ladder boss, foul starts, a street race with no dropped frames, the
   dealer and crates.
 

@@ -4,7 +4,7 @@
 ; popular by Pixel Car Racer.  All code, art, music and names are original.
 ;
 ; Build: ca65 + ld65 (see Makefile).  Mapper: MMC1 (SNROM), 128 KB PRG,
-; 8 KB CHR-RAM, 8 KB battery-backed WRAM.
+; 8 KB CHR-RAM, 8 KB WRAM (no battery: progress is kept as two passwords).
 ; ===========================================================================
 
 .include "defs.inc"
@@ -136,6 +136,9 @@ cheat_debug:     .byte 0        ; $FFC2  non-zero: SELECT in the garage = debug 
 
 .segment "BANK2"
 .include "race.s"
+
+.segment "BANK5"
+.include "password.s"
 
 ; ---------------------------------------------------------------------------
 ; Reset stubs: identical in every bank so the console boots no matter which

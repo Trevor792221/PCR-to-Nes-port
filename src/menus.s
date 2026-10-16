@@ -58,6 +58,7 @@ title_main:
         sta text_attr
         PRINT str_t_cont, 12, 15
         PRINT str_t_new, 12, 17
+        PRINT str_t_pw, 12, 19
         PRINT str_t_fan1, 3, 26
         PRINT str_t_fan2, 5, 27
         ; road
@@ -109,7 +110,7 @@ title_main:
         lda #0
         sta ui_sel
         sta t_car_x
-        lda #2
+        lda #3
         sta ui_count
         lda #10
         sta ui_x
@@ -170,6 +171,15 @@ title_main:
         jmp @loop
 @pick:  jsr rng_stir
         lda ui_sel
+        cmp #2
+        bne :+
+        FARCALL BANK_PW, pw_title
+        bne @redo
+        lda #MODE_GARAGE
+        sta next_mode
+        rts
+@redo:  jmp title_main
+:       lda ui_sel
         bne @new
         lda #MODE_GARAGE
         sta next_mode
@@ -193,9 +203,10 @@ str_t_sub:  .byte "- STREET DRAG RACING -", 0
 str_t_nes:  .byte "NES EDITION", 0
 str_t_cont: .byte "CONTINUE", 0
 str_t_new:  .byte "NEW GAME", 0
+str_t_pw:   .byte "PASSWORD", 0
 str_t_fan1: .byte "UNOFFICIAL FAN-MADE DEMAKE", 0
 str_t_fan2: .byte "ORIGINAL ART AND MUSIC", 0
-str_t_sure: .byte "ERASE SAVE?", 0
+str_t_sure: .byte "START OVER?", 0
 str_blank:  .byte 0
 
 ; ===========================================================================
