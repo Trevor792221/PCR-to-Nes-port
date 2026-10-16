@@ -2,9 +2,12 @@
 """Reference encoder/decoder for Pixel Racer's two passwords (mirrors
 src/password.s bit for bit).
 
-PLAYER password, 15 characters:
+PLAYER password, 32 characters:
     version 2 | cash 24 | gems 12 | level 7 | xp 12 | ladder 4 | secret 1 |
-    options 3 | checksum 8
+    options 3 | races 12 | wins 12 | losses 12 | crates 10 | street wins 8 |
+    best 1/4 ms 15 | its car 4 | top mph 10 | its car 4 | checksum 8
+  (15-character version-1 passwords from v3.0, without the stats after
+  options, are still accepted.)
 GARAGE password, 11-66 characters (grows with the number of cars):
     version 2 | cars-1 3 | car in use 3 |
     per car: model 4, parts as 6 pairs (a*5+b) of 5 bits, body colour 5 |
@@ -20,9 +23,9 @@ for the two passwords so they can't be swapped.
 import sys
 
 ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
-VERSION = 1
 SEED_PLAYER, SEED_GARAGE = 0x5A, 0xC3
-PLAYER_LEN = 15
+PLAYER_LEN = 15             # version 1 (v3.0): no stats
+PLAYER_LEN2 = 32            # version 2: with stats
 NPARTS = 12
 NCARS = 13
 CASH_MAX = 9999999
@@ -35,27 +38,45 @@ def garage_len(ncars):
 
 
 class Bits:
-    def __init__(self, seed):
+    """crc=True: CRC-8 (poly $07) over every field bit -- catches any one
+    wrong letter.  crc=False: the version-1 rotate-and-add field sum."""
+
+    def __init__(self, seed, crc=True):
         self.bits = []
         self.pos = 0
         self.chk = seed
+        self.crc = crc
 
     def _sum(self, v):
         self.chk = ((self.chk << 1) | (self.chk >> 7)) & 0xFF
         self.chk = (self.chk + v) & 0xFF
 
+    def _crc_bit(self, bit):
+        fb = (self.chk >> 7) ^ bit
+        self.chk = (self.chk << 1) & 0xFF
+        if fb:
+            self.chk ^= 0x07
+
     def put(self, v, n, chk=True):
         assert 0 <= v < (1 << n), (v, n)
+        bits = [(v >> (n - 1 - i)) & 1 for i in range(n)]
         if chk:
-            self._sum(v)
-        self.bits += [(v >> (n - 1 - i)) & 1 for i in range(n)]
+            if self.crc:
+                for bit in bits:
+                    self._crc_bit(bit)
+            else:
+                self._sum(v)
+        self.bits += bits
 
     def get(self, n, chk=True):
         v = 0
         for _ in range(n):
-            v = v << 1 | (self.bits[self.pos] if self.pos < len(self.bits) else 0)
+            bit = self.bits[self.pos] if self.pos < len(self.bits) else 0
+            v = v << 1 | bit
             self.pos += 1
-        if chk:
+            if chk and self.crc:
+                self._crc_bit(bit)
+        if chk and not self.crc:
             self._sum(v)
         return v
 
@@ -69,8 +90,8 @@ class Bits:
         return out
 
     @classmethod
-    def from_text(cls, s, seed):
-        b = cls(seed)
+    def from_text(cls, s, seed, crc=True):
+        b = cls(seed, crc)
         m = 7
         for c in s:
             b.put(ALPHABET.index(c) ^ m, 5, chk=False)
@@ -79,52 +100,84 @@ class Bits:
         return b
 
 
-def encode_player(cash, gems, level, xp, ladder, secret, options):
-    b = Bits(SEED_PLAYER)
-    gems, xp = min(gems, 4095), min(xp, 4095)
-    b.put(VERSION, 2)
+STATS = (('races', 12), ('wins', 12), ('losses', 12), ('crates', 10), ('street', 8),
+         ('pbest', 15), ('pbcar', 4), ('topmph', 10), ('topcar', 4))
+
+
+def put_w(b, v, n):
+    """n-bit field (n >= 8): high n-8 bits, then the low byte.  Clamped."""
+    v = min(v, (1 << n) - 1)
+    if n > 8:
+        b.put(v >> 8, n - 8)
+    b.put(v & 0xFF, 8)
+
+
+def get_w(b, n):
+    v = b.get(n - 8) << 8 if n > 8 else 0
+    return v | b.get(8)
+
+
+def encode_player(cash, gems, level, xp, ladder, secret, options, stats=None):
+    """With stats: version 2, 32 letters.  Without: version 1, 15 letters."""
+    b = Bits(SEED_PLAYER, crc=bool(stats))
+    b.put(2 if stats else 1, 2)
     for sh in (16, 8, 0):
         b.put(cash >> sh & 0xFF, 8)
-    b.put(gems >> 8, 4)
-    b.put(gems & 0xFF, 8)
+    put_w(b, gems, 12)
     b.put(level, 7)
-    b.put(xp >> 8, 4)
-    b.put(xp & 0xFF, 8)
+    put_w(b, xp, 12)
     b.put(ladder, 4)
     b.put(secret & 1, 1)
     b.put(options & 7, 3)
+    if stats:
+        for name, n in STATS:
+            if n < 8:
+                b.put(stats[name] & ((1 << n) - 1), n)
+            else:
+                put_w(b, stats[name], n)
     b.put(b.chk, 8, chk=False)
-    return b.text(PLAYER_LEN)
+    return b.text(PLAYER_LEN2 if stats else PLAYER_LEN)
 
 
 def decode_player(s):
-    if len(s) != PLAYER_LEN:
+    if len(s) not in (PLAYER_LEN, PLAYER_LEN2):
         return None
-    b = Bits.from_text(s, SEED_PLAYER)
-    if b.get(2) != VERSION:
+    b = Bits.from_text(s, SEED_PLAYER, crc=len(s) == PLAYER_LEN2)
+    ver = b.get(2)
+    if ver != (1 if len(s) == PLAYER_LEN else 2):
         return None
     cash = b.get(8) << 16
     cash |= b.get(8) << 8
     cash |= b.get(8)
-    gems = b.get(4) << 8
-    gems |= b.get(8)
+    gems = get_w(b, 12)
     level = b.get(7)
-    xp = b.get(4) << 8
-    xp |= b.get(8)
+    xp = get_w(b, 12)
     ladder, secret, options = b.get(4), b.get(1), b.get(3)
+    stats = None
+    if ver == 2:
+        stats = {name: (b.get(n) if n < 8 else get_w(b, n)) for name, n in STATS}
     want = b.chk
-    if b.get(8, chk=False) != want or b.get(2, chk=False):    # padding must be 0
+    if b.get(8, chk=False) != want:
+        return None
+    pad = len(s) * 5 - b.pos
+    if pad and b.get(pad, chk=False):                           # padding must be 0
         return None
     if cash > CASH_MAX or not 1 <= level <= 99 or ladder > 11:
         return None
-    return dict(cash=cash, gems=gems, level=level, xp=xp, ladder=ladder,
-                secret=secret, options=options)
+    out = dict(cash=cash, gems=gems, level=level, xp=xp, ladder=ladder,
+               secret=secret, options=options)
+    if stats:
+        if stats['pbcar'] >= NCARS or stats['topcar'] >= NCARS:
+            return None
+        out['stats'] = stats
+    return out
 
 
-def encode_garage(cars, cur):
-    """cars: list of (model, parts[12], body colour byte); cur: index."""
-    b = Bits(SEED_GARAGE)
-    b.put(VERSION, 2)
+def encode_garage(cars, cur, version=2):
+    """cars: list of (model, parts[12], body colour byte); cur: index.
+    Version 2 uses the CRC; version 1 (v3.0) the field sum."""
+    b = Bits(SEED_GARAGE, crc=version == 2)
+    b.put(version, 2)
     b.put(len(cars) - 1, 3)
     b.put(cur, 3)
     for model, parts, paint in cars:
@@ -137,9 +190,11 @@ def encode_garage(cars, cur):
 
 
 def decode_garage(s):
-    b = Bits.from_text(s, SEED_GARAGE)
-    if b.get(2) != VERSION:
+    ver = Bits.from_text(s, SEED_GARAGE).get(2, chk=False)
+    if ver not in (1, 2):
         return None
+    b = Bits.from_text(s, SEED_GARAGE, crc=ver == 2)
+    b.get(2)
     n = b.get(3) + 1
     cur = b.get(3)
     if len(s) != garage_len(n) or cur >= n:
@@ -171,6 +226,6 @@ if __name__ == '__main__':
         print(decode_player(sys.argv[1].upper()))
         print(decode_garage(sys.argv[2].upper()))
     else:
-        p = encode_player(3000, 5, 1, 0, 0, 0, 0)
+        p = encode_player(3000, 5, 1, 0, 0, 0, 0, dict.fromkeys(dict(STATS), 0))
         g = encode_garage([(0, [0] * 12, 0x27)], 0)
         print('new game:', p, g)

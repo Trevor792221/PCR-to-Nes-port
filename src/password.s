@@ -1,8 +1,12 @@
 ; ===========================================================================
 ; password.s -- the two passwords that replace the battery save (bank 5)
 ;
-; PLAYER (15 chars): version 2 | cash 24 | gems 12 | level 7 | xp 12 |
-;                    ladder 4 | secret 1 | options 3 | checksum 8
+; PLAYER (32 chars): version 2 | cash 24 | gems 12 | level 7 | xp 12 |
+;                    ladder 4 | secret 1 | options 3 | races 12 | wins 12 |
+;                    losses 12 | crates 10 | street wins 8 | best 1/4 15 |
+;                    its car 4 | top mph 10 | its car 4 | checksum 8
+;                    (15-char version 1 passwords from v3.0 stop after
+;                    options and still work)
 ; GARAGE (11-66 chars): version 2 | cars-1 3 | car in use 3 |
 ;                    per car: model 4, parts as 6 pairs (a*5+b) x 5 bits,
 ;                    body colour 5 | checksum 8
@@ -29,21 +33,27 @@ pw_i:       .res 1
 pw_j:       .res 1
 pw_s:       .res 1
 pw_row:     .res 1
+pw_hb:      .res 1
+pw_mode:    .res 1          ; checksum: 0 field sum (version 1), 1 CRC-8
+pw_crcon:   .res 1          ; $80 while a field's bits go through the CRC
+pw_tb:      .res 1
+pw_ver:     .res 1
 
 .segment "BANK5"
 
 PW_BUF    = DYNO_BMP            ; 48-byte bit buffer (dyno work area)
 PW_BUFSZ  = 48
 PW_TEXT   = DYNO_BMP + $40      ; up to 72 symbols (0-31)
-PW_PL     = DYNO_BMP + $90      ; decoded player fields (11 bytes)
-PW_N      = DYNO_BMP + $9E      ; decoded garage: cars
-PW_CUR    = DYNO_BMP + $9F      ;   car in use
-PW_CARS   = DYNO_BMP + $A0      ;   8 x 14: model, 12 parts, colour index
+PW_PL     = DYNO_BMP + $90      ; decoded player fields (25 bytes, see pw_apply)
+PW_N      = DYNO_BMP + $B0      ; decoded garage: cars
+PW_CUR    = DYNO_BMP + $B1      ;   car in use
+PW_CARS   = DYNO_BMP + $C0      ;   8 x 14: model, 12 parts, colour index
 
-PW_VERSION   = 1
+PW_PL_SIZE   = 25
 SEED_PLAYER  = $5A
 SEED_GARAGE  = $C3
-PLAYER_LEN   = 15
+PLAYER_LEN   = 15               ; version 1 (v3.0): no stats
+PLAYER_LEN2  = 32               ; version 2: with stats
 GARAGE_MAX   = 66
 
 pw_alpha:   .byte "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
@@ -81,10 +91,38 @@ pw_sum:
         pla
         rts
 
-; pw_put: write the low X bits of A, MSB first, and add A to the checksum.
-; pw_putb: the same without the checksum.  Clobbers X, Y.
+; pw_crc_bit: CRC-8 (poly $07) step for the data bit in A (0/1).  Keeps X, Y.
+pw_crc_bit:
+        sta pw_tb
+        lda pw_chk
+        rol a                   ; C = top bit
+        lda #0
+        rol a
+        eor pw_tb               ; feedback
+        asl pw_chk
+        lsr a
+        bcc :+
+        lda pw_chk
+        eor #$07
+        sta pw_chk
+:       rts
+
+; pw_put: write the low X bits of A, MSB first, and run it through the
+; checksum (pw_mode).  pw_putb: no checksum.  Clobbers X, Y.
 pw_put:
+        pha
+        lda pw_mode
+        bne @crc
+        pla
         jsr pw_sum
+        jmp pw_putb
+@crc:   lda #$80
+        sta pw_crcon
+        pla
+        jsr pw_putb
+        lda #0
+        sta pw_crcon
+        rts
 pw_putb:
         sta pw_v
         stx pw_cnt
@@ -98,7 +136,15 @@ pw_putb:
         bne :-
 :       ldx pw_cnt
 @b:     asl pw_v
-        bcc @z
+        lda #0
+        rol a                   ; A = the bit
+        bit pw_crcon
+        bpl :+
+        pha
+        jsr pw_crc_bit
+        pla
+:       tay
+        beq @z
         ldy pw_byte
         lda PW_BUF,y
         ora pw_bit
@@ -111,11 +157,20 @@ pw_putb:
         bne @b
         rts
 
-; pw_get: read X bits -> A and add it to the checksum.  pw_getb: no
+; pw_get: read X bits -> A and run it through the checksum.  pw_getb: no
 ; checksum.  Clobbers X, Y.
 pw_get:
+        lda pw_mode
+        bne @crc
         jsr pw_getb
         jmp pw_sum
+@crc:   lda #$80
+        sta pw_crcon
+        jsr pw_getb
+        ldy #0
+        sty pw_crcon
+        tay                     ; flags from the value
+        rts
 pw_getb:
         lda #0
         sta pw_v
@@ -124,7 +179,12 @@ pw_getb:
         and pw_bit
         cmp #1                  ; carry = the bit
         rol pw_v
-        lsr pw_bit
+        bit pw_crcon
+        bpl :+
+        lda pw_v
+        and #1
+        jsr pw_crc_bit
+:       lsr pw_bit
         bne :+
         ror pw_bit
         inc pw_byte
@@ -179,27 +239,46 @@ pw_next_mask:
         sta pw_m
         rts
 
-; pw_put12: 12-bit field, A = high byte, pw_lo = low byte (max 4095)
-pw_put12:
-        cmp #16
-        bcc :+
+; pw_put_w: (X+8)-bit field: A = high byte (X bits), pw_lo = low byte.
+; Values too big for the field are clamped to its maximum.
+pw_put_w:
+        stx pw_hb
+        cpx #8
+        bcs @ok
+        cmp pw_lim,x
+        bcc @ok
         lda #$FF
         sta pw_lo
-        lda #15
-:       ldx #4
+        lda pw_lim,x
+        sec
+        sbc #1
+@ok:    ldx pw_hb
         jsr pw_put
         lda pw_lo
         ldx #8
         jmp pw_put
+pw_lim: .byte 1, 2, 4, 8, 16, 32, 64, 128
+
+; pw_get_w: read an (X+8)-bit field -> A = high byte, pw_lo = low byte
+pw_get_w:
+        jsr pw_get
+        pha
+        ldx #8
+        jsr pw_get
+        sta pw_lo
+        pla
+        rts
 
 ; ---------------------------------------------------------------------------
 ; PLAYER password
 ; ---------------------------------------------------------------------------
 pw_enc_player:
         jsr pw_reset
+        lda #1
+        sta pw_mode
         lda #SEED_PLAYER
         sta pw_chk
-        lda #PW_VERSION
+        lda #2                  ; version 2: with stats
         ldx #2
         jsr pw_put
         lda SV_CASH+2
@@ -214,14 +293,16 @@ pw_enc_player:
         lda SV_GEMS
         sta pw_lo
         lda SV_GEMS+1
-        jsr pw_put12
+        ldx #4
+        jsr pw_put_w
         lda SV_LEVEL
         ldx #7
         jsr pw_put
         lda SV_XP
         sta pw_lo
         lda SV_XP+1
-        jsr pw_put12
+        ldx #4
+        jsr pw_put_w
         lda SV_LADDER
         and #15
         ldx #4
@@ -234,24 +315,78 @@ pw_enc_player:
         and #7
         ldx #3
         jsr pw_put
+        ; stats
+        lda SV_RACES
+        sta pw_lo
+        lda SV_RACES+1
+        ldx #4
+        jsr pw_put_w
+        lda SV_WINS
+        sta pw_lo
+        lda SV_WINS+1
+        ldx #4
+        jsr pw_put_w
+        lda SV_LOSSES
+        sta pw_lo
+        lda SV_LOSSES+1
+        ldx #4
+        jsr pw_put_w
+        lda SV_CRATES
+        sta pw_lo
+        lda SV_CRATES+1
+        ldx #2
+        jsr pw_put_w
+        lda SV_STREET
+        ldx #8
+        jsr pw_put
+        lda SV_PBEST
+        sta pw_lo
+        lda SV_PBEST+1
+        ldx #7
+        jsr pw_put_w
+        lda SV_PBCAR
+        and #15
+        ldx #4
+        jsr pw_put
+        lda SV_TOPSPD           ; top speed: mph (10 bits), then its car
+        sta pw_lo
+        lda SV_TOPSPD+1
+        and #3
+        ldx #2
+        jsr pw_put_w
+        lda SV_TOPSPD+1
+        lsr a
+        lsr a
+        lsr a
+        lsr a
+        ldx #4
+        jsr pw_put
         lda pw_chk
         ldx #8
         jsr pw_putb
-        lda #PLAYER_LEN
+        lda #PLAYER_LEN2
         sta pw_len
         jmp pw_to_text
 
 ; pw_dec_player: PW_TEXT -> PW_PL.  Carry set if the password is wrong.
+; 32 letters (version 2, with stats) or 15 (version 1 from v3.0: no stats).
 pw_dec_player:
+        ldx #1
         lda pw_len
         cmp #PLAYER_LEN
+        beq :+
+        inx
+        cmp #PLAYER_LEN2
         jne pw_bad
+:       stx pw_ver
+        dex                     ; version 2 checks with the CRC
+        stx pw_mode
         jsr pw_from_text
         lda #SEED_PLAYER
         sta pw_chk
         ldx #2
         jsr pw_get
-        cmp #PW_VERSION
+        cmp pw_ver
         jne pw_bad
         ldx #8
         jsr pw_get
@@ -286,15 +421,75 @@ pw_dec_player:
         ldx #3
         jsr pw_get
         sta PW_PL+10            ; options
-        lda pw_chk
+        ldx #PW_PL_SIZE-12      ; stats: none in a version 1 password
+        lda #0
+:       sta PW_PL+11,x
+        dex
+        bpl :-
+        lda pw_ver
+        cmp #2
+        jne @sum
+        ldx #4
+        jsr pw_get_w
+        sta PW_PL+12            ; races
+        lda pw_lo
+        sta PW_PL+11
+        ldx #4
+        jsr pw_get_w
+        sta PW_PL+14            ; wins
+        lda pw_lo
+        sta PW_PL+13
+        ldx #4
+        jsr pw_get_w
+        sta PW_PL+16            ; losses
+        lda pw_lo
+        sta PW_PL+15
+        ldx #2
+        jsr pw_get_w
+        sta PW_PL+18            ; crates
+        lda pw_lo
+        sta PW_PL+17
+        ldx #8
+        jsr pw_get
+        sta PW_PL+19            ; street wins
+        ldx #7
+        jsr pw_get_w
+        sta PW_PL+21            ; best 1/4 ms
+        lda pw_lo
+        sta PW_PL+20
+        ldx #4
+        jsr pw_get
+        sta PW_PL+22            ; its car
+        cmp #NCARS
+        jcs pw_bad
+        ldx #2
+        jsr pw_get_w
+        sta PW_PL+24            ; top speed (mph high bits)
+        lda pw_lo
+        sta PW_PL+23
+        ldx #4
+        jsr pw_get              ; its car
+        cmp #NCARS
+        jcs pw_bad
+        asl a
+        asl a
+        asl a
+        asl a
+        ora PW_PL+24
+        sta PW_PL+24
+@sum:   lda pw_chk
         sta pw_want
         ldx #8
         jsr pw_getb
         cmp pw_want
-        bne pw_bad
-        ldx #2                  ; the 2 spare bits must be 0
+        jne pw_bad
+        lda pw_ver              ; version 1 has 2 spare bits; they must be 0
+        cmp #2
+        beq :+
+        ldx #2
         jsr pw_getb
-        bne pw_bad
+        jne pw_bad
+:
         lda PW_PL+5             ; level 1-99
         beq pw_bad
         cmp #100
@@ -319,9 +514,11 @@ pw_bad: sec
 ; ---------------------------------------------------------------------------
 pw_enc_garage:
         jsr pw_reset
+        lda #1
+        sta pw_mode
         lda #SEED_GARAGE
         sta pw_chk
-        lda #PW_VERSION
+        lda #2                  ; version 2: CRC
         ldx #2
         jsr pw_put
         ; count the cars and find the one in use
@@ -410,12 +607,24 @@ pw_dec_garage:
         cmp #11
         jcc pw_bad
         jsr pw_from_text
+        ldx #2                  ; version 1 (v3.0) field sum, 2 CRC
+        jsr pw_getb
+        sta pw_ver
+        beq @bad
+        cmp #3
+        bcs @bad
+        sec
+        sbc #1
+        sta pw_mode
+        jsr pw_rewind
         lda #SEED_GARAGE
         sta pw_chk
         ldx #2
         jsr pw_get
-        cmp #PW_VERSION
-        jne pw_bad
+        cmp pw_ver
+        beq :+
+@bad:   jmp pw_bad
+:
         ldx #3
         jsr pw_get
         tax
@@ -516,6 +725,34 @@ pw_apply:
         sta SV_SECRET
         lda PW_PL+10
         sta SV_OPTIONS
+        lda PW_PL+11
+        sta SV_RACES
+        lda PW_PL+12
+        sta SV_RACES+1
+        lda PW_PL+13
+        sta SV_WINS
+        lda PW_PL+14
+        sta SV_WINS+1
+        lda PW_PL+15
+        sta SV_LOSSES
+        lda PW_PL+16
+        sta SV_LOSSES+1
+        lda PW_PL+17
+        sta SV_CRATES
+        lda PW_PL+18
+        sta SV_CRATES+1
+        lda PW_PL+19
+        sta SV_STREET
+        lda PW_PL+20
+        sta SV_PBEST
+        lda PW_PL+21
+        sta SV_PBEST+1
+        lda PW_PL+22
+        sta SV_PBCAR
+        lda PW_PL+23
+        sta SV_TOPSPD
+        lda PW_PL+24
+        sta SV_TOPSPD+1
         MOVI16 ptr2, PW_CARS
         lda #0
         sta pw_s
@@ -576,15 +813,15 @@ pw_show:
         lda #$20
         sta text_attr
         PRINT str_pw_yours, 2, 3
-        PRINT str_pw_player, 2, 6
-        PRINT str_pw_garage, 2, 11
+        PRINT str_pw_player, 2, 5
+        PRINT str_pw_garage, 2, 12
         lda #0
         sta text_attr
         jsr pw_enc_player
-        lda #8
+        lda #7
         jsr pw_print_rows
         jsr pw_enc_garage
-        lda #13
+        lda #14
         jsr pw_print_rows
         PRINT str_pw_note1, 2, 24
         PRINT str_pw_note2, 2, 25
@@ -712,7 +949,7 @@ pw_enter:
         lda #0
         sta pw_len
         sta pw_sel
-        lda #PLAYER_LEN
+        lda #PLAYER_LEN2
         ldx pw_kind
         beq :+
         lda #GARAGE_MAX
@@ -882,7 +1119,7 @@ pw_hints_lo:  .byte <str_pw_h1, <str_pw_h2
 pw_hints_hi:  .byte >str_pw_h1, >str_pw_h2
 str_pw_t1:     .byte "PASSWORD 1: PLAYER", 0
 str_pw_t2:     .byte "PASSWORD 2: GARAGE", 0
-str_pw_h1:     .byte "15 LETTERS", 0
+str_pw_h1:     .byte "32 LETTERS", 0
 str_pw_h2:     .byte "11 LETTERS, MORE WITH MORE CARS", 0
 str_pw_help1:  .byte "A:ADD  B:DELETE  START:DONE", 0
 str_pw_help2:  .byte "SELECT:BACK TO THE TITLE", 0
