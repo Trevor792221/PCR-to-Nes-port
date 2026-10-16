@@ -30,7 +30,10 @@ $(ROM): build/main.o cfg/pxracer.cfg
 test: $(ROM)
 	$(PYTHON) -m unittest discover -s tests -v
 
+soundtrack: tools/render_wav.py tools/mkmusic.py
+	$(PYTHON) tools/render_wav.py release/soundtrack
+
 clean:
 	rm -rf build
 
-.PHONY: all test clean
+.PHONY: all test clean soundtrack

@@ -71,6 +71,22 @@ make test       # needs: pip install cynes py65 numpy pillow
 
 A prebuilt ROM is at [`release/pxracer.nes`](release/pxracer.nes).
 
+## Soundtrack
+
+The game's original music is also available as WAV files (44.1 kHz,
+16-bit mono) in [`release/soundtrack/`](release/soundtrack):
+
+| File | Track |
+|---|---|
+| `01-midnight-garage.wav` | "Midnight Garage", the title and garage theme (two loops, 68 s) |
+| `02-win.wav` | Race win jingle |
+| `03-lose.wav` | Race lose jingle |
+
+`make soundtrack` regenerates them. `tools/render_wav.py` plays the same
+music data as the ROM through an emulation of the game's sound engine and
+the NES APU: two pulse channels, the triangle and the noise channel, mixed
+the way the console mixes them.
+
 ## Cartridge
 
 | Part | Size | Notes |
