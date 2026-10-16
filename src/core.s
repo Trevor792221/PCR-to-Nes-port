@@ -364,6 +364,20 @@ rand:
         cmp #0
         rts
 
+; rng_stir: mix the frame counter into the generator.  Called when the
+; player presses a button (title screen, race start): how many frames that
+; took is the one truly random input the console has.
+rng_stir:
+        lda rng
+        eor frame
+        sta rng
+        lda rng+1
+        eor frame+1
+        ora #$01                ; never let the state become zero
+        sta rng+1
+        jsr rand
+        jmp rand
+
 ; rand_below: A = limit (1-255) -> A in 0..limit-1
 rand_below:
         sta tmp6

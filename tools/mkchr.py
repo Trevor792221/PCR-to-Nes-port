@@ -5,12 +5,13 @@ Usage: mkchr.py OUTDIR
 
 Writes:
   common.chr   BG tiles $00-$7F (UI tiles + font)              2 KB
-  race.chr     BG tiles $80-$FF for races (skyline, road)      2 KB
+  raceN.chr    BG tiles $80-$FF for race theme N (road, skyline) 2 KB each
+               themes: 0 day, 1 sunset, 2 night
   menu.chr     BG tiles $80-$FF for menus (logo, garage)       2 KB
   sprites.chr  sprite tiles $00-$3F                            1 KB
   cars.chr     6 car bodies x 12 tiles (top 4, wheels A, wheels B)
   bigcars.chr  6 car bodies x 32 tiles (2x scale, for menus)
-  race_map.bin nametable rows 6-29 for the race background (24x32)
+  race_mapN.bin nametable rows 6-29 for race theme N (24x32)
   logo_map.bin title logo (2 rows x 22 tiles)
 """
 import os
@@ -116,63 +117,119 @@ class TileSet:
         return b''.join(self.tiles + [solid(0)] * (self.limit - len(self.tiles)))
 
 
-def build_race():
-    ts = TileSet(0x80)
-    rnd = random.Random(1987)
-    W = 256
-    # --- skyline: rows 6..14 (72 px).  Palette: 0 black, 1 navy, 2 blue glow, 3 windows
-    H = 72
-    pix = [['1'] * W for _ in range(H)]
-    # horizon glow on the lowest sky rows
-    for y in range(40, H):
-        for x in range(W):
-            if y >= 52 or (y >= 44 and (x + y) % 2 == 0):
-                pix[y][x] = '2'
-    # stars
-    for _ in range(10):
-        x, y = rnd.randrange(W), rnd.randrange(30)
-        pix[y][x] = '3'
-    # moon
-    for y in range(6, 15):
-        for x in range(200, 210):
-            if (x - 204.5) ** 2 + (y - 10.5) ** 2 < 20:
-                pix[y][x] = '3'
-    # buildings: widths multiples of 8, tops on 8-pixel boundaries
+RACE_THEMES = ['DAY', 'SUNSET', 'NIGHT']
+SKY_W, SKY_H = 256, 72          # skyline: nametable rows 6-14
+
+
+def _buildings(pix, rnd, body, window, lit, tops=(24, 32, 32, 40, 40, 48)):
+    """City block along the bottom of the sky.  body/window are colour
+    chars; lit(lx, ly) decides which window cells get the window colour.
+    Widths are multiples of 8 and tops sit on 8-pixel boundaries so the
+    tiles repeat."""
     x = 0
-    while x < W:
-        w = rnd.choice([16, 24, 32, 16, 40])
-        w = min(w, W - x)
-        top = rnd.choice([24, 32, 32, 40, 40, 48])
+    while x < SKY_W:
+        w = min(rnd.choice([16, 24, 32, 16, 40]), SKY_W - x)
+        top = rnd.choice(tops)
         style = rnd.randrange(3)
-        for yy in range(top, H):
+        for yy in range(top, SKY_H):
             for xx in range(x, x + w):
-                px = '0'
+                px = body
                 lx, ly = xx - x, yy - top
                 if 1 <= lx < w - 1 and ly >= 3:
-                    if style == 0 and lx % 4 in (1, 2) and ly % 6 in (1, 2, 3) and (lx // 4 + ly // 6) % 3 != 2:
-                        px = '3'
-                    if style == 1 and lx % 8 in (2, 3, 4, 5) and ly % 8 in (2, 3) and (lx // 8 + ly // 8) % 2 == 0:
-                        px = '3'
-                    if style == 2 and lx % 3 == 1 and ly % 4 == 1 :
-                        px = '3'
+                    on = False
+                    if style == 0:
+                        on = lx % 4 in (1, 2) and ly % 6 in (1, 2, 3)
+                    elif style == 1:
+                        on = lx % 8 in (2, 3, 4, 5) and ly % 8 in (2, 3)
+                    else:
+                        on = lx % 3 == 1 and ly % 4 == 1
+                    if on and lit(style, lx, ly):
+                        px = window
                 pix[yy][xx] = px
-        # antenna on tall buildings
-        if top <= 24 and w >= 16:
+        if top <= 24 and w >= 16:                  # antenna
             for yy in range(top - 6, top):
-                pix[yy][x + w // 2] = '0'
-            pix[top - 7][x + w // 2] = '3'
+                pix[yy][x + w // 2] = body
+            pix[top - 7][x + w // 2] = window if window != body else '3'
         x += w
-    pix = [''.join(r) for r in pix]
-    sky_rows = []
-    for ty in range(9):
-        row = []
-        for tx in range(32):
-            row.append(ts.add(tile([pix[ty * 8 + y][tx * 8:tx * 8 + 8] for y in range(8)])))
-        sky_rows.append(row)
 
+
+def _disc(pix, cx, cy, r, c):
+    for y in range(max(0, int(cy - r - 1)), min(SKY_H, int(cy + r + 2))):
+        for x in range(max(0, int(cx - r - 1)), min(SKY_W, int(cx + r + 2))):
+            if (x + 0.5 - cx) ** 2 + (y + 0.5 - cy) ** 2 < r * r:
+                pix[y][x] = c
+
+
+def sky_night(rnd):
+    """Palette: 0 black buildings, 1 navy sky, 2 blue glow, 3 lit windows."""
+    pix = [['1'] * SKY_W for _ in range(SKY_H)]
+    for y in range(40, SKY_H):
+        for x in range(SKY_W):
+            if y >= 52 or (y >= 44 and (x + y) % 2 == 0):
+                pix[y][x] = '2'
+    for _ in range(10):
+        pix[rnd.randrange(30)][rnd.randrange(SKY_W)] = '3'
+    _disc(pix, 205, 11, 4.5, '3')                 # moon
+    _buildings(pix, rnd, '0', '3',
+               lambda st, lx, ly: st == 2 or (st == 0 and (lx // 4 + ly // 6) % 3 != 2)
+               or (st == 1 and (lx // 8 + ly // 8) % 2 == 0))
+    return pix
+
+
+def sky_day(rnd):
+    """Palette: 0 black windows, 1 pale sky, 2 grey buildings, 3 white
+    clouds and sun."""
+    pix = [['1'] * SKY_W for _ in range(SKY_H)]
+    _disc(pix, 44, 13, 7, '3')                    # sun
+    # clouds: overlapping discs, flat bottoms on 8-pixel rows
+    for cx, cy, n in ((112, 16, 4), (190, 10, 3), (240, 24, 3), (12, 30, 3)):
+        for i in range(n):
+            _disc(pix, cx + i * 7 - n * 3, cy - (2 if i % 2 else 0), 5 if i % 2 else 4, '3')
+        for x in range(cx - n * 3 - 3, cx + n * 4 + 1):
+            for y in range(cy + 2, cy + 5):
+                if 0 <= x < SKY_W:
+                    pix[y][x] = '1'
+    _buildings(pix, rnd, '2', '0',
+               lambda st, lx, ly: st != 0 or (lx // 4 + ly // 6) % 3 != 2)
+    # roof lines
+    for y in range(1, SKY_H):
+        for x in range(SKY_W):
+            if pix[y][x] == '2' and pix[y - 1][x] in '13':
+                pix[y][x] = '0'
+    return pix
+
+
+def sky_sunset(rnd):
+    """Palette: 0 black silhouettes, 1 purple sky, 2 orange glow, 3 sun and
+    a few lit windows."""
+    pix = [['1'] * SKY_W for _ in range(SKY_H)]
+    # purple overhead fading to orange at the horizon (dithered bands)
+    for y in range(SKY_H):
+        for x in range(SKY_W):
+            if (y >= 40 or (y >= 32 and (x + y) % 2 == 0)
+                    or (y >= 24 and x % 2 == 0 and y % 2 == 0)
+                    or (y >= 16 and x % 4 == 0 and y % 4 == 0)):
+                pix[y][x] = '2'
+    _disc(pix, 168, 40, 17, '3')                  # big low sun
+    for y in (36, 42, 47, 51):                    # haze bands across it
+        for x in range(150, 187):
+            if pix[y][x] == '3':
+                pix[y][x] = '2'
+    _buildings(pix, rnd, '0', '3',
+               lambda st, lx, ly: st == 1 and (lx // 8 + ly // 8) % 3 == 0,
+               tops=(40, 48, 48, 56, 56, 40))
+    return pix
+
+
+SKY_PAINTERS = {'DAY': sky_day, 'SUNSET': sky_sunset, 'NIGHT': sky_night}
+
+
+def build_race(theme):
+    """Tiles $80-$FF and the rows 6-29 map for one race theme.  Road and
+    special tiles come first so their numbers are the same in every theme."""
+    ts = TileSet(0x80)
     # --- road: palette 0 black, 1 asphalt, 2 light grey, 3 white
-    asphalt = solid(1)
-    A = ts.add(asphalt)
+    A = ts.add(solid(1))
     # the rail row shares its attribute block with the sky: colours 0 and 3 only
     rail_top = ts.add(tile(['........', '33333333', '33333333', '0.0..0.0', '.0....0.', '33333333', '33333333', '00000000']))
     rail_post = ts.add(tile(['........', '33333333', '33333333', '0.0330.0', '.0.33.0.', '33333333', '33333333', '00033000']))
@@ -181,8 +238,16 @@ def build_race():
     curb_top = ts.add(tile(['00000000', '33333333', '11111111', '11111111', '11111111', '11111111', '11111111', '11111111']))
     curb_bot = ts.add(tile(['11111111', '11111111', '11111111', '11111111', '11111111', '11111111', '33333333', '00000000']))
     dash = ts.add(tile(['11111111', '11111111', '11111111', '33333333', '33333333', '11111111', '11111111', '11111111']))
-    nodash = A
     gutter = ts.add(tile(['00000000', '22222222', '22202220', '22222222', '22222222', '22022202', '22222222', '22222222']))
+    specials = {}
+    specials['START'] = ts.add(tile(['33..33..'] * 8))
+    specials['FINISH_A'] = ts.add(tile(['3333....'] * 4 + ['....3333'] * 4))
+    specials['FINISH_B'] = ts.add(tile(['....3333'] * 4 + ['3333....'] * 4))
+    specials['ASPHALT'] = A
+    specials['CURB_TOP'] = curb_top
+    specials['CURB_BOT'] = curb_bot
+    specials['DASH'] = dash
+    specials['HUD_EDGE'] = ts.add(tile(['........', '11111111'] + ['........'] * 6))
     road_rows = []
     for r in range(15, 30):
         row = []
@@ -194,7 +259,7 @@ def build_race():
             elif r == 17:
                 row.append(curb_top)
             elif r in (21, 25):
-                row.append(dash if (c // 2) % 2 == 0 else nodash)
+                row.append(dash if (c // 2) % 2 == 0 else A)
             elif r == 28:
                 row.append(curb_bot)
             elif r == 29:
@@ -202,19 +267,13 @@ def build_race():
             else:
                 row.append(A)
         road_rows.append(row)
-    # special tiles used by the code (column streaming)
-    specials = {}
-    specials['START'] = ts.add(tile(['33..33..', '33..33..', '33..33..', '33..33..', '33..33..', '33..33..', '33..33..', '33..33..']))
-    specials['FINISH_A'] = ts.add(tile(['3333....', '3333....', '3333....', '3333....', '....3333', '....3333', '....3333', '....3333']))
-    specials['FINISH_B'] = ts.add(tile(['....3333', '....3333', '....3333', '....3333', '3333....', '3333....', '3333....', '3333....']))
-    specials['ASPHALT'] = A
-    specials['CURB_TOP'] = curb_top
-    specials['CURB_BOT'] = curb_bot
-    specials['DASH'] = dash
-    # HUD extras in the race set
-    specials['HUD_EDGE'] = ts.add(tile(['........', '11111111', '........', '........', '........', '........', '........', '........']))
-    rows = sky_rows + road_rows
-    nt = bytes(sum(rows, []))
+    # --- skyline
+    pix = [''.join(r) for r in SKY_PAINTERS[theme](random.Random(1987))]
+    sky_rows = []
+    for ty in range(9):
+        sky_rows.append([ts.add(tile([pix[ty * 8 + y][tx * 8:tx * 8 + 8] for y in range(8)]))
+                         for tx in range(32)])
+    nt = bytes(sum(sky_rows + road_rows, []))
     return ts.blob(), nt, specials, len(ts.tiles)
 
 
@@ -341,9 +400,16 @@ def main():
     os.makedirs(out, exist_ok=True)
     w = lambda n, d: open(os.path.join(out, n), 'wb').write(d)
     w('common.chr', build_common())
-    race, race_nt, race_sp, nrace = build_race()
-    w('race.chr', race)
-    w('race_map.bin', race_nt)
+    counts = []
+    for i, theme in enumerate(RACE_THEMES):
+        race, race_nt, sp, n = build_race(theme)
+        if i == 0:
+            race_sp = sp
+        assert sp == race_sp, 'road tiles must match across themes'
+        w('race%d.chr' % i, race)
+        w('race_map%d.bin' % i, race_nt)
+        counts.append('%s %d' % (theme.lower(), n))
+    nrace = ', '.join(counts)
     menu, logo_map, menu_sp, nmenu = build_menu()
     w('menu.chr', menu)
     w('logo_map.bin', logo_map)
@@ -361,7 +427,8 @@ def main():
             else:
                 f.write('T_%s = $%02X\n' % (k, v))
         f.write('LOGO_W = %d\n' % (len(logo_map) // 2))
-    print('race tiles %d/128, menu tiles %d/128' % (nrace, nmenu), file=sys.stderr)
+        f.write('NTHEMES = %d\n' % len(RACE_THEMES))
+    print('race tiles (of 128): %s; menu tiles %d/128' % (nrace, nmenu), file=sys.stderr)
 
 
 if __name__ == '__main__':

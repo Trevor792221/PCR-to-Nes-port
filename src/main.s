@@ -92,6 +92,8 @@ res_opp_et: .res 2
 res_t60:    .res 2          ; 0-60 time ms
 res_mph:    .res 2          ; trap speed in mph (for the stats page)
 tmp_rec:    .res 32         ; scratch car record (dealer, crates)
+race_theme: .res 1          ; 0 day, 1 sunset, 2 night (picked per race)
+copy_bank:  .res 1          ; source bank for chr_copy / bank0_copy (0 = graphics)
 
 ; ---------------------------------------------------------------------------
 .include "header.s"
@@ -126,6 +128,9 @@ cheat_debug:     .byte 0        ; $FFC2  non-zero: SELECT in the garage = debug 
 
 .segment "BANK3"
 .include "menus2.s"
+
+.segment "BANK4"
+.include "scenes.s"
 
 .segment "BANK2"
 .include "race.s"

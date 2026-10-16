@@ -469,13 +469,14 @@ draw_big_car:
 
 ; ---------------------------------------------------------------------------
 ; CHR loading (PPU off).  chr_copy: tmp0/tmp1 = byte count, ptr0 = source
-; in BANK_GFX, A/X = PPU address hi/lo.
+; in bank copy_bank (normally BANK_GFX = 0; reset to 0 afterwards),
+; A/X = PPU address hi/lo.
 ; ---------------------------------------------------------------------------
 chr_copy:
         jsr vram_addr
         lda cur_bank
         pha
-        lda #BANK_GFX
+        lda copy_bank
         jsr set_bank
         ldy #0
 @l:     lda (ptr0),y
@@ -490,6 +491,8 @@ chr_copy:
         lda tmp0
         ora tmp1
         bne @l
+        lda #BANK_GFX
+        sta copy_bank
         pla
         jmp set_bank
 
@@ -509,9 +512,27 @@ load_common_chr:
         CHR_LOAD gfx_sprites, $1000, $0400
         rts
 
+; load_race_chr: BG tiles $80-$FF for race_theme
 load_race_chr:
-        CHR_LOAD gfx_race, $0800, $0800
-        rts
+        ldx race_theme
+        lda scene_chr_lo,x
+        sta ptr0
+        lda scene_chr_hi,x
+        sta ptr0+1
+        lda #0
+        sta tmp0
+        lda #8
+        sta tmp1
+        lda #BANK_SCENE
+        sta copy_bank
+        lda #$08
+        ldx #$00
+        jmp chr_copy
+
+scene_chr_lo: .byte <scene_chr0, <scene_chr1, <scene_chr2
+scene_chr_hi: .byte >scene_chr0, >scene_chr1, >scene_chr2
+scene_map_lo: .byte <scene_map0, <scene_map1, <scene_map2
+scene_map_hi: .byte >scene_map0, >scene_map1, >scene_map2
 
 load_menu_chr:
         CHR_LOAD gfx_menu, $0800, $0800
@@ -632,11 +653,12 @@ screen_begin:
         jmp load_menu_chr
 @race:  jmp load_race_chr
 
-; bank0_copy: copy tmp0/tmp1 bytes from ptr0 (bank 0) to ptr1 (RAM/WRAM)
+; bank0_copy: copy tmp0/tmp1 bytes from ptr0 (bank copy_bank, normally
+; BANK_GFX; reset afterwards) to ptr1 (RAM/WRAM)
 bank0_copy:
         lda cur_bank
         pha
-        lda #BANK_GFX
+        lda copy_bank
         jsr set_bank
         ldy #0
 @l:     lda (ptr0),y
@@ -652,5 +674,7 @@ bank0_copy:
         lda tmp0
         ora tmp1
         bne @l
+        lda #BANK_GFX
+        sta copy_bank
         pla
         jmp set_bank

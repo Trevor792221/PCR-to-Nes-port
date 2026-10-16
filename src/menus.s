@@ -167,7 +167,8 @@ title_main:
         cmp #4
         beq @pick
         jmp @loop
-@pick:  lda ui_sel
+@pick:  jsr rng_stir
+        lda ui_sel
         bne @new
         lda #MODE_GARAGE
         sta next_mode

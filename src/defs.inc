@@ -57,6 +57,7 @@ BANK_GFX   = 0
 BANK_MENU  = 1
 BANK_RACE  = 2
 BANK_MENU2 = 3
+BANK_SCENE = 4                  ; race background themes
 
 ; --- game modes (index into mode table in main.s) ----------------------------
 MODE_TITLE   = 0

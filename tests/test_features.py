@@ -100,6 +100,27 @@ class Features(unittest.TestCase):
         s.step(40)
         self.assertEqual(s.mem('ui_count'), 10, 'back in the garage')
 
+    def test_race_backgrounds_vary(self):
+        s = new_game()
+        seen = set()
+        for _ in range(12):
+            start_race(s, 4)
+            s.step(40)
+            seen.add(s.mem('race_theme'))
+            self.assertLess(s.mem('race_theme'), 3)
+            f = 0
+            while s.mem('rc_state') == 0 and f < 400:
+                s.step(1, A if rpm(s) < 6600 else 0)
+                f += 1
+            for f in range(120):
+                s.step(1, A | (RIGHT if s.mem('ph_gear') == 0 and f % 4 < 2 else 0))
+            self.assertEqual(s.mem('lag'), 0)
+            s.step(4, START)
+            s.step(4)
+            s.step(4, SELECT)
+            s.step(60)
+        self.assertEqual(seen, {0, 1, 2}, 'day, sunset and night all come up')
+
     def test_quit_to_title_from_options(self):
         s = new_game()
         s.garage_goto(G_OPTIONS)

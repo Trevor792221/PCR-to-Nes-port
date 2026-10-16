@@ -118,10 +118,26 @@ race_main:
 
 ; ---------------------------------------------------------------------------
 race_setup:
+        jsr rng_stir
+        lda #NTHEMES            ; random background: day, sunset or night
+        jsr rand_below
+        sta race_theme
         lda #1
-        jsr screen_begin        ; race tiles
+        jsr screen_begin        ; race tiles for that theme
         MOVI16 ptr0, pal_race
         jsr load_palette
+        lda race_theme          ; sky and road palettes (BG 2 and 3)
+        asl a
+        asl a
+        asl a
+        tax
+        ldy #0
+:       lda theme_pal,x
+        sta palette+8,y
+        inx
+        iny
+        cpy #8
+        bne :-
         ; clear state
         lda #0
         ldx #(tr_x_h - rc_state)
@@ -162,12 +178,18 @@ race_setup:
         sta rc_street
 :
         ; copy the map to WRAM, then draw it in both nametables
-        MOVI16 ptr0, gfx_race_map
+        ldx race_theme
+        lda scene_map_lo,x
+        sta ptr0
+        lda scene_map_hi,x
+        sta ptr0+1
         MOVI16 ptr1, MAP_COPY
         lda #<768
         sta tmp0
         lda #>768
         sta tmp1
+        lda #BANK_SCENE
+        sta copy_bank
         jsr bank0_copy
         lda #$20
         jsr draw_map
@@ -305,6 +327,12 @@ race_setup:
         rts
 
 split_tab: .byte 69, 64, 69     ; NTSC, PAL, Dendy
+
+; sky (BG palette 2) and road (BG palette 3) colours per theme
+theme_pal:
+        .byte $0F,$31,$00,$30,  $0F,$00,$10,$30     ; day: pale sky, grey city
+        .byte $0F,$04,$27,$38,  $0F,$2D,$10,$30     ; sunset: purple to orange
+        .byte $0F,$01,$12,$38,  $0F,$2D,$10,$30     ; night: navy, lit windows
 
 ppu_on_race:
         lda #0
