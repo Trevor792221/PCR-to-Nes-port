@@ -121,6 +121,32 @@ class Features(unittest.TestCase):
             s.step(60)
         self.assertEqual(seen, {0, 1, 2}, 'day, sunset and night all come up')
 
+    def test_zenith_in_dealer_after_the_legend(self):
+        s = new_game()
+        s.garage_goto(4)                             # dealer
+        s.press(A)
+        s.step(40)
+        s.press(LEFT)
+        s.step(30)
+        self.assertEqual(s.mem('dl_model'), 11, 'no Zenith before The Legend')
+        s.press(B, hold=12)
+        s.step(40)
+        s.nes[0x600C] = 11                           # ladder complete
+        set_cash(s, 700000)
+        s.garage_goto(4)
+        s.press(A)
+        s.step(40)
+        self.assertEqual(s.mem('dl_count'), 13)
+        while s.mem('dl_model') != 12:
+            s.press(LEFT)
+            s.step(30)
+        s.press(A)
+        s.step(5)
+        s.press(A)                                   # confirm
+        s.step(10)
+        self.assertEqual(s.wram(SV_CARS + 32), 12, 'bought the Zenith')
+        self.assertEqual(s.wram(SV_CASH, 3), 100000)
+
     def test_quit_to_title_from_options(self):
         s = new_game()
         s.garage_goto(G_OPTIONS)

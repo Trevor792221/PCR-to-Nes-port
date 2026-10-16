@@ -8,6 +8,7 @@ g_sel:      .res 1          ; garage menu selection (kept between visits)
 rs_sel:     .res 1          ; race select selection
 dl_model:   .res 1          ; dealer: model shown
 dl_buf:     .res 1          ; big car double buffer (0/1)
+dl_count:   .res 1          ; cars on sale (12, or 13 with the Zenith)
 mc_sel:     .res 1
 t_car_x:    .res 2          ; title screen car positions
 t_ready:    .res 1
@@ -1270,7 +1271,20 @@ str_sellfor:  .byte "SELL FOR ", 0
 ; DEALER
 ; ===========================================================================
 dealer_screen:
+        ; the crate-only Zenith X400 joins the line-up once The Legend
+        ; (the last ladder boss) is beaten
+        lda #NDEALER
+        ldx SV_LADDER
+        cpx #NBOSS
+        bcc :+
+        lda #NCARS
+:       sta dl_count
+        lda dl_model
+        cmp dl_count
+        bcc :+
         lda #0
+        sta dl_model
+:       lda #0
         jsr screen_begin
         jsr use_menu_palette
         MOVI16 ptr0, str_dealer
@@ -1299,7 +1313,7 @@ dealer_screen:
         beq :+
         ldx dl_model
         bne @dec
-        ldx #NDEALER
+        ldx dl_count
 @dec:   dex
         stx dl_model
         jmp @chg
@@ -1308,7 +1322,7 @@ dealer_screen:
         beq :+
         ldx dl_model
         inx
-        cpx #NDEALER
+        cpx dl_count
         bcc @inc
         ldx #0
 @inc:   stx dl_model
@@ -1406,9 +1420,11 @@ dl_info:
         sta linebuf
         lda #'/'
         sta linebuf+3
-        lda #'1'
+        lda dl_count            ; "12" or "13"
+        jsr fmt_8
+        lda numbuf+6
         sta linebuf+4
-        lda #'2'
+        lda numbuf+7
         sta linebuf+5
         lda #'>'
         sta linebuf+6
