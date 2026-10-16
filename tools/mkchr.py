@@ -333,12 +333,7 @@ def car_tiles(name):
 
 
 def big_car_tiles(name):
-    a = art.car_pixels(name, 0)
-    big = []
-    for r in a:
-        rr = ''.join(c * 2 for c in r)
-        big += [rr, rr]
-    return grid_tiles(big, 8, 4)
+    return grid_tiles(art.big_car_pixels(name), 8, 4)
 
 
 def main():

@@ -127,6 +127,26 @@ class Game(unittest.TestCase):
         self.assertNotEqual(s.wram(SV_CASH, 3), cash)
         self.assertEqual(s.wram(0x6013), 1)          # crates opened
 
+    def test_dealer_streams_the_right_big_car(self):
+        # every model's 2x tiles must come from its own shape (odd shapes
+        # used to start 128 bytes early)
+        here = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        with open(os.path.join(here, 'build', 'bigcars.chr'), 'rb') as f:
+            big = f.read()
+        sys.path.insert(0, os.path.join(here, 'tools'))
+        import gamedata as gd
+        s = new_game()
+        s.garage_goto(G_DEALER)
+        s.press(A)
+        s.step(40)
+        for _ in range(gd.NDEALER):
+            model = s.mem('dl_model')
+            shape = gd.CARS[model][1]
+            wbuf = bytes(s.nes[0x6400 + i] for i in range(512))
+            self.assertEqual(wbuf, big[shape * 512:shape * 512 + 512], 'model %d' % model)
+            s.press(RIGHT)
+            s.step(40)
+
     def test_ultra_rare_crate_car(self):
         s = new_game()
         s.nes[SV_GEMS] = 20                          # premium crate costs 10

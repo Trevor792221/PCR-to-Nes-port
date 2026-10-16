@@ -560,22 +560,12 @@ tile_addr_spr:
 ; sprite tile X (32 tiles) through the NMI over 16 frames.
 big_car_stream:
         stx tmp2
-        lsr a                   ; shape*512 = shape<<9
-        pha
-        lda #0
-        ror a
-        sta ptr0
-        pla
-        asl a
-        asl a
-        sta tmp0
-        lda ptr0
+        asl a                   ; shape*512: high byte shape*2, low byte 0
         clc
-        adc #<gfx_bigcars
-        sta ptr0
-        lda tmp0
         adc #>gfx_bigcars
         sta ptr0+1
+        lda #<gfx_bigcars
+        sta ptr0
         MOVI16 ptr1, WBUF
         lda cur_bank
         pha
