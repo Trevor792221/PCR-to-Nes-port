@@ -4,11 +4,11 @@ are original.
 
 ### Downloads
 * **`pxracer.nes`**: the game. Run it in an NES emulator or copy it to a
-  flash cart (EverDrive N8, PowerPak and similar). MMC1 / SNROM, no
-  battery needed: progress is saved with two passwords (OPTIONS > PASSWORD,
-  enter them from TITLE > PASSWORD). Timing is tuned for NTSC.
+  flash cart (EverDrive N8, PowerPak and similar). MMC1 / SNROM. Timing is
+  tuned for NTSC. How this version saves is in the patch notes above and in
+  [CHANGELOG.md](https://github.com/Trevor792221/PCR-to-Nes-port/blob/HEAD/CHANGELOG.md).
 * **`pixel-racer-soundtrack.zip`**: the original soundtrack as WAV files.
-  The three tracks are also attached individually.
+  Each track is also attached on its own.
 
 ### Controls
 A = gas (hold on the line to rev), Right = shift up / launch on green,
