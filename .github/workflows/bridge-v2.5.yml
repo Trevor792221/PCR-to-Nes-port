@@ -1,8 +1,8 @@
 name: bridge-v2.5
 # Publishes v2.5, the bridge release for battery saves (v1.0-v2.4): v2.4 plus
 # release/bridge/v2.5.patch, which adds OPTIONS > PASSWORD showing the v3.1+
-# passwords. It is tagged v2.5 on its own commit off v2.4 and is never marked
-# the latest release, so the download buttons keep pointing at v3.x.
+# passwords. The tag points at the v2.4 commit (the built ROM is v2.5) and
+# the release is never marked the latest, so the download buttons stay on v3.x.
 on:
   workflow_dispatch:
 permissions:
@@ -30,10 +30,12 @@ jobs:
         run: |
           make
           make test
-      - name: Tag v2.5
-        run: |
-          git tag -f v2.5
-          git push -f origin v2.5
+      - name: Base commit
+        # GitHub refuses new commits from Actions whose workflow files differ
+        # from the default branch, so the v2.5 tag points at the v2.4 commit;
+        # the v2.5 source is release/bridge/v2.5.patch on top of it.
+        id: base
+        run: echo "sha=$(git rev-parse v2.4)" >> "$GITHUB_OUTPUT"
       - name: Package
         run: |
           mkdir -p dist
@@ -42,9 +44,11 @@ jobs:
           (cd dist && zip -r pixel-racer-soundtrack.zip soundtrack)
           cp dist/soundtrack/*.wav dist/
           cat release/notes/v2.5.md release/RELEASE_NOTES.md > dist/body.md
+          printf '\n_Source: v2.4 plus [release/bridge/v2.5.patch](https://github.com/Trevor792221/PCR-to-Nes-port/blob/HEAD/release/bridge/v2.5.patch)._\n' >> dist/body.md
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: v2.5
+          target_commitish: ${{ steps.base.outputs.sha }}
           name: Pixel Racer NES v2.5
           body_path: dist/body.md
           make_latest: false
