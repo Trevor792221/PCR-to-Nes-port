@@ -580,35 +580,21 @@ car_stats:
         bne @ld
         rts
 
-; print_car_stats_vb: queue "HP 123  KG 1234  RWD" for record ptr1 on row Y
+; stats_line: "123HP 1234KG RWD" for record ptr1 on row Y
 .segment "BSS"
 stat_row:   .res 1
 .segment "FIXED"
 stats_line:
         sty stat_row
         jsr car_stats
-        ; build text in padbuf: "HP xxxx KG xxxx DRV"
+        ; build "8682HP 970KG AWD" in linebuf (17 characters at most)
         jsr num_text
         ldy #0
+        jsr cat_ptr0
         lda #'H'
         sta linebuf,y
         iny
         lda #'P'
-        sta linebuf,y
-        iny
-        lda #' '
-        sta linebuf,y
-        iny
-        jsr cat_ptr0
-        lda #' '
-        sta linebuf,y
-        iny
-        sta linebuf,y
-        iny
-        lda #'K'
-        sta linebuf,y
-        iny
-        lda #'G'
         sta linebuf,y
         iny
         lda #' '
@@ -623,9 +609,13 @@ stats_line:
         jsr num_text
         ldy tmp6
         jsr cat_ptr0
-        lda #' '
+        lda #'K'
         sta linebuf,y
         iny
+        lda #'G'
+        sta linebuf,y
+        iny
+        lda #' '
         sta linebuf,y
         iny
         sty tmp6
