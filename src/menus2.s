@@ -8,6 +8,7 @@ pt_sel:     .res 1
 pt_page:    .res 1          ; 0 engine, 1 chassis
 pt_part:    .res 1
 pt_count:   .res 1
+pt_buf:     .res 20         ; compact stats line
 tn_row_y:   .res 1
 tn_sel:     .res 1
 pn_sel:     .res 1
@@ -204,15 +205,64 @@ pt_info:
 
 ; pt_stats: HP / weight / drive line for the car (only changes on a purchase:
 ; measuring peak HP takes a few frames, so cursor moves don't redo it)
+; Next to the car name there are 18 columns, too few for "HP 8682  KG 970
+; AWD": the line is rewritten as "8682HP 970KG AWD" (17 at most).
 pt_stats:
         jsr cur_car_ptr
         ldy #4
-        jsr stats_line
+        jsr stats_line          ; linebuf = "HP n  KG n  DRV"
+        ldx #3                  ; past "HP "
+        ldy #0
+        jsr @num
+        lda #'H'
+        sta pt_buf,y
+        iny
+        lda #'P'
+        jsr @unit
+        inx                     ; past "KG "
+        inx
+        inx
+        jsr @num
+        lda #'K'
+        sta pt_buf,y
+        iny
+        lda #'G'
+        jsr @unit
+:       lda linebuf,x           ; drivetrain
+        beq :+
+        cmp #' '
+        beq :+
+        sta pt_buf,y
+        inx
+        iny
+        bne :-
+:       lda #0
+        sta pt_buf,y
+        MOVI16 ptr0, pt_buf
         lda #18
         jsr pad_ptr0
         ldy #4
         ldx #14
         jmp vb_str
+@num:   lda linebuf,x           ; copy digits up to the space
+        cmp #' '
+        beq :+
+        sta pt_buf,y
+        inx
+        iny
+        bne @num
+:       rts
+@unit:  sta pt_buf,y            ; second unit letter, a space, then skip
+        iny                     ; the source's spaces
+        lda #' '
+        sta pt_buf,y
+        iny
+:       lda linebuf,x
+        cmp #' '
+        bne :+
+        inx
+        bne :-
+:       rts
 
 pt_buy:
         ldx pt_sel
