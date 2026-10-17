@@ -564,11 +564,14 @@ race_select:
 :       cmp #7
         bne :+
         jsr setup_secret
-        clc
-        rts
+        lda #BOSS_SECRET
+        jmp @intro
 :       cmp #0
         bne :+
         jsr setup_ladder
+        jsr boss_index
+@intro: jsr boss_intro          ; B on the intro: back to race select
+        jcs race_select
         clc
         rts
 :       cmp #1
@@ -764,6 +767,218 @@ boss_names:
         .byte "PHANTOM     ", 0
         .byte "THE LEGEND  ", 0
         .byte "ECLIPSE     ", 0
+
+.segment "BSS"
+bi_boss:    .res 1
+.segment "BANK1"
+
+; ---------------------------------------------------------------------------
+; boss_intro: A = boss.  Who you're about to race: name, car, a short bio
+; and the prize.  Carry clear = A (race), set = B (back).
+; ---------------------------------------------------------------------------
+boss_intro:
+        sta bi_boss
+        lda #0
+        jsr screen_begin
+        jsr use_menu_palette
+        MOVI16 ptr0, str_rsel
+        jsr draw_header
+        ; "BOSS 3 OF 11" / "SECRET BOSS"
+        lda #$20
+        sta text_attr
+        lda bi_boss
+        cmp #BOSS_SECRET
+        bne :+
+        PRINT str_bi_secret, 2, 4
+        jmp @name
+:       ldy #0
+:       lda str_bi_boss,y
+        beq :+
+        sta linebuf,y
+        iny
+        bne :-
+:       ldx bi_boss
+        inx
+        cpx #10
+        bcc :+
+        lda #'1'
+        sta linebuf,y
+        iny
+        txa
+        sbc #10
+        tax
+:       txa
+        ora #'0'
+        sta linebuf,y
+        iny
+        ldx #0
+:       lda str_bi_of,x
+        sta linebuf,y
+        beq :+
+        iny
+        inx
+        bne :-
+:       MOVI16 ptr0, linebuf
+        ldx #2
+        ldy #4
+        jsr print
+@name:  lda bi_boss
+        jsr boss_name_ptr
+        ldx #2
+        ldy #6
+        jsr print
+        lda #0
+        sta text_attr
+        ; car name
+        lda opp_rec+CR_MODEL
+        jsr car_name_ptr
+        ldx #2
+        ldy #13
+        jsr print
+        ; bio: three lines
+        lda bi_boss
+        asl a
+        tax
+        lda boss_bios,x
+        sta ptr0
+        lda boss_bios+1,x
+        sta ptr0+1
+        lda #16
+        sta tmp7
+@bio:   ldx #2
+        ldy tmp7
+        jsr print               ; returns Y = length
+        tya
+        sec                     ; skip the 0
+        adc ptr0
+        sta ptr0
+        bcc :+
+        inc ptr0+1
+:       inc tmp7
+        inc tmp7
+        lda tmp7
+        cmp #22
+        bne @bio
+        ; prize
+        ldx bi_boss
+        lda boss_cash0,x
+        sta m_a
+        lda boss_cash1,x
+        sta m_a+1
+        lda boss_cash2,x
+        sta m_a+2
+        jsr money_text
+        ldy #0
+:       lda str_bi_prize,y
+        beq :+
+        sta linebuf,y
+        iny
+        bne :-
+:       jsr cat_ptr0
+        lda #0
+        sta linebuf,y
+        MOVI16 ptr0, linebuf
+        ldx #2
+        ldy #23
+        jsr print
+        PRINT str_bi_help, 2, 26
+        jsr attr_upload
+        lda #0
+        sta oam_idx
+        jsr oam_clear
+        jsr ppu_on
+        ; the boss's car, 2x, in their colours, and its numbers
+        MOVI16 ptr1, opp_rec
+        jsr set_car_palette
+        jsr wait_frame
+        MOVI16 ptr1, opp_rec
+        ldy #14
+        jsr stats_line
+        ldx #2
+        ldy #14
+        jsr vb_str
+        lda opp_rec+CR_MODEL
+        tax
+        lda car_shape,x
+        ldx #$40
+        jsr big_car_stream
+@loop:  jsr wait_frame
+        jsr read_pad
+        lda #4
+        sta oam_idx
+        lda chr_cnt             ; once the tiles are in
+        bne :+
+        lda #96
+        sta sp_x
+        lda #67
+        sta sp_y
+        lda #$40
+        sta sp_tile
+        lda #0
+        sta sp_attr
+        jsr draw_big_car
+:       jsr oam_clear
+        lda pad_new
+        and #BTN_A|BTN_START
+        bne @go
+        lda pad_new
+        and #BTN_B
+        beq @loop
+        lda #SFX_BACK
+        jsr sfx_play
+        sec
+        rts
+@go:    lda #SFX_SELECT
+        jsr sfx_play
+        clc
+        rts
+
+str_bi_boss:   .byte "BOSS ", 0
+str_bi_of:     .byte " OF 11", 0
+str_bi_secret: .byte "SECRET BOSS", 0
+str_bi_prize:  .byte "WIN ", 0
+str_bi_help:   .byte "A:RACE  B:BACK", 0
+
+; Bios: three lines each (all made up)
+boss_bios:
+        .word bio0, bio1, bio2, bio3, bio4, bio5
+        .word bio6, bio7, bio8, bio9, bio10, bio11
+bio0:   .byte "DELIVERS NOODLES BY DAY,", 0
+        .byte "RACES THE SAME MINI BY", 0
+        .byte "NIGHT. NEVER LATE TWICE.", 0
+bio1:   .byte "BUILT HIS KOMET FROM THREE", 0
+        .byte "JUNKYARD WRECKS. TALKS", 0
+        .byte "MORE THAN HE WINS.", 0
+bio2:   .byte "TOP OF HER CLASS AT", 0
+        .byte "MECHANIC SCHOOL. SHIFTS BY", 0
+        .byte "EAR AND NEVER LOOKS DOWN.", 0
+bio3:   .byte "OLD-SCHOOL V8 MAN. SAYS", 0
+        .byte "TURBOS ARE CHEATING.", 0
+        .byte "HIS TIRES DISAGREE.", 0
+bio4:   .byte "RALLY DRIVER WHO GOT BORED", 0
+        .byte "OF DIRT. LAUNCHES LIKE A", 0
+        .byte "CANNON, EVEN IN THE RAIN.", 0
+bio5:   .byte "RUNS THE HARBOR MEETS.", 0
+        .byte "NOBODY KNOWS HER REAL", 0
+        .byte "NAME. NOBODY ASKS.", 0
+bio6:   .byte "DRIVES A TRUCK BECAUSE IT", 0
+        .byte "FITS HIS SHOULDERS. HEAVY,", 0
+        .byte "SLOW OFF THE LINE, STUBBORN.", 0
+bio7:   .byte "EX-STUNT DRIVER. HAS JUMPED", 0
+        .byte "A DRAWBRIDGE, YET STILL", 0
+        .byte "STOPS FOR DUCKS.", 0
+bio8:   .byte "THIRTY YEARS ON THE STRIP", 0
+        .byte "AND NOT ONE FOUL START.", 0
+        .byte "HER HANDS ARE A STOPWATCH.", 0
+bio9:   .byte "ARRIVES WITH NO LIGHTS ON,", 0
+        .byte "LEAVES WITH YOUR CASH.", 0
+        .byte "NOBODY HAS SEEN HIS FACE.", 0
+bio10:  .byte "WON EVERY RACE IN THIS CITY", 0
+        .byte "BEFORE YOU WERE BORN. CAME", 0
+        .byte "BACK FOR ONE MORE.", 0
+bio11:  .byte "NO NAME. NO FACE. ONLY", 0
+        .byte "SHOWS UP WHEN ANOTHER", 0
+        .byte "X400 IS IN TOWN.", 0
 
 ; boss_index: A = current boss (0-10)
 boss_index:
@@ -1190,55 +1405,69 @@ mycars_screen:
 @nosell:
         jmp @redraw
 
-; sell_value: ptr1 = record -> m_a = half the car price + 400 per part level
+.segment "BSS"
+sv_acc:     .res 3
+sv_tier:    .res 1
+sv_p:       .res 1
+sv_l:       .res 1
+.segment "BANK1"
+; sell_value: ptr1 = record -> m_a = half the car price + half of what its
+; part upgrades cost
 sell_value:
         ldy #CR_MODEL
         lda (ptr1),y
+        tax
+        lda car_tier,x
+        sta sv_tier
+        txa
         jsr car_price
         lsr m_a+2
         ror m_a+1
         ror m_a
-        ldy #CR_PARTS
+        ldx #2
+:       lda m_a,x
+        sta sv_acc,x
+        dex
+        bpl :-
+        ; parts: half of what every installed level cost
         lda #0
-        sta tmp4
-:       lda (ptr1),y
+        sta sv_p
+@part:  lda sv_p
         clc
-        adc tmp4
-        sta tmp4
-        iny
-        cpy #CR_PARTS+NPARTS
-        bne :-
-        lda m_a
-        pha
-        lda m_a+1
-        pha
-        lda m_a+2
-        pha
-        lda tmp4
-        sta m_a
-        lda #<400
-        sta m_b
-        lda #>400
-        sta m_b+1
-        lda #0
-        sta m_a+1
-        jsr mul16
-        pla
-        sta m_a+2
-        pla
-        sta m_a+1
-        pla
-        sta m_a
+        adc #CR_PARTS
+        tay
+        lda (ptr1),y
+        sta sv_l
+@lvl:   lda sv_l
+        beq @next
+        tay
+        ldx sv_tier
+        lda sv_p
+        jsr part_price
+        lsr m_a+2
+        ror m_a+1
+        ror m_a
         clc
-        lda m_a
-        adc m_r
-        sta m_a
-        lda m_a+1
-        adc m_r+1
-        sta m_a+1
-        lda m_a+2
-        adc #0
-        sta m_a+2
+        lda sv_acc
+        adc m_a
+        sta sv_acc
+        lda sv_acc+1
+        adc m_a+1
+        sta sv_acc+1
+        lda sv_acc+2
+        adc m_a+2
+        sta sv_acc+2
+        dec sv_l
+        jmp @lvl
+@next:  inc sv_p
+        lda sv_p
+        cmp #NPARTS
+        bne @part
+        ldx #2
+:       lda sv_acc,x
+        sta m_a,x
+        dex
+        bpl :-
         ; at least $200
         lda m_a+2
         ora m_a+1

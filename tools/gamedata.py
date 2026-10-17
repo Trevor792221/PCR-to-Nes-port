@@ -103,6 +103,19 @@ P_INTAKE, P_EXHAUST, P_ECU, P_TURBO, P_INTERNALS, P_NITROUS, P_GEARBOX, \
 LEVEL_NAMES = ['STOCK', 'STREET', 'SPORT', 'RACE', 'PRO']
 PART_PRICE = [0, 600, 1800, 4500, 11000]           # times tier multiplier
 TIER_MULT = [2, 3, 4, 6, 9, 14]                    # /2
+# Price weight per part (/16), set from how much each part speeds a car up:
+# the average 1/4 + 1/2 mile time gain of one level, over 8 cars at every
+# level (tools/part_value.py).  The average weight is 16, so overall
+# upgrade spending stays where it was; turbo and tires cost the most.
+PART_WEIGHT = [9, 9, 15, 42, 12, 12, 11, 42, 12, 10, 8, 11]
+
+
+def part_cost(part, tier, level):
+    """Price of one level of a part on a car of this tier, to $50."""
+    if level == 0:
+        return 0
+    v = PART_PRICE[level] * TIER_MULT[tier] / 2 * PART_WEIGHT[part] / 16
+    return max(50, int(round(v / 50)) * 50)
 
 HP_BONUS = {P_INTAKE: 10, P_EXHAUST: 10, P_ECU: 8, P_INTERNALS: 13,
             P_ICOOL: 5}                                       # *256ths per level

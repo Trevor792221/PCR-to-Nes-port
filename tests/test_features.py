@@ -109,6 +109,9 @@ class Features(unittest.TestCase):
         self.assertEqual(self.race_select_count(s), 8)
         s.list_goto('rs_sel', 7)
         s.press(A)
+        s.step(45)
+        self.assertEqual(s.mem('bi_boss'), 11, 'intro: ECLIPSE')
+        s.press(A)
         s.step(5)
         self.assertEqual(s.mem('race_kind'), 4)
         self.assertEqual(s.mem('opp_rec'), 12)       # rival drives a Zenith too
@@ -347,6 +350,26 @@ class Features(unittest.TestCase):
             s.press(A)
             s.step(400)
             self.assertEqual(s.mem16('ep_hp'), garage)
+
+    def test_boss_intro_back_and_race(self):
+        s = new_game()
+        s.garage_goto(G_RACE)
+        s.press(A)
+        s.step(30)
+        s.press(A)                                   # LADDER BOSS
+        s.step(45)
+        self.assertEqual(s.mem('bi_boss'), 0)
+        self.assertEqual(s.mem('game_mode'), 1, 'intro, not racing yet')
+        s.press(B)                                   # back to race select
+        s.step(40)
+        self.assertEqual(s.mem('ui_count'), 7)
+        self.assertEqual(s.mem('game_mode'), 1)
+        s.press(A)
+        s.step(45)
+        s.press(A)                                   # race
+        s.step(60)
+        self.assertEqual(s.mem('game_mode'), 2)
+        self.assertEqual(s.mem('race_kind'), 0)
 
     def test_quit_to_title_from_options(self):
         s = new_game()

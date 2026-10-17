@@ -178,6 +178,7 @@ part_line:
         tax
         ldy tmp4
         iny
+        lda tmp6
         jsr part_price
         jsr money_text
 @p:     ldy tmp5
@@ -232,6 +233,7 @@ pt_buy:
         tax
         ldy tmp4
         iny
+        lda pt_part
         jsr part_price
         jsr cash_cmp
         bcc @fail

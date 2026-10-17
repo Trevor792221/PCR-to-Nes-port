@@ -81,15 +81,16 @@ def main():
     o('tire_grip:')
     o(bytes_line(gd.TIRE_GRIP))
     out += words('drive_k', gd.DRIVE_K)
-    # part prices: level 1..4 times tier multiplier / 2  (24-bit)
-    o('; part_price[tier][level] (24-bit), level 0 unused')
-    for b in range(3):
-        o('part_price%d:' % b)
-        vals = []
+    # part prices in $10 units: per part, [tier][level] words (level 0 unused)
+    o('part_cost_lo:')
+    o('        .byte ' + ', '.join('<part_cost_%d' % p for p in range(gd.NPARTS)))
+    o('part_cost_hi:')
+    o('        .byte ' + ', '.join('>part_cost_%d' % p for p in range(gd.NPARTS)))
+    for p in range(gd.NPARTS):
+        o('part_cost_%d:' % p)
         for t in range(6):
-            for lv in range(5):
-                vals.append((gd.PART_PRICE[lv] * gd.TIER_MULT[t] // 2 >> (8 * b)) & 0xFF)
-        o(bytes_line(vals))
+            vals = [gd.part_cost(p, t, lv) // 10 for lv in range(5)]
+            o('        .word ' + ', '.join(str(v) for v in vals))
     # engine sound: pulse period for rpm>>7 (0..95).  Pitch rises with rpm.
     per = []
     for i in range(96):

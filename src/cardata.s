@@ -86,8 +86,12 @@ drive_name_ptr:
         sta ptr0+1
         rts
 
-; part_price: X = tier, Y = level (1-4) -> m_a (24-bit)
+; part_price: A = part, X = tier, Y = level (1-4) -> m_a (24-bit).  Each
+; part is priced by how much speed it adds (PART_WEIGHT in gamedata.py).
+; Clobbers tmp0, tmp1, ptr3, X, Y.
 part_price:
+        sty tmp1
+        pha
         txa
         asl a
         asl a
@@ -95,16 +99,31 @@ part_price:
         txa
         clc
         adc tmp0                ; tier*5
+        adc tmp1                ;  + level
+        asl a                   ; words
         sta tmp0
-        tya
-        clc
-        adc tmp0
+        pla
         tax
-        lda part_price0,x
+        lda part_cost_lo,x
+        sta ptr3
+        lda part_cost_hi,x
+        sta ptr3+1
+        ldy tmp0
+        lda (ptr3),y            ; $10 units
         sta m_a
-        lda part_price1,x
+        iny
+        lda (ptr3),y
         sta m_a+1
-        lda part_price2,x
+        lda #10
+        sta m_b
+        lda #0
+        sta m_b+1
+        jsr mul16
+        lda m_r
+        sta m_a
+        lda m_r+1
+        sta m_a+1
+        lda m_r+2
         sta m_a+2
         rts
 

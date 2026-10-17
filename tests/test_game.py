@@ -6,6 +6,8 @@ import unittest
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 from harness import *          # noqa: F401,F403
+sys.path.insert(0, os.path.join(HERE, '..', 'tools'))
+import gamedata as gd          # noqa: E402
 
 SV_CASH, SV_GEMS, SV_LEVEL, SV_LADDER = 0x6004, 0x6007, 0x600B, 0x600C
 SV_CARS = 0x6020
@@ -31,6 +33,11 @@ def start_race(s, item):
     s.list_goto('rs_sel', item)
     s.press(A)
     s.step(5)
+    if item in (0, 7):                      # boss intro screen: A to race
+        s.step(40)
+        assert s.mem('bi_boss') < 12
+        s.press(A)
+        s.step(5)
 
 
 class Game(unittest.TestCase):
@@ -61,17 +68,18 @@ class Game(unittest.TestCase):
         s.garage_goto(G_PARTS)
         s.press(A)
         s.step(30)
-        s.press(A)                                   # intake level 1 ($600)
+        s.press(A)                                   # intake level 1
         s.step(10)
+        cash = 3000 - gd.part_cost(gd.P_INTAKE, 0, 1)
         self.assertEqual(s.wram(SV_CARS + 1), 1)
-        self.assertEqual(s.wram(SV_CASH, 3), 2400)
-        # soft reset keeps battery RAM: the save must still be valid
+        self.assertEqual(s.wram(SV_CASH, 3), cash)
+        # soft reset keeps the work RAM: the game must still be valid
         s.nes.reset()
         s.step(120)
         s.press(A)                                   # CONTINUE
         s.step(40)
         self.assertEqual(s.wram(SV_CARS + 1), 1)
-        self.assertEqual(s.wram(SV_CASH, 3), 2400)
+        self.assertEqual(s.wram(SV_CASH, 3), cash)
 
     def test_test_run(self):
         s = new_game()
