@@ -85,8 +85,10 @@ music_play:
         lda SV_OPTIONS
         and #OPT_NOMUSIC
         beq :+
-        cpx #SONG_GARAGE
-        bne :+
+        cpx #SONG_WIN           ; jingles still play; the looping
+        beq :+                  ; themes are off
+        cpx #SONG_LOSE
+        beq :+
         jmp music_stop
 :       lda #0
         sta mus_on              ; stop the NMI player while we set up

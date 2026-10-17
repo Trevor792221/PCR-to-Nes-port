@@ -636,6 +636,7 @@ race_split:
 ; ---------------------------------------------------------------------------
 race_frame:
         lda pad_new
+        ora pad2_new            ; either player can pause
         and #BTN_START
         beq :+
         lda rc_state
@@ -712,8 +713,17 @@ race_tree:
         sta rc_endt
         rts
 @nofoul:
+        lda race_kind
+        cmp #RK_2P
+        beq :+
         jsr ai_tree
-        inc rc_t
+        jmp @tick
+:       jsr p2_tree
+        lda rc_state
+        cmp #RS_END
+        bne @tick
+        rts
+@tick:  inc rc_t
         lda rc_t
         cmp #60
         beq @light
@@ -857,7 +867,12 @@ race_run:
         inc car_lane
 @ai:    lda rc_opp
         beq :+
+        lda race_kind
+        cmp #RK_2P
+        beq @p2
         jsr ai_run
+        jmp :+
+@p2:    jsr p2_run
 :       ; 0-60
         lda rc_t60
         ora rc_t60+1
@@ -1047,8 +1062,16 @@ check_finish0:
         ora #RF_WIN
         sta res_flags
         MOVI16 msg_ptr, str_m_win
+        lda race_kind
+        cmp #RK_2P
+        bne @m
+        MOVI16 msg_ptr, str_m_p1win
         jmp @m
 @lost:  MOVI16 msg_ptr, str_m_lose
+        lda race_kind
+        cmp #RK_2P
+        bne @m
+        MOVI16 msg_ptr, str_m_p2win
         jmp @m
 @solo:  MOVI16 msg_ptr, str_m_fin
 @m:     lda #1
@@ -1085,7 +1108,17 @@ check_finish1:
         sta rc_fin_t_h+1
         lda #0
         sta ph_thr+1
+        lda race_kind           ; two players: player 2 got there first
+        cmp #RK_2P
+        bne :+
         lda rc_fin
+        bne :+
+        MOVI16 msg_ptr, str_m_p2win
+        lda #1
+        sta msg_dirty
+        lda #0
+        sta msg_t
+:       lda rc_fin
         beq @r
         ; player already done: wrap up
         lda rc_state
@@ -1095,6 +1128,76 @@ check_finish1:
         sta rc_state
         lda #60
         sta rc_endt
+@r:     rts
+
+; ---------------------------------------------------------------------------
+; Player 2 (controller 2) drives car 1 in two-player races
+; ---------------------------------------------------------------------------
+; p2_tree: rev with A; Right before green is a foul start (player 1 wins)
+p2_tree:
+        lda pad2
+        and #BTN_A
+        beq :+
+        lda #1
+:       sta ph_thr+1
+        lda pad2_new
+        and #BTN_RIGHT
+        beq @r
+        lda #RF_WIN|RF_P2FOUL
+        sta res_flags
+        lda #SFX_FOUL
+        jsr sfx_play
+        MOVI16 msg_ptr, str_m_p2foul
+        lda #1
+        sta msg_dirty
+        lda #5                  ; red lights
+        sta rc_tree
+        sta tree_dirty
+        lda #RS_END
+        sta rc_state
+        lda #120
+        sta rc_endt
+@r:     rts
+
+; p2_run: the same controls as player 1 (no shift-quality messages)
+p2_run:
+        lda rc_fin+1
+        bne @r
+        lda pad2
+        and #BTN_A
+        beq :+
+        lda #1
+:       sta ph_thr+1
+        lda pad2_new
+        and #BTN_RIGHT
+        beq @nr
+        lda ph_gear+1
+        sta tmp7
+        ldx #1
+        jsr phys_shift_up
+        bcc @nr
+        lda tmp7
+        bne :+
+        lda #1                  ; that was the launch
+        sta rc_launch+1
+:       lda #SFX_SHIFT
+        jsr sfx_play
+@nr:    lda pad2_new
+        and #BTN_LEFT
+        beq @nl
+        ldx #1
+        jsr phys_shift_down
+        bcc @nl
+        lda #SFX_SHIFT
+        jsr sfx_play
+@nl:    lda pad2_new
+        and #BTN_B
+        beq @r
+        ldx #1
+        jsr phys_nitrous
+        bcc @r
+        lda #SFX_NOS
+        jsr sfx_play
 @r:     rts
 
 ; ---------------------------------------------------------------------------
@@ -1495,12 +1598,53 @@ crash_check:
 ; Drawing: camera, scroll, columns, HUD, sprites, sound
 ; ---------------------------------------------------------------------------
 race_draw:
-        ; camera follows the player
-        lda ph_p1
+        ; camera follows the player.  Two players: the trailing car stays at
+        ; x 64 until the leader is 128 px ahead, then the camera follows the
+        ; leader (x 192).  cam = max(trailer, leader - 128): never backwards.
+        lda race_kind
+        cmp #RK_2P
+        bne @cam1
+        ldx #0                  ; X = leader, Y = trailer
+        ldy #1
+        lda ph_p1+1
+        cmp ph_p1
+        lda ph_p2+1
+        sbc ph_p2
+        bcc :+
+        ldx #1
+        ldy #0
+:       sec
+        lda ph_p1,x
+        sbc #128
+        sta tmp0
+        lda ph_p2,x
+        sbc #0
+        sta tmp1
+        bcs :+
+        lda #0                  ; leader still inside the first 128 px
+        sta tmp0
+        sta tmp1
+:       lda tmp0                ; trailer >= leader - 128 ?
+        cmp ph_p1,y
+        lda tmp1
+        sbc ph_p2,y
+        bcs :+
+        lda ph_p1,y
+        sta tmp0
+        lda ph_p2,y
+        sta tmp1
+:       lda tmp0
         sta cam
-        sta road_x
+        lda tmp1
+        sta cam+1
+        jmp @cam2
+@cam1:  lda ph_p1
+        sta cam
         lda ph_p2
         sta cam+1
+@cam2:  lda cam
+        sta road_x
+        lda cam+1
         sta road_x+1
         lda cam+1
         lsr a
@@ -1978,12 +2122,30 @@ marker:
 marker_pal: .byte 0, 2
 
 spr_cars:
-        ; player at x 64
-        lda #0
+        ; player at x 64 (two players: 64 + pos - cam, like the other car)
+        lda race_kind
+        cmp #RK_2P
+        bne :+
+        clc
+        lda ph_p1
+        adc #64
+        sta tmp2
+        lda ph_p2
+        adc #0
+        sta tmp3
+        sec
+        lda tmp2
+        sbc cam
+        sta sx_l
+        lda tmp3
+        sbc cam+1
+        sta sx_h
+        jmp @have
+:       lda #0
         sta sx_h
         lda #64
         sta sx_l
-        lda crash_t
+@have:  lda crash_t
         beq :+
         lda frame
         and #2
@@ -2216,6 +2378,7 @@ race_pause:
         lda #0
         sta eng_thr
         lda pad_new
+        ora pad2_new
         and #BTN_START
         beq :+
         lda #0
@@ -2225,6 +2388,7 @@ race_pause:
         sta msg_dirty
         jmp hud_update
 :       lda pad_new
+        ora pad2_new
         and #BTN_SELECT
         beq @r
         lda #1
@@ -2246,13 +2410,27 @@ race_results:
         ; quitting counts as a loss (handled like a foul without a message)
         lda race_kind
         cmp #RK_TEST
-        beq @r
+        jeq @r
         lda #RF_FOUL
         sta res_flags
         rts
 :       lda foul
-        bne @r
+        jne @r
+        lda race_kind           ; two players, nobody finished: the leader wins
+        cmp #RK_2P
+        bne @fin
         lda rc_fin
+        ora rc_fin+1
+        bne @fin
+        lda ph_p1+1
+        cmp ph_p1
+        lda ph_p2+1
+        sbc ph_p2
+        bcs @fin
+        lda res_flags
+        ora #RF_WIN
+        sta res_flags
+@fin:   lda rc_fin
         beq :+
         lda rc_fin_t_l
         ldx rc_fin_t_h
@@ -2321,6 +2499,9 @@ str_m_late:  .byte "LATE SHIFT", 0
 str_m_nos:   .byte "NITROUS!", 0
 str_m_win:   .byte "YOU WIN!", 0
 str_m_lose:  .byte "YOU LOSE", 0
+str_m_p1win: .byte "PLAYER 1 WINS!", 0
+str_m_p2win: .byte "PLAYER 2 WINS!", 0
+str_m_p2foul: .byte "P2 FOUL START!", 0
 str_m_fin:   .byte "FINISH!", 0
 str_m_crash: .byte "CRASH!", 0
 str_m_pause: .byte "PAUSED  SELECT:QUIT", 0

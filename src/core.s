@@ -137,6 +137,9 @@ nmi:
 
         lda pal_dirty
         beq @nopal
+        lda vbuf_len            ; a long VRAM queue this frame: the palette
+        cmp #NMI_PAL_VLEN+1     ; waits one frame (both won't fit in vblank)
+        bcs @nopal
         lda ppu_ctrl
         and #$FB
         sta PPUCTRL
@@ -276,17 +279,28 @@ wait_frames:
 read_pad:
         lda pad
         sta pad_old
+        lda pad2
+        sta pad2_old
         lda #1
-        sta JOY1
+        sta JOY1                ; strobe latches both controllers
         sta pad
         lsr a
         sta JOY1
-@rd:    lda JOY1
+        sta pad2
+@rd:    lda JOY2
         and #$03
         cmp #1
-        rol pad
+        rol pad2
+        lda JOY1
+        and #$03
+        cmp #1
+        rol pad                 ; the sentinel bit ends the loop after 8
         bcc @rd
         ; Famicom expansion controllers on bit 1 are folded in above.
+        lda pad2_old
+        eor #$FF
+        and pad2
+        sta pad2_new
         lda pad_old
         eor #$FF
         and pad

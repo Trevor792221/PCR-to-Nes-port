@@ -137,16 +137,19 @@ RK_STREET = 2
 RK_TEST   = 3
 RK_SECRET = 4                   ; hidden 12th boss (needs the Zenith X400)
 RK_CRUISE = 5                   ; endless driving with traffic, quit from pause
+RK_2P     = 6                   ; two players: controller 2 drives the other car
 
 ; --- result flags ------------------------------------------------------------
 RF_WIN    = $01
 RF_FOUL   = $02
 RF_OPPFIN = $04         ; opponent finished (has an ET)
+RF_P2FOUL = $08         ; two players: player 2 jumped the start
 RF_DONE   = $80
 
 ; --- misc ---------------------------------------------------------------------
 VBUF_MAX  = 104
 NMI_CHR_VLEN = 40            ; CHR streaming only if the queue is this short
+NMI_PAL_VLEN = 48            ; palette upload only if the queue is this short
 
 ; Write A to an MMC1 register (5 serial writes, LSB first).  Clobbers A.
 .macro MMC1_WRITE reg

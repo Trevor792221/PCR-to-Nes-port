@@ -461,17 +461,19 @@ race_select:
         PRINT str_rs3, 4, 10
         PRINT str_rs4, 4, 12
         PRINT str_rs7, 4, 14
-        PRINT str_rs5, 4, 16
-        lda #7
+        PRINT str_rs8, 4, 16
+        PRINT str_rs5, 4, 18
+        jsr mp_check
+        lda #8
         sta ui_count
         jsr has_zenith
         bne :+
         lda #$20
         sta text_attr
-        PRINT str_rs6, 4, 18
+        PRINT str_rs6, 4, 20
         lda #0
         sta text_attr
-        lda #8
+        lda #9
         sta ui_count
 :       BOX 1, 24, 30, 5
         jsr attr_upload
@@ -514,7 +516,11 @@ race_select:
         beq @pick
         jmp @loop
 @left:  lda ui_sel
-        cmp #1
+        cmp #6
+        bne :+
+        lda #$FF                ; player 2's car: previous owned car
+        jmp @mp
+:       cmp #1
         bne @dl
         lda race_diff
         beq @loop
@@ -533,7 +539,12 @@ race_select:
         sta race_half
         jmp @chg
 @right: lda ui_sel
-        cmp #1
+        cmp #6
+        bne :+
+        lda #1                  ; player 2's car: next owned car
+@mp:    jsr mp_step
+        jmp @chg
+:       cmp #1
         beq :+
         cmp #2
         bne @dl
@@ -543,7 +554,7 @@ race_select:
         jmp @chg
 :       lda race_diff
         cmp #2
-        bcs @loop
+        jcs @loop
         inc race_diff
 @chg:   lda #SFX_MOVE
         jsr sfx_play
@@ -552,8 +563,14 @@ race_select:
 @back:  sec
         rts
 @pick:  lda ui_sel
-        cmp #6
+        cmp #7
         beq @back
+        cmp #6
+        bne :+
+        jsr setup_2p
+        clc
+        rts
+:       lda ui_sel
         cmp #2
         jeq @loop               ; distance row: use left/right
         cmp #5
@@ -561,7 +578,7 @@ race_select:
         jsr setup_cruise
         clc
         rts
-:       cmp #7
+:       cmp #8
         bne :+
         jsr setup_secret
         lda #BOSS_SECRET
@@ -633,6 +650,11 @@ rs_refresh:
         ldy #14
         jsr vb_str
         jsr wait_frame
+        jsr mp_line
+        ldx #15
+        ldy #16
+        jsr vb_str
+        jsr wait_frame
         ; info box rows 25..26
         lda rs_sel
         asl a
@@ -658,6 +680,10 @@ rs_refresh:
         bne :+
         MOVI16 ptr0, str_i7b
         jmp @show
+:       cmp #6
+        bne :+
+        MOVI16 ptr0, str_i8b
+        jmp @show
 :       cmp #1
         bne @n1
         ; bet
@@ -674,7 +700,7 @@ rs_refresh:
         sta linebuf,y
         MOVI16 ptr0, linebuf
         jmp @show
-@n1:    cmp #7
+@n1:    cmp #8
         bne @n2
         MOVI16 ptr0, str_i6b
         jmp @show
@@ -700,6 +726,7 @@ str_rs4:    .byte "TEST RUN", 0
 str_rs5:    .byte "BACK", 0
 str_rs6:    .byte "??? SECRET BOSS", 0
 str_rs7:    .byte "CRUISE", 0
+str_rs8:    .byte "2 PLAYER", 0
 str_poor:   .byte "NOT ENOUGH CASH FOR THE BET", 0
 str_bet:    .byte "BET ", 0
 diff_names: .word str_easy, str_med, str_hard
@@ -717,7 +744,7 @@ MOVI_EMPTY = 2
 traf_names: .word str_traf, str_notraf
 str_traf:   .byte "< TRAFFIC >", 0
 str_notraf: .byte "< NO CARS >", 0
-rs_info:    .word str_i0, str_i1, str_i2, str_i3, str_i4, str_i7, str_i5, str_i6
+rs_info:    .word str_i0, str_i1, str_i2, str_i3, str_i4, str_i7, str_i8, str_i5, str_i6
 str_i0:     .byte "BEAT THE 10 STREET BOSSES", 0
 str_i1:     .byte "RANDOM RIVAL, WIN THE BET", 0
 str_i2:     .byte "LEFT/RIGHT: RACE LENGTH", 0
@@ -728,6 +755,8 @@ str_i6:     .byte "ONLY AN X400 CAN TAKE IT ON", 0
 str_i6b:    .byte "ECLIPSE - WIN $500000", 0
 str_i7:     .byte "ENDLESS ROAD, L/R: TRAFFIC", 0
 str_i7b:    .byte "START, THEN SELECT: EXIT", 0
+str_i8:     .byte "PLAYER 2 USES CONTROLLER 2", 0
+str_i8b:    .byte "L/R: PLAYER 2'S CAR", 0
 
 ; calc_bet: m_a = bet for race_diff
 calc_bet:
@@ -902,6 +931,8 @@ boss_intro:
         lda car_shape,x
         ldx #$40
         jsr big_car_stream
+        lda #SONG_BOSS
+        jsr music_play
 @loop:  jsr wait_frame
         jsr read_pad
         lda #4
@@ -926,6 +957,8 @@ boss_intro:
         beq @loop
         lda #SFX_BACK
         jsr sfx_play
+        lda #SONG_GARAGE
+        jsr music_play
         sec
         rts
 @go:    lda #SFX_SELECT
@@ -1139,6 +1172,95 @@ setup_street:
         sta race_kind
         lda #1
         jmp set_dist
+
+.segment "BSS"
+mp_slot:    .res 1          ; garage slot player 2 drives
+.segment "BANK1"
+
+; mp_check: keep mp_slot on an owned car (the one in use if not)
+mp_check:
+        lda mp_slot
+        cmp #NSLOTS
+        bcs :+
+        jsr slot_ptr
+        ldy #CR_MODEL
+        lda (ptr1),y
+        cmp #$FF
+        bne @ok
+:       lda SV_CURCAR
+        sta mp_slot
+@ok:    rts
+
+; mp_step: A = +1 / -1 -> next / previous owned car for player 2
+mp_step:
+        sta tmp7
+        ldx #NSLOTS
+@try:   lda mp_slot
+        clc
+        adc tmp7
+        and #NSLOTS-1
+        sta mp_slot
+        jsr slot_ptr
+        ldy #CR_MODEL
+        lda (ptr1),y
+        cmp #$FF
+        bne @ok
+        dex
+        bne @try
+@ok:    rts
+
+; mp_line: ptr0 = "<KOMET 1.6  >" for player 2's car
+mp_line:
+        jsr mp_check
+        lda mp_slot
+        jsr slot_ptr
+        ldy #CR_MODEL
+        lda (ptr1),y
+        jsr car_name_ptr
+        lda #'<'
+        sta linebuf
+        ldy #1
+        jsr cat_ptr0
+:       cpy #12                 ; pad the name to 11
+        bcs :+
+        lda #' '
+        sta linebuf,y
+        iny
+        bne :-
+:       lda #'>'
+        sta linebuf,y
+        iny
+        lda #0
+        sta linebuf,y
+        MOVI16 ptr0, linebuf
+        rts
+
+; setup_2p: player 2 drives a copy of the chosen garage car
+setup_2p:
+        lda #RK_2P
+        sta race_kind
+        jsr mp_check
+        lda mp_slot
+        jsr slot_ptr
+        ldy #CR_SIZE-1
+:       lda (ptr1),y
+        sta opp_rec,y
+        dey
+        bpl :-
+        ldy #12
+:       lda str_p2name,y
+        sta opp_name,y
+        dey
+        bpl :-
+        lda #200
+        sta opp_skill
+        lda #0
+        sta race_bet
+        sta race_bet+1
+        sta race_bet+2
+        lda race_half
+        jmp set_dist
+str_p2name: .byte "PLAYER 2    ", 0
 
 setup_cruise:
         lda #RK_CRUISE
@@ -1961,7 +2083,27 @@ results_main:
         lda #$20
         sta text_attr
         lda race_kind
-        cmp #RK_TEST
+        cmp #RK_2P
+        bne @v1
+        ; two players: who won (and whether it was a foul)
+        lda res_flags
+        and #RF_FOUL
+        beq :+
+        MOVI16 ptr0, str_r_p1foul
+        jmp @v
+:       lda res_flags
+        and #RF_P2FOUL
+        beq :+
+        MOVI16 ptr0, str_r_p2foul
+        jmp @v
+:       lda res_flags
+        and #RF_WIN
+        beq :+
+        MOVI16 ptr0, str_r_p1win
+        jmp @v
+:       MOVI16 ptr0, str_r_p2win
+        jmp @v
+@v1:    cmp #RK_TEST
         bne :+
         MOVI16 ptr0, str_r_test
         jmp @v
@@ -2043,7 +2185,10 @@ results_main:
         ldy #15
         jsr print
 @noopp:
-        ; rewards
+        ; rewards (none in two-player races)
+        lda race_kind
+        cmp #RK_2P
+        jeq @help
         PRINT str_r_cash, 4, 19
         lda rw_cash+2
         bmi @neg
@@ -2092,9 +2237,9 @@ results_main:
         lda #0
         sta text_attr
 :       lda rw_best
-        beq :+
+        beq @help
         PRINT str_r_best, 4, 23
-:       PRINT str_r_help, 2, 26
+@help:  PRINT str_r_help, 2, 26
         PRINT str_r_help2, 2, 27
         jsr attr_upload
         lda #0
@@ -2237,7 +2382,12 @@ apply_rewards:
         sta rw_xp+1
         sta rw_lvup
         sta rw_best
-        lda #5
+        sta rw_xp
+        lda race_kind           ; two players: no money, XP or stats
+        cmp #RK_2P
+        bne :+
+        rts
+:       lda #5
         sta rw_xp
         jsr track_stats
         ; best 1/4 mile time (test runs and races over 1/4 mile)
@@ -2415,6 +2565,10 @@ apply_rewards:
 
 str_results:  .byte "RESULTS", 0
 str_r_win:    .byte "YOU WIN!", 0
+str_r_p1win:  .byte "PLAYER 1 WINS!", 0
+str_r_p2win:  .byte "PLAYER 2 WINS!", 0
+str_r_p1foul: .byte "P1 FOUL - PLAYER 2 WINS", 0
+str_r_p2foul: .byte "P2 FOUL - PLAYER 1 WINS", 0
 str_r_lose:   .byte "YOU LOSE", 0
 str_r_foul:   .byte "FOUL START - YOU LOSE", 0
 str_r_test:   .byte "TEST RUN COMPLETE", 0

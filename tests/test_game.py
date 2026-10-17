@@ -33,7 +33,7 @@ def start_race(s, item):
     s.list_goto('rs_sel', item)
     s.press(A)
     s.step(5)
-    if item in (0, 7):                      # boss intro screen: A to race
+    if item in (0, 8):                      # boss intro screen: A to race
         s.step(40)
         assert s.mem('bi_boss') < 12
         s.press(A)

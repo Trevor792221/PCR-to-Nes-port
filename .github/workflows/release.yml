@@ -45,4 +45,5 @@ jobs:
             dist/pixel-racer-soundtrack.zip
             dist/01-midnight-garage.wav
             dist/02-win.wav
+            dist/04-showdown.wav
             dist/03-lose.wav

@@ -39,6 +39,9 @@ scroll_nt:  .res 1
 pad:        .res 1
 pad_old:    .res 1
 pad_new:    .res 1
+pad2:       .res 1          ; controller 2 (two-player races)
+pad2_old:   .res 1
+pad2_new:   .res 1
 cur_bank:   .res 1
 vbuf_len:   .res 1
 pal_dirty:  .res 1

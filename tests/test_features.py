@@ -101,13 +101,13 @@ class Features(unittest.TestCase):
 
     def test_secret_boss_hidden_without_zenith(self):
         s = new_game()
-        self.assertEqual(self.race_select_count(s), 7)
+        self.assertEqual(self.race_select_count(s), 8)
 
     def test_secret_boss_race_and_reward(self):
         s = new_game()
         give_car(s, 0, 12, 4)
-        self.assertEqual(self.race_select_count(s), 8)
-        s.list_goto('rs_sel', 7)
+        self.assertEqual(self.race_select_count(s), 9)
+        s.list_goto('rs_sel', 8)
         s.press(A)
         s.step(45)
         self.assertEqual(s.mem('bi_boss'), 11, 'intro: ECLIPSE')
@@ -362,7 +362,7 @@ class Features(unittest.TestCase):
         self.assertEqual(s.mem('game_mode'), 1, 'intro, not racing yet')
         s.press(B)                                   # back to race select
         s.step(40)
-        self.assertEqual(s.mem('ui_count'), 7)
+        self.assertEqual(s.mem('ui_count'), 8)
         self.assertEqual(s.mem('game_mode'), 1)
         s.press(A)
         s.step(45)
@@ -370,6 +370,65 @@ class Features(unittest.TestCase):
         s.step(60)
         self.assertEqual(s.mem('game_mode'), 2)
         self.assertEqual(s.mem('race_kind'), 0)
+
+    # --- two players ------------------------------------------------------------
+    def drive_two(self, s, frames=3000):
+        def rpm_c(c):
+            return s.mem('ph_rpm_l', c) | s.mem('ph_rpm_h', c) << 8
+
+        def red_c(c):
+            return s.mem('ph_redl_l', c) | s.mem('ph_redl_h', c) << 8
+        for f in range(frames):
+            bs = []
+            for c in (0, 1):
+                b = A
+                if s.mem('ph_gear', c) == 0:
+                    if s.mem('rc_green') and f % 4 < 2:
+                        b |= RIGHT
+                elif (rpm_c(c) >= red_c(c) - 300 and s.mem('ph_shift_t', c) == 0
+                      and f % 4 < 2):
+                    b |= RIGHT
+                bs.append(b)
+            s.step(1, bs[0] | bs[1] << 8)
+            if s.mem('game_mode') == 3:
+                break
+
+    def start_two(self, s, p2_next=0):
+        s.garage_goto(G_RACE)
+        s.press(A)
+        s.step(30)
+        s.list_goto('rs_sel', 6)
+        for _ in range(p2_next):
+            s.press(RIGHT)
+            s.step(10)
+        s.press(A)
+        s.step(60)
+
+    def test_two_player_race(self):
+        s = new_game()
+        give_car(s, 1, 11, 4)                        # player 2 takes the Nova Hyper
+        self.start_two(s, p2_next=1)
+        self.assertEqual(s.mem('race_kind'), 6)
+        self.assertEqual(s.mem('opp_rec'), 11)
+        self.drive_two(s)
+        s.step(30)
+        self.assertEqual(s.mem('game_mode'), 3)
+        self.assertEqual(s.mem('lag'), 0)
+        flags = s.mem('res_flags')
+        self.assertFalse(flags & 1, 'player 2 (hypercar) wins')
+        self.assertTrue(flags & 4, 'player 2 has a time')
+        self.assertLess(s.mem16('res_opp_et'), s.mem16('res_et'))
+        self.assertEqual(s.wram(SV_CASH, 3), 3000, 'no money in 2-player races')
+        self.assertEqual(s.wram(SV_RACES, 2), 0, 'not counted in the stats')
+
+    def test_two_player_foul_start(self):
+        s = new_game()
+        self.start_two(s)
+        s.step(20)
+        s.step(2, RIGHT << 8)                        # player 2 launches on amber
+        s.step(200)
+        self.assertEqual(s.mem('game_mode'), 3)
+        self.assertEqual(s.mem('res_flags') & 0x09, 0x09, 'P2 foul: player 1 wins')
 
     def test_quit_to_title_from_options(self):
         s = new_game()

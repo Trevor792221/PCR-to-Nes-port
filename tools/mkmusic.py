@@ -114,6 +114,30 @@ K:4 H:4 S:4 H:4 | K:4 H:4 S:4 O:4 | K:4 H:4 S:4 H:4 | K:4 S:4 S:2 S:2 S:4
 K:4 H:4 S:4 H:4 | K:4 H:4 S:4 O:4 | K:4 H:4 S:4 H:4 | K:4 S:4 S:2 S:2 S:4
 '''
 
+# ---------------------------------------------------------------------------
+# "Showdown" -- boss intro theme.  E minor, same tempo, driving 16th bass.
+# Em | Em | C | B | Em | Em | C B7 | Em
+# ---------------------------------------------------------------------------
+BOSS_LEAD = '''
+I0 E5:2 R:1 E5:1 G5:2 B5:2 A5:4 G5:2 F#5:2 | E5:6 D5:2 B4:8
+   C5:2 R:1 C5:1 E5:2 G5:2 F#5:4 E5:2 D5:2 | B4:12 R:4
+   E5:2 R:1 E5:1 G5:2 B5:2 C6:4 B5:2 A5:2 | G5:4 A5:2 B5:2 E6:8
+   D6:2 C6:2 B5:2 A5:2 G5:2 F#5:2 E5:2 D#5:2 | E5:12 R:4
+'''
+BOSS_HARM = '''
+I1 R:2 B4:2 R:2 G4:2 R:2 B4:2 R:2 G4:2 | R:2 B4:2 R:2 G4:2 R:2 F#4:2 R:2 F#4:2
+   R:2 G4:2 R:2 E4:2 R:2 G4:2 R:2 E4:2 | R:2 F#4:2 R:2 D#4:2 R:2 F#4:2 R:2 D#4:2
+   R:2 B4:2 R:2 G4:2 R:2 B4:2 R:2 G4:2 | R:2 B4:2 R:2 G4:2 R:2 B4:2 R:2 G4:2
+   R:2 G4:2 R:2 E4:2 R:2 F#4:2 R:2 D#4:2 | R:2 B4:2 R:2 G4:2 G4:4 R:4
+'''
+_E = 'E2:1 E2:1 E3:1 E2:1 ' * 4
+_C = 'C3:1 C3:1 C4:1 C3:1 ' * 4
+_B = 'B2:1 B2:1 B3:1 B2:1 ' * 4
+BOSS_BASS = 'I2 ' + _E + _E + _C + _B + _E + _E + _C[:len(_C) // 2] + _B[:len(_B) // 2] + _E
+_BEAT = 'K:2 H:1 H:1 S:2 H:2 K:2 K:2 S:2 H:2 '
+_FILL = 'K:2 H:2 S:2 H:2 S:1 S:1 S:2 S:2 S:2 '
+BOSS_DRUM = (_BEAT * 3 + _FILL) * 2
+
 # short jingles (do not loop)
 WIN_LEAD = 'I9 C5:1 E5:1 G5:1 C6:3 R:1 A5:1 C6:6'
 WIN_HARM = 'I1 E4:1 G4:1 C5:1 E5:3 R:1 F5:1 E5:6'
@@ -130,6 +154,8 @@ SONGS = [
                   (WIN_BASS, False, False), (SILENT, False, True)]),
     ('song_lose', [(LOSE_LEAD, False, False), (LOSE_HARM, False, False),
                    (LOSE_BASS, False, False), (SILENT, False, True)]),
+    ('song_boss', [(BOSS_LEAD, True, False), (BOSS_HARM, True, False),
+                   (BOSS_BASS, True, False), (BOSS_DRUM, True, True)]),
 ]
 
 
@@ -170,6 +196,7 @@ def main():
     lines.append('SONG_GARAGE = 0')
     lines.append('SONG_WIN = 1')
     lines.append('SONG_LOSE = 2')
+    lines.append('SONG_BOSS = 3')
     open(sys.argv[1], 'w').write('\n'.join(lines) + '\n')
 
 
