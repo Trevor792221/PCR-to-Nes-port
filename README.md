@@ -23,6 +23,7 @@ runs on real NES / Famicom hardware or any accurate emulator.
 
 ![Splash](docs/splash.png) ![Title](docs/title.png) ![Garage](docs/garage.png)
 ![Race](docs/race.png) ![Dyno](docs/dyno.png)
+![Parts](docs/parts.png) ![Tune](docs/tune.png) ![Stats](docs/stats.png)
 
 ## What carried over from the Android game
 
