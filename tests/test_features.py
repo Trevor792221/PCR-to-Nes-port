@@ -421,6 +421,18 @@ class Features(unittest.TestCase):
         self.assertEqual(s.wram(SV_CASH, 3), 3000, 'no money in 2-player races')
         self.assertEqual(s.wram(SV_RACES, 2), 0, 'not counted in the stats')
 
+    def test_perfect_shift_mark(self):
+        from test_game import start_race
+        s = new_game()
+        start_race(s, 4)
+        s.step(10)
+        # the mark sits where the tach shows redline - 450 rpm (bar at x 32)
+        red = redline(s)
+        k = s.mem16('tach_k')
+        self.assertEqual(s.mem('shift_x'), 32 + ((red - 450) * k >> 16))
+        tiles = [s.nes[0x200 + i * 4 + 1] for i in range(64)]
+        self.assertIn(0x0D, tiles, 'mark sprite on screen')
+
     def test_two_player_foul_start(self):
         s = new_game()
         self.start_two(s)

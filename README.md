@@ -44,7 +44,7 @@ runs on real NES / Famicom hardware or any accurate emulator.
 | Story / ladder progression | Ladder of 10 street bosses, plus a final "Legend" boss. A hidden 12th boss, **Eclipse**, appears in race select only while you drive the Zenith X400. Beating it pays $500,000 and, the first time, 25 gems. Before every boss race an intro screen shows the boss, their car in its colours with its HP, a short bio and the prize; B backs out. The intro plays its own theme, "Showdown" |
 | Quick races with bets | Random rival on Easy, Medium or Hard, betting $300, $1,000 or $2,500 |
 | Free roam | **Cruise**: endless driving on the 3-lane road, no rival and no finish line. Press Left/Right on CRUISE to turn traffic on or off. Nitrous is unlimited: the bottle refills as soon as a shot ends. START pauses, then SELECT returns to the garage |
-| Multiplayer | **2 PLAYER** in race select: a head-to-head drag race on one console. Player 2 uses controller 2 with the same buttons (A gas, Right launch/shift up, Left shift down, B nitrous) and drives any car from your garage (Left/Right on the 2 PLAYER row picks it). Distance follows the DISTANCE setting. Either player can foul by launching early. The camera keeps both cars on screen until the leader is far ahead. No money, XP or stats are at stake. Online play from the Android game isn't possible on an NES |
+| Multiplayer | **2 PLAYER** in race select: a head-to-head drag race on one console. Player 2 uses controller 2 with the same buttons (A gas, Right launch/shift up, Left shift down, B nitrous) and drives any car from your garage (Left/Right on the 2 PLAYER row picks it). Distance follows the DISTANCE setting. Either player can foul by launching early. The HUD splits in two: each player has a rev counter, gear, speed and nitrous bar, with the clock in the middle. The camera keeps both cars on screen until the leader is far ahead. No money, XP or stats are at stake. Online play from the Android game isn't possible on an NES |
 | Practice / test runs | Solo test run with elapsed time, trap speed, reaction time and 0-60 time. The best 1/4-mile time is kept per car |
 | XP, levels and premium currency | XP from every race. Levelling up gives gems, and higher levels unlock better cars |
 | Saving | **Passwords**, like classic NES games. OPTIONS → PASSWORD shows two: a 32-letter **player** password (cash, gems, level, XP, bosses beaten, options, and the stats page: races, wins, losses, crates, street wins, best 1/4-mile time and fastest trap speed with their cars) and a **garage** password (every car with all its parts and body colour, and the car you drive) that is 11 letters for one car and grows by about 8 letters per car, up to 66. Enter them from TITLE → PASSWORD. Gear tunes, rim and glass colours and each car's own best time start fresh after a password. The letters skip I, O, 0 and 1 so nothing looks alike, and a CRC-8 check rejects any password with a wrong letter. 15-letter player passwords from v3.0 (no stats) still work |
@@ -76,8 +76,8 @@ jumps to any ladder boss.
 
 **How to race.** Hold **A** to rev while the amber lights come on. When the
 light turns green, press **Right** to drop the clutch. Pressing it before
-green is a foul start, and you lose. Shift when the tach is deep in the red
-zone, just under the limiter, for a *Perfect* shift, which also makes the
+green is a foul start, and you lose. Shift once the tach passes the orange
+mark (450 rpm under the redline) for a *Perfect* shift, which also makes the
 gear change faster. Pick your launch revs to suit your tires: high revs with
 street tires just make smoke.
 

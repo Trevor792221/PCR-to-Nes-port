@@ -66,6 +66,11 @@ tr_type:    .res NTRAFFIC   ; vehicle type 0-4 (see tr_shape)
 tr_pal:     .res NTRAFFIC   ; sprite palette (3, or 2 when cruising)
 tr_spawn:   .res 1
 hud_gear:   .res 1
+hud_gear1:  .res 1          ; (must follow hud_gear: indexed by car)
+tach_k1:    .res 2          ; two players: player 2's tach and nitrous scales
+nos_k1:     .res 1
+hc:         .res 1
+shift_x:    .res 2          ; screen x of the perfect-shift mark per car
 mark_x:     .res 2
 nos_k:      .res 1          ; 48*256/nos_frames
 sx_l:       .res 1          ; signed screen x scratch
@@ -309,7 +314,46 @@ race_setup:
         jsr div16_8
         lda m_r
         sta nos_k
-:       clc
+:
+        ; two players: the same scales for car 1
+        lda race_kind
+        cmp #RK_2P
+        bne @no2
+        lda #0
+        sta m_r
+        sta m_r+1
+        sta m_r+3
+        lda #$A0
+        sta m_r+2
+        lda ph_lim_l+1
+        sta m_b
+        lda ph_lim_h+1
+        sta m_b+1
+        jsr div32
+        lda m_r
+        sta tach_k1
+        lda m_r+1
+        sta tach_k1+1
+        lda ph_nos_fr+1
+        beq @no2
+        lda #0
+        sta m_r
+        lda #48
+        sta m_r+1
+        lda ph_nos_fr+1
+        jsr div16_8
+        lda m_r
+        sta nos_k1
+@no2:   ; perfect-shift marks: where the tach reaches redline - 450 rpm
+        ldx #0
+        jsr shift_mark
+        lda race_kind
+        cmp #RK_2P
+        bne :+
+        ldx #1
+        jsr shift_mark
+:
+        clc
         lda race_dist
         adc #96
         sta fin_x
@@ -471,13 +515,23 @@ race_attrs:
         inx
         cpx #64
         bne :-
-        ; HUD: redline blocks (x 10-11, y 1) and amber lights (x 0-2, y 2)
-        ldx #10
+        ; HUD: redline blocks (x 10-11, y 1) and amber lights (x 0-2, y 2).
+        ; Two players: the last block of each short tach (x 5 and 13).
+        lda race_kind
+        cmp #RK_2P
+        bne @red1
+        ldx #5
+        ldy #1
+        lda #1
+        jsr set_attr
+        ldx #13
+        bne @red2
+@red1:  ldx #10
         ldy #1
         lda #1
         jsr set_attr
         ldx #11
-        ldy #1
+@red2:  ldy #1
         lda #1
         jsr set_attr
         ldx #0
@@ -525,13 +579,27 @@ draw_hud:
         jmp :++
 :       PRINT str_h_quart, 29, 1
 :
-@rest:  PRINT str_h_rpm, 1, 2
+@rest:  lda race_kind
+        cmp #RK_2P
+        bne @hud1
+        ; two players: "1 [tach] G n    2 [tach] G n" / speeds, nitrous, clock
+        PRINT str_h_p1, 1, 2
+        PRINT str_h_g, 12, 2
+        PRINT str_h_p2, 17, 2
+        PRINT str_h_g, 28, 2
+        jsr speed_unit_r
+        ldx #26
+        ldy #3
+        jsr print
+        jmp @lights
+@hud1:  PRINT str_h_rpm, 1, 2
         PRINT str_h_g, 25, 2
         jsr speed_unit_r
         ldx #1
         ldy #3
         jsr print
         PRINT str_h_nos, 19, 3
+@lights:
         ; tree lights off
         ldx #0
 :       stx tmp7
@@ -585,6 +653,8 @@ str_h_cruise: .byte "CRUISE   START:PAUSE", 0
 str_h_half:  .byte "1/2", 0
 str_h_mile:  .byte "1MI", 0
 str_h_rpm:   .byte "RPM", 0
+str_h_p1:    .byte "1", 0
+str_h_p2:    .byte "2", 0
 str_h_g:     .byte "G", 0
 str_h_mph:   .byte "MPH", 0
 str_h_kmh:   .byte "KMH", 0
@@ -1001,7 +1071,7 @@ player_shift_up:
         bmi @late               ; rpm above redline
         bne @early              ; >= 256 below
         lda tmp4
-        cmp #<450
+        cmp #<PERFECT_RPM      ; same window as the tach mark
         bcc @perfect
         jmp @good
 @early: lda tmp5
@@ -1173,6 +1243,13 @@ p2_run:
         lda pad2_new
         and #BTN_RIGHT
         beq @nr
+        sec                     ; rpm under the redline (perfect window)
+        lda ph_redl_l+1
+        sbc ph_rpm_l+1
+        sta tmp4
+        lda ph_redl_h+1
+        sbc ph_rpm_h+1
+        sta tmp5
         lda ph_gear+1
         sta tmp7
         ldx #1
@@ -1182,6 +1259,14 @@ p2_run:
         bne :+
         lda #1                  ; that was the launch
         sta rc_launch+1
+        bne :++
+:       lda tmp5                ; a perfect shift: quicker gear change
+        bne :+
+        lda tmp4
+        cmp #<PERFECT_RPM
+        bcs :+
+        lsr ph_shift_t+1
+        inc ph_shift_t+1
 :       lda #SFX_SHIFT
         jsr sfx_play
 @nr:    lda pad2_new
@@ -1851,7 +1936,11 @@ col_restore:
 ; HUD
 ; ---------------------------------------------------------------------------
 hud_update:
-        ; tach: fill px = rpm * tach_k >> 16 (0-160)
+        lda race_kind
+        cmp #RK_2P
+        bne :+
+        jmp hud_2p
+:       ; tach: fill px = rpm * tach_k >> 16 (0-160)
         lda ph_rpm_l
         sta m_a
         lda ph_rpm_h
@@ -1920,7 +2009,7 @@ hud_update:
         ldx #5
         ldy #3
         jsr vb_numbuf
-        jmp @tree
+        jmp hud_tree
 @clock: lda rc_state
         cmp #RS_TREE
         beq @noclk
@@ -1951,7 +2040,7 @@ hud_update:
         adc #6
         tax
         jsr vb_close
-@noclk: jmp @tree
+@noclk: jmp hud_tree
 @nos:   ; nitrous bar: 6 tiles
         lda #0
         sta tmp4
@@ -1994,7 +2083,8 @@ hud_update:
         dey
         bne @n
         jsr vb_close
-@tree:  lda tree_dirty
+hud_tree:                       ; (shared with hud_2p) start lights, message
+        lda tree_dirty
         beq @notree
         lda #0
         sta tree_dirty
@@ -2031,6 +2121,273 @@ hud_update:
         jmp vb_str
 @r:     rts
 
+; ---------------------------------------------------------------------------
+; shift_mark: X = car -> shift_x,x = screen x of redline - 450 rpm on its tach
+; (the perfect-shift window starts there; see player_shift_up)
+; ---------------------------------------------------------------------------
+PERFECT_RPM = 450
+shift_mark:
+        stx hc
+        sec
+        lda ph_redl_l,x
+        sbc #<PERFECT_RPM
+        sta m_a
+        lda ph_redl_h,x
+        sbc #>PERFECT_RPM
+        sta m_a+1
+        txa
+        bne :+
+        lda tach_k
+        sta m_b
+        lda tach_k+1
+        sta m_b+1
+        jmp :++
+:       lda tach_k1
+        sta m_b
+        lda tach_k1+1
+        sta m_b+1
+:       jsr mul16
+        lda m_r+2               ; px 0-160
+        ldx race_kind
+        cpx #RK_2P
+        beq :+
+        clc                     ; one player: the tach starts at x 32
+        adc #32
+        ldx hc
+        sta shift_x,x
+        rts
+:       lsr a                   ; two players: half-size tachs at x 16 / 144
+        clc
+        adc #16
+        ldx hc
+        beq :+
+        adc #128
+:       sta shift_x,x
+        rts
+
+; ---------------------------------------------------------------------------
+; hud_2p: the two-player HUD.  Row 2: "1 [tach] G n    2 [tach] G n" (10-tile
+; tachs); row 3: speed and a 4-tile nitrous bar per player, the clock in the
+; middle.  Like the one-player HUD, row 3 takes turns: clock, speeds, bars.
+; ---------------------------------------------------------------------------
+hud_2p:
+        lda #0
+        sta hc
+@car:   ldx hc                  ; tach px = rpm * k >> 16 (0-160), halved
+        lda ph_rpm_l,x
+        sta m_a
+        lda ph_rpm_h,x
+        sta m_a+1
+        txa
+        bne :+
+        lda tach_k
+        sta m_b
+        lda tach_k+1
+        sta m_b+1
+        jmp :++
+:       lda tach_k1
+        sta m_b
+        lda tach_k1+1
+        sta m_b+1
+:       jsr mul16
+        lda m_r+3
+        bne @full
+        lda m_r+2
+        cmp #161
+        bcc :+
+@full:  lda #160
+:       lsr a
+        sta tmp4
+        lda hc                  ; row 2, col 2 / 18
+        asl a
+        asl a
+        asl a
+        asl a
+        adc #$42
+        sta ptr3
+        lda #$20
+        sta ptr3+1
+        lda #10
+        jsr vb_open
+        ldy #10
+@t:     lda tmp4
+        cmp #8
+        bcc @part
+        sbc #8
+        sta tmp4
+        lda #$14
+        bne @st
+@part:  adc #$0C
+        pha
+        lda #0
+        sta tmp4
+        pla
+@st:    sta vbuf,x
+        inx
+        dey
+        bne @t
+        jsr vb_close
+        ldx hc                  ; gear (when it changes): col 13 / 29
+        lda ph_gear,x
+        cmp hud_gear,x
+        beq @nog
+        sta hud_gear,x
+        txa
+        asl a
+        asl a
+        asl a
+        asl a
+        adc #$4D
+        sta ptr3
+        lda #$20
+        sta ptr3+1
+        lda #1
+        jsr vb_open
+        ldy hc
+        lda hud_gear,y
+        bne :+
+        lda #'N'
+        bne :++
+:       ora #'0'
+:       sta vbuf,x
+        inx
+        jsr vb_close
+@nog:   inc hc
+        lda hc
+        cmp #2
+        jne @car
+        lda frame
+        and #1
+        beq @clock
+        lda frame
+        and #2
+        beq @speed
+        jmp @nos
+@speed: lda #0                  ; speeds: col 1 / 17
+        sta hc
+:       ldx hc
+        jsr phys_speed
+        jsr fmt3w
+        lda #3
+        sta tmp2
+        lda hc
+        asl a
+        asl a
+        asl a
+        asl a
+        ora #1
+        tax
+        ldy #3
+        jsr vb_numbuf
+        inc hc
+        lda hc
+        cmp #2
+        bne :-
+        jmp hud_tree
+@clock: lda rc_state            ; the race clock: row 3, col 10
+        cmp #RS_TREE
+        beq @noclk
+        lda rc_fin
+        and rc_fin+1            ; runs until both have finished
+        bne @noclk
+        MOVI16 ptr3, $206A
+        lda #6
+        jsr vb_open
+        lda clk
+        ora #'0'
+        sta vbuf,x
+        lda clk+1
+        ora #'0'
+        sta vbuf+1,x
+        lda #'.'
+        sta vbuf+2,x
+        lda clk+2
+        ora #'0'
+        sta vbuf+3,x
+        lda clk+3
+        ora #'0'
+        sta vbuf+4,x
+        lda clk+4
+        ora #'0'
+        sta vbuf+5,x
+        txa
+        clc
+        adc #6
+        tax
+        jsr vb_close
+@noclk: jmp hud_tree
+@nos:   lda #0                  ; nitrous bars: 4 tiles at col 5 / 21
+        sta hc
+@nc:    lda #0
+        sta tmp4
+        ldx hc
+        lda ph_nos_fr,x
+        beq @nb
+        lda ph_nos_t,x
+        bne :+
+        lda #32                 ; unused bottle: full
+        sta tmp4
+        bne @nb
+:       lda ph_nos_on,x
+        beq @nb                 ; used up
+        lda ph_nos_t,x          ; remaining (0-48) = nos_t * k >> 8
+        sta m_a
+        lda nos_k
+        cpx #0
+        beq :+
+        lda nos_k1
+:       sta m_b
+        jsr mul8
+        lda m_r+1               ; 48 -> 32 px: x/2 + x/8 + x/32
+        lsr a
+        sta tmp4
+        lsr a
+        lsr a
+        pha
+        lsr a
+        lsr a
+        sta tmp5
+        pla
+        clc
+        adc tmp4
+        adc tmp5
+        sta tmp4
+@nb:    lda hc
+        asl a
+        asl a
+        asl a
+        asl a
+        adc #$65
+        sta ptr3
+        lda #$20
+        sta ptr3+1
+        lda #4
+        jsr vb_open
+        ldy #4
+@n:     lda tmp4
+        cmp #8
+        bcc :+
+        lda #8
+:       pha
+        clc
+        adc #$0C
+        sta vbuf,x
+        inx
+        pla
+        sta tmp5
+        sec
+        lda tmp4
+        sbc tmp5
+        sta tmp4
+        dey
+        bne @n
+        jsr vb_close
+        inc hc
+        lda hc
+        cmp #2
+        jne @nc
+        jmp hud_tree
+
 ; light_tile: Y = light 0-3 -> A = tile
 light_tile:
         lda rc_tree
@@ -2061,6 +2418,23 @@ light_tile:
 race_sprites:
         lda #4
         sta oam_idx
+        ; perfect-shift marks over the tach (row 2)
+        lda #15
+        sta sp_y
+        lda #$0D
+        sta sp_tile
+        lda #3
+        sta sp_attr
+        lda shift_x
+        sta sp_x
+        jsr spr_add
+        lda race_kind
+        cmp #RK_2P
+        bne :+
+        lda shift_x+1
+        sta sp_x
+        jsr spr_add
+:
         ; progress markers on row 1 (not when cruising)
         lda race_kind
         cmp #RK_CRUISE

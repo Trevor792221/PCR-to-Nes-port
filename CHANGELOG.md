@@ -3,6 +3,12 @@
 Every version of Pixel Racer NES, newest first. Downloads are on the
 [Releases page](https://github.com/Trevor792221/PCR-to-Nes-port/releases).
 
+## v3.9: Player 2 HUD and a shift marker (2026-10-17)
+
+* 2 PLAYER races now show a full HUD for both players: each gets a rev counter with its own red zone, gear, speed and nitrous bar, with the race clock in the middle.
+* An orange mark on the rev counter shows where a Perfect shift starts (450 rpm under the redline): shift when the bar reaches it.
+* Player 2 now gets the quicker Perfect shift too.
+
 ## v3.8: The garage at night (2026-10-17)
 
 * After every race the garage is day or night at random.

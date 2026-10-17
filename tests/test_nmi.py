@@ -60,6 +60,40 @@ class NMIBudget(unittest.TestCase):
         self.check('dyno', self.watch(s, 3, 150))
         self.leave(s)
 
+    def test_two_player_race(self):
+        # two tachs, gears, speeds and nitrous bars must still fit in vblank
+        s = Sim(boot=120)
+        s.press(A)
+        s.step(40)
+        s.garage_goto(0)
+        s.press(A)
+        s.step(30)
+        s.list_goto('rs_sel', 6)
+        s.press(A)
+        worst, f, gears = 0, 0, set()
+        while s.mem('game_mode') == 2 and f < 3000:
+            bs = []
+            for c in (0, 1):
+                b = A
+                g = s.mem('ph_gear', c)
+                r = s.mem('ph_rpm_l', c) | s.mem('ph_rpm_h', c) << 8
+                red = s.mem('ph_redl_l', c) | s.mem('ph_redl_h', c) << 8
+                if g == 0:
+                    b |= RIGHT if s.mem('rc_green') and f % 4 < 2 else 0
+                elif r >= red - 300 and s.mem('ph_shift_t', c) == 0 and f % 4 < 2:
+                    b |= RIGHT
+                bs.append(b)
+            s.step(1, bs[0] | bs[1] << 8)
+            f += 1
+            gears.add(s.mem('hud_gear1'))
+            c = nmi_cycles(s, 2)
+            if c:
+                worst = max(worst, c)
+        self.check('two-player race', worst)
+        self.assertEqual(s.mem('lag'), 0)
+        self.assertGreater(len(gears), 2, "player 2's gear shown")
+        self.assertNotEqual(s.mem16('tach_k1'), 0, "player 2's tach scaled")
+
     def test_street_race(self):
         s = Sim(boot=120)
         s.press(A)
