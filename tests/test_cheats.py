@@ -79,12 +79,12 @@ class Cheats(unittest.TestCase):
         s.press(A)
         s.step(40)
         self.assertEqual(s.mem('ui_count'), 4)
-        s.press(LEFT)                                # songs wrap: 0 -> 4
+        s.press(LEFT)                                # songs wrap: 0 -> 5
         s.step(5)
-        self.assertEqual(s.mem('st_song'), 4)
+        self.assertEqual(s.mem('st_song'), 5)
         s.press(A)
         s.step(10)
-        self.assertEqual(s.mem('mus_song'), 4, 'NEON BOULEVARD playing')
+        self.assertEqual(s.mem('mus_song'), 5, 'AFTER HOURS playing')
         self.assertTrue(any(s.mem('mus_act', i) for i in range(4)))
         s.list_goto('ui_sel', 1)                     # effects: 1 -> 17 -> 16
         s.press(LEFT)

@@ -8,7 +8,7 @@ noise channels with the APU's non-linear mixer.
 Usage: render_wav.py OUTDIR
 Writes 01-midnight-garage.wav (two loops), 02-win.wav, 03-lose.wav,
 04-showdown.wav (boss theme, two loops), 05-neon-boulevard.wav (second
-garage theme).
+garage theme), 06-after-hours.wav (the garage at night).
 """
 import os
 import struct
@@ -160,7 +160,8 @@ def main():
     names = {'song_garage': ('01-midnight-garage.wav', 2),
              'song_win': ('02-win.wav', 0), 'song_lose': ('03-lose.wav', 0),
              'song_boss': ('04-showdown.wav', 2),
-             'song_neon': ('05-neon-boulevard.wav', 1)}
+             'song_neon': ('05-neon-boulevard.wav', 1),
+             'song_night': ('06-after-hours.wav', 1)}
     for name, chans in mm.SONGS:
         data = [mm.compile_channel(t, loop, drums) for t, loop, drums in chans]
         fname, loops = names[name]

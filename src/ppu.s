@@ -686,7 +686,17 @@ bank0_copy:
 ; ---------------------------------------------------------------------------
 draw_garage_bg:
         MOVI16 ptr0, gfx_garage_map
-        lda #<288
+        lda garage_night
+        beq :+
+        MOVI16 ptr0, gfx_garage_night_map
+        ldx #11                 ; night colours for BG palettes 1-3
+@np:    lda pal_garage_night,x
+        sta palette+4,x
+        dex
+        bpl @np
+        lda #1
+        sta pal_dirty
+:       lda #<288
         sta tmp0
         lda #>288
         sta tmp1
@@ -701,6 +711,10 @@ draw_garage_bg:
         sta gb_x
 @col:   ldx gb_i
         lda garage_attr,x
+        ldy garage_night
+        beq :+
+        lda garage_night_attr,x
+:
         ldx gb_x
         ldy gb_y
         jsr set_attr            ; (uses tmp4-tmp6)
@@ -722,3 +736,9 @@ gb_i:       .res 1
 .segment "FIXED"
 
 garage_attr: .incbin "build/garage_attr.bin"
+garage_night_attr: .incbin "build/garage_night_attr.bin"
+; night: 1 = sky through the open door (black, navy skyline, lit windows,
+; pale moon and stars), 2 = tool chest in shadow, 3 = walls and floor in
+; dark blues
+pal_garage_night:
+        .byte $0F,$01,$28,$38,  $0F,$0F,$06,$16,  $0F,$01,$02,$0C

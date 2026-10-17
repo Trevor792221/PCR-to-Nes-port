@@ -292,7 +292,24 @@ garage_draw:
         beq :+
         jsr cash_max
         jsr save_write
-:       lda #0
+:       lda new_song            ; back from a race: day or night at random,
+        beq @same               ; then the music to match
+        lda #0
+        sta new_song
+        jsr rand
+        and #1
+        sta garage_night
+        beq :+
+        lda #SONG_NIGHT         ; night: "After Hours"
+        bne @song
+:       lda #SONG_GARAGE        ; day: one of the two day themes
+        sta garage_song
+        jsr rand
+        and #1
+        beq @same
+        lda #SONG_NEON
+@song:  sta garage_song
+@same:  lda #0
         jsr screen_begin
         jsr use_menu_palette
         MOVI16 ptr0, str_garage
@@ -357,18 +374,7 @@ garage_draw:
         jsr cur_car_ptr
         jsr set_car_palette
         jsr ppu_on
-        lda new_song            ; after a race: one of the two themes at random
-        beq :+
-        lda #0
-        sta new_song
-        lda #SONG_GARAGE
-        sta garage_song
-        jsr rand
-        and #1
-        beq :+
-        lda #SONG_NEON
-        sta garage_song
-:       lda garage_song         ; the garage theme: carries on if playing,
+        lda garage_song         ; the garage theme: carries on if playing,
         jsr music_play          ; else (after a race or the boss intro) starts
         lda #10
         sta ui_count
@@ -2765,7 +2771,7 @@ st_sfx:     .res 1
 ; ---------------------------------------------------------------------------
 ; snd_test: play any song or sound effect (debug menu)
 ; ---------------------------------------------------------------------------
-NSONGS = 5
+NSONGS = 6
 NSFX   = 17
 snd_test:
         lda #0
@@ -2947,12 +2953,13 @@ str_st0:     .byte "MUSIC", 0
 str_st1:     .byte "SOUND", 0
 str_st2:     .byte "STOP", 0
 str_st_help: .byte "LEFT/RIGHT:PICK  A:PLAY", 0
-st_song_names: .word sn0, sn1, sn2, sn3, sn4
+st_song_names: .word sn0, sn1, sn2, sn3, sn4, sn5
 sn0:    .byte "MIDNIGHT GARAGE", 0
 sn1:    .byte "WIN", 0
 sn2:    .byte "LOSE", 0
 sn3:    .byte "SHOWDOWN", 0
 sn4:    .byte "NEON BOULEVARD", 0
+sn5:    .byte "AFTER HOURS", 0
 st_sfx_names:
         .word sf1, sf2, sf3, sf4, sf5, sf6, sf7, sf8, sf9
         .word sf10, sf11, sf12, sf13, sf14, sf15, sf16, sf17

@@ -299,8 +299,10 @@ def big_letter(ch):
     return [''.join(r) for r in pix]
 
 
-def build_garage(ts):
+def build_garage(ts, night=False):
     """Garage backdrop behind the showroom car: nametable rows 4-12.
+    night=True: the roll-up door is open on a night sky (moon, stars, a lit
+    skyline) drawn in palette 1; the night colours are set in code.
     Palettes (menu): 0 = black/white/grey/yellow (ceiling and lamps),
     2 = reds (tool chest), 3 = greys (walls, door, floor).
     Returns (map bytes 9x32, palette per 16x16 block, 5 block rows x 16)."""
@@ -344,6 +346,8 @@ def build_garage(ts):
                 pix[y][x] = '2' if (y - 20) % 4 < 2 else ('1' if (y - 20) % 4 == 2 else '3')
     for x in range(120, 136):
         pix[52][x] = pix[53][x] = '3'             # handle
+    if night:
+        _night_door(pix)
     # pegboard with tools (cols 1-6, rows 6-7)
     for y in range(17, 31):
         for x in range(9, 55):
@@ -411,10 +415,41 @@ def build_garage(ts):
                 attr.append(0)                    # ceiling
             elif by in (1, 2) and bx in (12, 13):
                 attr.append(2)                    # tool chest
+            elif night and by in (1, 2) and 5 <= bx <= 10:
+                attr.append(1)                    # open door: night sky
             else:
                 attr.append(3)
     return bytes(gmap), bytes(attr)
 
+
+def _night_door(pix):
+    """Open door on a night sky, laid out on the 8x8 tile grid so it costs
+    only ~10 tiles.  Tile columns 10-21, rows 6-9 use palette 1 (0 sky,
+    1 skyline and door header, 2 lit windows, 3 moon and stars); row 10 is
+    the driveway (palette 3)."""
+    for y in range(16, 48):
+        for x in range(80, 176):
+            pix[y][x] = '1' if y < 20 else '0'                # header, sky
+    for tx, y in ((11, 21), (14, 21), (18, 21), (12, 27), (16, 27), (21, 27)):
+        pix[y][tx * 8 + 4] = '3'                              # stars
+    moon = ['..33....', '.33.....', '33......', '33......', '33......', '.33.....', '..33....', '........']
+    for dy, row in enumerate(moon):                           # crescent, tile (19, 7)
+        for dx, ch in enumerate(row):
+            if ch == '3':
+                pix[24 + dy][152 + dx + 2] = '3'
+    lit_a = ['11111111', '12112111', '11111111', '12112111', '11111111', '12112111', '11111111', '11111111']
+    lit_b = ['11111111', '11112111', '11111111', '12111111', '11111111', '11112111', '11111111', '11111111']
+    # building height per tile column 10..21: 2 = rows 8-9, 1 = row 9 only
+    heights = [1, 2, 2, 1, 2, 1, 1, 2, 2, 2, 1, 2]
+    for i, h in enumerate(heights):
+        for row in range(2 - h, 2):
+            pat = lit_a if (i + row) % 2 else lit_b
+            for dy in range(8):
+                for dx in range(8):
+                    pix[32 + row * 8 + dy][80 + i * 8 + dx] = pat[dy][dx]
+    for y in range(48, 56):                                   # driveway
+        for x in range(80, 176):
+            pix[y][x] = '2' if y == 48 else '1'
 
 def build_menu():
     ts = TileSet(0x80)
@@ -443,6 +478,7 @@ def build_menu():
     # garage backdrop, rows 4-12 (see build_garage)
     gmap, gattr = build_garage(ts)
     specials['GARAGE'] = (gmap, gattr)
+    specials['GARAGE_NIGHT'] = build_garage(ts, night=True)
     # crate 4x4 (32x32)
     crate = [
         '11111111111111111111111111111111',
@@ -539,6 +575,8 @@ def main():
     w('menu.chr', menu)
     w('garage_map.bin', menu_sp['GARAGE'][0])
     w('garage_attr.bin', menu_sp['GARAGE'][1])
+    w('garage_night_map.bin', menu_sp['GARAGE_NIGHT'][0])
+    w('garage_night_attr.bin', menu_sp['GARAGE_NIGHT'][1])
     w('logo_map.bin', logo_map)
     w('sprites.chr', build_sprites())
     w('cars.chr', b''.join(b''.join(car_tiles(n)) for n in art.SHAPE_ORDER + art.TRAFFIC_ORDER))
@@ -549,7 +587,7 @@ def main():
         for k, v in race_sp.items():
             f.write('T_%s = $%02X\n' % (k, v))
         for k, v in menu_sp.items():
-            if k == 'GARAGE':
+            if k in ('GARAGE', 'GARAGE_NIGHT'):
                 continue
             if isinstance(v, list):
                 f.write('.define T_%s_MAP %s\n' % (k, ', '.join('$%02X' % x for x in v)))

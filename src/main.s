@@ -100,6 +100,7 @@ race_theme: .res 1          ; 0 day, 1 sunset, 2 night (picked per race)
 copy_bank:  .res 1          ; source bank for chr_copy / bank0_copy (0 = graphics)
 garage_song: .res 1         ; garage theme in use (SONG_GARAGE or SONG_NEON)
 new_song:   .res 1          ; set by a race: the garage picks a theme again
+garage_night: .res 1        ; 1: the garage is shown at night
 
 ; ---------------------------------------------------------------------------
 .include "header.s"

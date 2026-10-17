@@ -47,4 +47,5 @@ jobs:
             dist/02-win.wav
             dist/04-showdown.wav
             dist/05-neon-boulevard.wav
+            dist/06-after-hours.wav
             dist/03-lose.wav

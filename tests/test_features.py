@@ -453,8 +453,26 @@ class Features(unittest.TestCase):
         s.press(A)                                   # results -> garage
         s.step(120)
         self.assertEqual(s.mem('game_mode'), 1)
-        self.assertEqual(s.mem('mus_song'), 0, 'garage theme again')
+        self.assertIn(s.mem('mus_song'), (0, 4, 5), 'a garage theme again')
         self.assertTrue(playing(s), 'not silent after the jingle')
+
+    def test_garage_day_and_night_after_races(self):
+        from test_game import start_race
+        s = new_game()
+        seen = set()
+        for _ in range(8):
+            start_race(s, 4)
+            drive_race(s, launch=4500, shift_margin=300)
+            s.step(60)
+            s.press(A)
+            s.step(100)
+            night, song = s.mem('garage_night'), s.mem('mus_song')
+            if night:
+                self.assertEqual(song, 5, 'night garage plays After Hours')
+            else:
+                self.assertIn(song, (0, 4), 'day garage plays a day theme')
+            seen.add(night)
+        self.assertEqual(seen, {0, 1}, 'both day and night came up')
 
     def test_quit_to_title_from_options(self):
         s = new_game()

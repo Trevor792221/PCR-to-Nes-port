@@ -103,6 +103,7 @@ The game's original music is also available as WAV files (44.1 kHz,
 | `03-lose.wav` | Race lose jingle |
 | `04-showdown.wav` | "Showdown", the boss intro theme (two loops, 34 s) |
 | `05-neon-boulevard.wav` | "Neon Boulevard", the second garage theme (one loop, 34 s) |
+| `06-after-hours.wav` | "After Hours", the garage at night (one loop, 34 s) |
 
 `make soundtrack` regenerates them. `tools/render_wav.py` plays the same
 music data as the ROM through an emulation of the game's sound engine and
@@ -160,8 +161,9 @@ physics runs at 50 Hz.
 * **Sound** (`src/sound.s`). A 4-channel music player plays an original
   theme and jingles. The theme starts on the first frame of the boot splash
   and keeps playing through the title and the garage. After every race the
-  garage picks one of its two themes at random ("Midnight Garage" or "Neon
-  Boulevard"). Choosing a title
+  garage rolls day or night at random. By day it plays "Midnight Garage" or
+  "Neon Boulevard"; at night the roll-up door is open on a starry sky and a
+  lit skyline, the walls go dark blue, and "After Hours" plays. Choosing a title
   option or a race blips an engine rev (a pulse growl that follows the race
   engine's rpm-to-pitch curve, plus an exhaust rumble) over the music. In races, an engine synthesizer drives pulse 1 and the
   triangle from your rpm and pulse 2 from the rival's. The noise channel
