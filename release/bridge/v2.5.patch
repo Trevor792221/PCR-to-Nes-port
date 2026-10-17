@@ -1,4 +1,4 @@
-From 8edcb6fa97c661bf8c97fe37aadcdd342beb8d18 Mon Sep 17 00:00:00 2001
+From bf7f64075af80eea9babc7c6179009ccc6c8df19 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Sat, 17 Oct 2026 19:23:27 +0000
 Subject: [PATCH] v2.5: bridge battery saves to v3.x passwords
@@ -13,46 +13,21 @@ keep pointing at the newest version.
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01Pa1irVVgbhgX6AcbsKKncE
 ---
- .github/workflows/release.yml |    8 +-
- cfg/pxracer.cfg               |    1 +
- release/notes/v2.5.md         |    6 +
- release/pxracer.nes           |  Bin 131088 -> 131088 bytes
- src/defs.inc                  |    1 +
- src/main.s                    |    3 +
- src/menus2.s                  |   16 +-
- src/password.s                | 1134 +++++++++++++++++++++++++++++++++
- tests/test_bridge.py          |   51 ++
- tools/password.py             |  231 +++++++
- 10 files changed, 1437 insertions(+), 14 deletions(-)
+ cfg/pxracer.cfg       |    1 +
+ release/notes/v2.5.md |    6 +
+ release/pxracer.nes   |  Bin 131088 -> 131088 bytes
+ src/defs.inc          |    1 +
+ src/main.s            |    3 +
+ src/menus2.s          |   16 +-
+ src/password.s        | 1134 +++++++++++++++++++++++++++++++++++++++++
+ tests/test_bridge.py  |   51 ++
+ tools/password.py     |  231 +++++++++
+ 9 files changed, 1430 insertions(+), 13 deletions(-)
  create mode 100644 release/notes/v2.5.md
  create mode 100644 src/password.s
  create mode 100644 tests/test_bridge.py
  create mode 100644 tools/password.py
 
-diff --git a/.github/workflows/release.yml b/.github/workflows/release.yml
-index 6d29a7d..c304d24 100644
---- a/.github/workflows/release.yml
-+++ b/.github/workflows/release.yml
-@@ -34,12 +34,18 @@ jobs:
-           python3 tools/render_wav.py dist/soundtrack
-           (cd dist && zip -r pixel-racer-soundtrack.zip soundtrack)
-           cp dist/soundtrack/*.wav dist/
-+      - name: Release notes
-+        run: |
-+          TAG="${{ inputs.tag || github.ref_name }}"
-+          if [ -f "release/notes/$TAG.md" ]; then cat "release/notes/$TAG.md" > dist/body.md; fi
-+          cat release/RELEASE_NOTES.md >> dist/body.md
-       - uses: softprops/action-gh-release@v2
-         with:
-           tag_name: ${{ inputs.tag || github.ref_name }}
-           target_commitish: ${{ github.sha }}
-           name: Pixel Racer NES ${{ inputs.tag || github.ref_name }}
--          body_path: release/RELEASE_NOTES.md
-+          body_path: dist/body.md
-+          make_latest: false        # v2.5 is a bridge: the download buttons stay on v3.x
-           files: |
-             dist/pxracer.nes
-             dist/pixel-racer-soundtrack.zip
 diff --git a/cfg/pxracer.cfg b/cfg/pxracer.cfg
 index 4c99301..04d193f 100644
 --- a/cfg/pxracer.cfg
