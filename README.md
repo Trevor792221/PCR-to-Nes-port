@@ -143,6 +143,31 @@ physics runs at 50 Hz.
 | 5 | Passwords (encode, decode, entry and display screens) |
 | 7 (fixed) | Reset/NMI, PPU helpers, math, physics, sound, game state, car data |
 
+### Label art
+
+<p align="center"><img src="art/label/front.png" width="320" alt="Cartridge front label"></p>
+
+Print-ready label art for a real cart is in `art/label/`. All of it is
+original artwork. Both labels are 600 dpi, with 2 mm of bleed on every side:
+
+| File | Use |
+|---|---|
+| `front.png` / `front.pdf` | Front label. The PDF has the exact physical size, for print shops |
+| `end.png` / `end.pdf` | Top end label |
+| `*_guides.png` | Proofs only. Green is the trim line, blue the 3 mm safe area. Don't print these |
+
+Label areas differ between shells and reproduction cases. Measure yours, or
+use your label stock's template, then regenerate at that trim size in mm
+(width x height):
+
+```
+python3 tools/mklabel.py --front 63.5x56 --end 50x12 --bleed 2 --dpi 600
+```
+
+The logo and text stay inside the safe area at any size. Print on glossy or
+matte vinyl (laminate it if you can), cut on the trim line, and put the
+bleed edge to the edge of the label recess.
+
 ## How it works
 
 * **Physics** (`src/physics.s`). Fixed-point 24-bit speed and position per
@@ -209,5 +234,6 @@ tools/      graphics (mkchr.py, art.py), data (gamedata.py, mkdata.py), music (m
 cfg/        ld65 memory map
 tests/      emulator test suites
 docs/       screenshots
+art/label/  cartridge label art (tools/mklabel.py)
 release/    prebuilt ROM
 ```
