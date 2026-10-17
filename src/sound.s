@@ -24,11 +24,14 @@ SFX_LEVELUP = 12
 SFX_CRASH   = 13
 SFX_FOUL    = 14
 SFX_TICK    = 15
+SFX_REV     = 16                ; engine rev growl (pulse 2) ...
+SFX_REVN    = 17                ; ... and its exhaust rumble (noise): rev_play
 
 MUS_TEMPO   = 8                 ; frames per sixteenth
 
 .segment "BSS"
 mus_on:     .res 1
+mus_song:   .res 1          ; song playing (music_play won't restart it)
 mus_tick:   .res 1
 mus_ptr_l:  .res 4
 mus_ptr_h:  .res 4
@@ -79,7 +82,9 @@ sound_init:
         sta sfxn_t
         rts
 
-; music_play: A = song.  Respects the "music off" option.
+; music_play: A = song.  Respects the "music off" option.  A song that is
+; already playing carries on (the theme runs from the splash through the
+; title and the garage).
 music_play:
         tax
         lda SV_OPTIONS
@@ -90,7 +95,18 @@ music_play:
         cpx #SONG_LOSE
         beq :+
         jmp music_stop
-:       lda #0
+:       lda mus_on
+        beq :+
+        cpx mus_song
+        bne :+
+        lda mus_act             ; still playing (a finished jingle doesn't
+        ora mus_act+1           ; count)
+        ora mus_act+2
+        ora mus_act+3
+        beq :+
+        rts
+:       stx mus_song
+        lda #0
         sta mus_on              ; stop the NMI player while we set up
         txa
         asl a
@@ -143,6 +159,13 @@ sfx_play:
         rts
 @n:     stx sfx_qn
         rts
+
+; rev_play: a quick blip of the throttle, over the music
+rev_play:
+        lda #SFX_REV
+        jsr sfx_play
+        lda #SFX_REVN
+        jmp sfx_play
 
 ; engine_start / engine_stop (race)
 engine_start:
@@ -571,15 +594,17 @@ eng_noise_out:
 ; --- effect data -----------------------------------------------------------
 ; channel per effect: 0 = pulse 2, 1 = noise
 sfx_chan:
-        .byte 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 1, 0, 0
+        .byte 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 1, 0, 0, 0, 1
 sfx_lo:
         .byte <sfxd_move, <sfxd_select, <sfxd_back, <sfxd_buy, <sfxd_error
         .byte <sfxd_amber, <sfxd_green, <sfxd_shift, <sfxd_blowoff, <sfxd_nos
         .byte <sfxd_crate, <sfxd_levelup, <sfxd_crash, <sfxd_foul, <sfxd_tick
+        .byte <sfxd_rev, <sfxd_revn
 sfx_hi:
         .byte >sfxd_move, >sfxd_select, >sfxd_back, >sfxd_buy, >sfxd_error
         .byte >sfxd_amber, >sfxd_green, >sfxd_shift, >sfxd_blowoff, >sfxd_nos
         .byte >sfxd_crate, >sfxd_levelup, >sfxd_crash, >sfxd_foul, >sfxd_tick
+        .byte >sfxd_rev, >sfxd_revn
 
 sfxd_move:    .byte 2,$B8,126,0, 2,$B4,126,0, 0
 sfxd_select:  .byte 3,$B9,84,0, 4,$B9,63,0, 3,$B4,63,0, 0
@@ -595,6 +620,12 @@ sfxd_crate:   .byte 4,$B9,213,0, 4,$B9,169,0, 4,$B9,142,0, 4,$B9,106,0
               .byte 4,$BA,84,0, 12,$BB,70,0, 8,$B5,70,0, 0
 sfxd_levelup: .byte 5,$B9,169,0, 5,$B9,142,0, 5,$B9,106,0, 5,$B9,142,0
               .byte 5,$BA,106,0, 16,$BB,84,0, 0
+; engine rev: pitch follows the race engine's rpm curve 1200 -> 7200 -> 1300
+; rpm (period = 1789773 / (16 * (22 + rpm/26)) - 1), 12.5% duty, 3 frames a step
+sfxd_rev:     .byte 3,$39,$68,$06, 3,$3A,$6A,$04, 3,$3B,$2D,$03, 3,$3C,$7B,$02, 3,$3C,$09,$02, 3,$3C,$BA,$01
+              .byte 3,$3C,$8A,$01, 3,$3C,$75,$01, 3,$3B,$75,$01, 3,$3A,$A0,$01, 3,$3A,$D6,$01, 3,$39,$1C,$02
+              .byte 3,$38,$7B,$02, 3,$37,$DB,$02, 3,$36,$5E,$03, 3,$35,$18,$04, 3,$34,$FF,$04, 3,$33,$11,$06, 0
+sfxd_revn:    .byte 6,$35,$0D, 8,$38,$0B, 8,$37,$0A, 8,$35,$0C, 8,$33,$0D, 6,$31,$0E, 0
 sfxd_crash:   .byte 4,$3F,$0C, 6,$3C,$0D, 8,$38,$0E, 8,$34,$0F, 0
 sfxd_foul:    .byte 30,$7A,$FB,$01, 0
 sfxd_tick:    .byte 1,$B6,84,0, 0

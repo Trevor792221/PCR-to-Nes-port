@@ -1,8 +1,9 @@
 ; ===========================================================================
 ; splash.s -- boot splash screen (bank 4).  Art: tools/mksplash.py.
 ; Replaces the whole BG pattern table while it is up; the title screen
-; reloads the normal tiles.  Fades in, revs an engine, blinks PRESS START,
-; and moves on after a button press or about five seconds.
+; reloads the normal tiles.  The theme starts at once (it carries on into the
+; title); the screen fades in, revs an engine, blinks PRESS START, and moves
+; on after a button press or about five seconds.
 ; ===========================================================================
 
 .segment "BSS"
@@ -17,6 +18,8 @@ splash_pal:
         .byte $0F,$16,$27,$38,  $0F,$30,$10,$28,  $0F,$16,$27,$38,  $0F,$16,$30,$00
 
 splash_main:
+        lda #SONG_GARAGE        ; music from the first frame
+        jsr music_play
         jsr ppu_off
         lda #0
         sta oam_idx
@@ -44,12 +47,7 @@ splash_main:
         lda #0
         jsr spl_fade            ; start black
         jsr ppu_on
-        jsr engine_start
         lda #0
-        sta eng_duty
-        sta eng_orpm
-        sta eng_orpm+1
-        sta eng_noise
         sta spl_t
         sta spl_t+1
         ; fade in
@@ -58,7 +56,7 @@ splash_main:
         pha
         jsr spl_fade
         lda #6
-        jsr wait_frames_snd
+        jsr wait_frames
         pla
         tax
         inx
@@ -66,8 +64,13 @@ splash_main:
         bne @in
 @loop:  jsr wait_frame
         jsr read_pad
-        jsr spl_engine
-        ; blink PRESS START (text palette colour 1)
+        lda spl_t+1             ; a rev of the engine as the screen settles
+        bne :+
+        lda spl_t
+        cmp #20
+        bne :+
+        jsr rev_play
+:       ; blink PRESS START (text palette colour 1)
         lda spl_t
         and #$20
         beq :+
@@ -88,8 +91,7 @@ splash_main:
         lda spl_t
         cmp #300-256
         bcc @loop
-@out:   jsr engine_stop
-        ldx #3
+@out:   ldx #3
 @fade:  txa
         pha
         jsr spl_fade
@@ -101,53 +103,6 @@ splash_main:
         bpl @fade
         lda #MODE_TITLE
         sta next_mode
-        rts
-
-; wait_frames_snd: wait A frames, keeping the engine sound going
-wait_frames_snd:
-        sta tmp7
-:       jsr wait_frame
-        jsr spl_engine
-        dec tmp7
-        bne :-
-        rts
-
-; spl_engine: a blip of the throttle as the screen comes up
-spl_engine:
-        lda spl_t+1
-        bne @idle
-        lda spl_t
-        cmp #20
-        bcc @idle
-        cmp #44
-        bcs @down
-        lda #1                  ; rev up: +250 rpm a frame
-        sta eng_thr
-        clc
-        lda eng_rpm
-        adc #250
-        sta eng_rpm
-        bcc :+
-        inc eng_rpm+1
-:       rts
-@down:  lda #0
-        sta eng_thr
-        lda eng_rpm+1           ; fall back to idle
-        cmp #>1100
-        bcc @idle
-        sec
-        lda eng_rpm
-        sbc #150
-        sta eng_rpm
-        bcs :+
-        dec eng_rpm+1
-:       rts
-@idle:  lda #<900
-        sta eng_rpm
-        lda #>900
-        sta eng_rpm+1
-        lda #0
-        sta eng_thr
         rts
 
 ; spl_fade: A = brightness 0 (black) .. 4 (full).  Builds the palette.

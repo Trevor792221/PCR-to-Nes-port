@@ -170,6 +170,7 @@ title_main:
         beq @pick
         jmp @loop
 @pick:  jsr rng_stir
+        jsr rev_play
         lda ui_sel
         cmp #2
         bne :+
@@ -356,11 +357,9 @@ garage_draw:
         jsr cur_car_ptr
         jsr set_car_palette
         jsr ppu_on
-        lda mus_on
-        bne :+
-        lda #SONG_GARAGE
-        jsr music_play
-:       lda #10
+        lda #SONG_GARAGE        ; the garage theme: carries on if playing,
+        jsr music_play          ; else (after a race or the boss intro) starts
+        lda #10
         sta ui_count
         lda #3
         sta ui_x
@@ -450,6 +449,8 @@ bosses_left: .res 1
 .segment "BANK1"
 
 race_select:
+        lda #SONG_GARAGE        ; back from the boss intro: garage theme again
+        jsr music_play
         lda #0
         jsr screen_begin
         jsr use_menu_palette
@@ -565,7 +566,11 @@ race_select:
 @pick:  lda ui_sel
         cmp #7
         beq @back
-        cmp #6
+        cmp #2
+        beq :+                  ; distance row: nothing to start
+        jsr rev_play            ; picking a race revs the engine
+        lda ui_sel
+:       cmp #6
         bne :+
         jsr setup_2p
         clc

@@ -430,6 +430,32 @@ class Features(unittest.TestCase):
         self.assertEqual(s.mem('game_mode'), 3)
         self.assertEqual(s.mem('res_flags') & 0x09, 0x09, 'P2 foul: player 1 wins')
 
+    def test_music_after_boss_intro_and_race(self):
+        def playing(s):
+            return any(s.mem('mus_act', i) for i in range(4))
+        s = new_game()
+        s.garage_goto(G_RACE)
+        s.press(A)
+        s.step(30)
+        s.press(A)                                   # boss intro: boss theme
+        s.step(60)
+        self.assertEqual(s.mem('mus_song'), 3)
+        s.press(B)                                   # back: garage theme
+        s.step(60)
+        self.assertEqual(s.mem('mus_song'), 0)
+        self.assertTrue(playing(s))
+        s.press(A)
+        s.step(60)
+        s.press(A)                                   # race the boss
+        s.step(5)
+        drive_race(s, launch=6600, shift_margin=200)
+        s.step(60)
+        s.press(A)                                   # results -> garage
+        s.step(120)
+        self.assertEqual(s.mem('game_mode'), 1)
+        self.assertEqual(s.mem('mus_song'), 0, 'garage theme again')
+        self.assertTrue(playing(s), 'not silent after the jingle')
+
     def test_quit_to_title_from_options(self):
         s = new_game()
         s.garage_goto(G_OPTIONS)

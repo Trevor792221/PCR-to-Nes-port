@@ -157,7 +157,10 @@ physics runs at 50 Hz.
   `tests/test_nmi.py` times the NMI on real game frames (including the
   514-cycle sprite DMA) and fails if any frame would overrun.
 * **Sound** (`src/sound.s`). A 4-channel music player plays an original
-  theme and jingles. In races, an engine synthesizer drives pulse 1 and the
+  theme and jingles. The theme starts on the first frame of the boot splash
+  and keeps playing through the title and the garage. Choosing a title
+  option or a race blips an engine rev (a pulse growl that follows the race
+  engine's rpm-to-pitch curve, plus an exhaust rumble) over the music. In races, an engine synthesizer drives pulse 1 and the
   triangle from your rpm and pulse 2 from the rival's. The noise channel
   handles exhaust rumble, tire squeal, nitrous hiss, blow-off valve and
   shift sounds.
