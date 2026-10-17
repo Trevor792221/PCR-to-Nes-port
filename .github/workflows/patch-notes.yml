@@ -1,0 +1,27 @@
+name: patch-notes
+# Rewrites the text of every published release from release/notes/<tag>.md
+# (followed by release/RELEASE_NOTES.md). Run it from the Actions tab after
+# editing the notes; the ROM and soundtrack files are left alone.
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  notes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Update release text
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for f in release/notes/*.md; do
+            tag=$(basename "$f" .md)
+            if gh release view "$tag" > /dev/null 2>&1; then
+              cat "$f" release/RELEASE_NOTES.md > body.md
+              gh release edit "$tag" --notes-file body.md
+              echo "updated $tag"
+            else
+              echo "no release for $tag, skipped"
+            fi
+          done

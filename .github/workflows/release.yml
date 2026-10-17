@@ -1,5 +1,6 @@
 name: release
 # Publishes a GitHub Release with the ROM and the soundtrack attached.
+# The release text starts with release/notes/<tag>.md (see CHANGELOG.md).
 # Push a v* tag, or run it from the Actions tab ("Run workflow") with a
 # version such as v1.1.
 on:
@@ -34,12 +35,18 @@ jobs:
           python3 tools/render_wav.py dist/soundtrack
           (cd dist && zip -r pixel-racer-soundtrack.zip soundtrack)
           cp dist/soundtrack/*.wav dist/
+      - name: Release notes
+        # this version's patch notes (release/notes/<tag>.md), then the usual text
+        run: |
+          TAG="${{ inputs.tag || github.ref_name }}"
+          if [ -f "release/notes/$TAG.md" ]; then cat "release/notes/$TAG.md" > dist/body.md; fi
+          cat release/RELEASE_NOTES.md >> dist/body.md
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ inputs.tag || github.ref_name }}
           target_commitish: ${{ github.sha }}
           name: Pixel Racer NES ${{ inputs.tag || github.ref_name }}
-          body_path: release/RELEASE_NOTES.md
+          body_path: dist/body.md
           files: |
             dist/pxracer.nes
             dist/pixel-racer-soundtrack.zip

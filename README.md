@@ -4,6 +4,7 @@
 [![Download soundtrack](https://img.shields.io/badge/Download-Soundtrack%20(.zip)-1f6feb?style=for-the-badge&logo=github)](https://github.com/Trevor792221/PCR-to-Nes-port/releases/latest/download/pixel-racer-soundtrack.zip)
 
 Every version is on the [Releases page](https://github.com/Trevor792221/PCR-to-Nes-port/releases).
+What changed in each one: [patch notes](CHANGELOG.md).
 
 An NES demake of the drag-racing and car-building game style made popular by
 **Pixel Car Racer** on Android. It's written from scratch in 6502 assembly and
@@ -86,10 +87,13 @@ make test       # needs: pip install cynes py65 numpy pillow
 
 A prebuilt ROM is also in the repo at [`release/pxracer.nes`](release/pxracer.nes).
 
-To publish a new release, push a version tag (`git tag v1.1 && git push
-origin v1.1`), or run the **release** workflow from the Actions tab. It
+To publish a new release, add its patch notes as `release/notes/vX.Y.md`
+(and to `CHANGELOG.md`), then push a version tag (`git tag v1.1 && git push
+origin v1.1`) or run the **release** workflow from the Actions tab. It
 builds and tests the ROM, then attaches it and the soundtrack to a GitHub
-Release, which is where the download buttons point.
+Release, which is where the download buttons point. The release text starts
+with that version's notes. The **patch-notes** workflow rewrites the text of
+every existing release from `release/notes/`.
 
 ## Soundtrack
 
