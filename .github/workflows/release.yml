@@ -46,4 +46,5 @@ jobs:
             dist/01-midnight-garage.wav
             dist/02-win.wav
             dist/04-showdown.wav
+            dist/05-neon-boulevard.wav
             dist/03-lose.wav

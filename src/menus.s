@@ -357,7 +357,18 @@ garage_draw:
         jsr cur_car_ptr
         jsr set_car_palette
         jsr ppu_on
-        lda #SONG_GARAGE        ; the garage theme: carries on if playing,
+        lda new_song            ; after a race: one of the two themes at random
+        beq :+
+        lda #0
+        sta new_song
+        lda #SONG_GARAGE
+        sta garage_song
+        jsr rand
+        and #1
+        beq :+
+        lda #SONG_NEON
+        sta garage_song
+:       lda garage_song         ; the garage theme: carries on if playing,
         jsr music_play          ; else (after a race or the boss intro) starts
         lda #10
         sta ui_count
@@ -449,7 +460,7 @@ bosses_left: .res 1
 .segment "BANK1"
 
 race_select:
-        lda #SONG_GARAGE        ; back from the boss intro: garage theme again
+        lda garage_song         ; back from the boss intro: garage theme again
         jsr music_play
         lda #0
         jsr screen_begin
@@ -962,7 +973,7 @@ boss_intro:
         beq @loop
         lda #SFX_BACK
         jsr sfx_play
-        lda #SONG_GARAGE
+        lda garage_song
         jsr music_play
         sec
         rts
@@ -2611,7 +2622,8 @@ debug_screen:
         PRINT str_dbg1, 4, 9
         PRINT str_dbg2, 4, 12
         PRINT str_dbg3, 4, 15
-        PRINT str_dbg4, 4, 18
+        PRINT str_dbg5, 4, 18
+        PRINT str_dbg4, 4, 21
         PRINT str_dbg_help, 2, 26
         PRINT str_dbg_help2, 2, 27
         jsr attr_upload
@@ -2621,7 +2633,7 @@ debug_screen:
         jsr ppu_on
         lda #0
         sta ui_sel
-        lda #5
+        lda #6
         sta ui_count
         lda #2
         sta ui_x
@@ -2652,6 +2664,10 @@ debug_screen:
         jeq @cash
         cmp #3
         jeq @gems
+        cmp #4
+        bne @back
+        jsr snd_test
+        jmp debug_screen
 @back:  sec
         rts
 @left:  ldx ui_sel
@@ -2737,9 +2753,226 @@ debug_screen:
         jsr header_update
         jsr wait_frame
         MOVI16 ptr0, str_dbg_done
-@msg:   ldy #22
+@msg:   ldy #24
         jsr vb_msg
         jmp @loop
+
+.segment "BSS"
+st_song:    .res 1
+st_sfx:     .res 1
+.segment "BANK1"
+
+; ---------------------------------------------------------------------------
+; snd_test: play any song or sound effect (debug menu)
+; ---------------------------------------------------------------------------
+NSONGS = 5
+NSFX   = 17
+snd_test:
+        lda #0
+        jsr screen_begin
+        jsr use_menu_palette
+        MOVI16 ptr0, str_st
+        jsr draw_header
+        PRINT str_st0, 4, 6
+        PRINT str_st1, 4, 9
+        PRINT str_st2, 4, 12
+        PRINT str_dbg4, 4, 15
+        PRINT str_st_help, 2, 26
+        PRINT str_dbg_help2, 2, 27
+        jsr attr_upload
+        lda #0
+        sta oam_idx
+        jsr oam_clear
+        jsr ppu_on
+        lda #0
+        sta ui_sel
+        lda #4
+        sta ui_count
+        lda #2
+        sta ui_x
+        lda #6
+        sta ui_y0
+        lda #3
+        sta ui_dy
+        lda #1
+        sta ui_cols
+        lda st_sfx
+        bne :+
+        inc st_sfx              ; effects are 1..NSFX
+:       jsr st_values
+@loop:  jsr wait_frame
+        jsr read_pad
+        jsr list_cursor
+        jsr list_select
+        cmp #2
+        jeq @out
+        cmp #6
+        beq @left
+        cmp #7
+        beq @right
+        cmp #1
+        bne @loop
+        lda ui_sel
+        beq @song
+        cmp #1
+        beq @sfx
+        cmp #2
+        jne @out
+        jsr music_stop
+        jmp @loop
+@song:  lda SV_OPTIONS          ; play it even with music switched off
+        pha
+        and #<~OPT_NOMUSIC
+        sta SV_OPTIONS
+        jsr music_stop
+        lda st_song
+        jsr music_play
+        pla
+        sta SV_OPTIONS
+        jmp @loop
+@sfx:   lda st_sfx
+        cmp #SFX_REV
+        bcc :+
+        jsr rev_play            ; the rev's two halves play together
+        jmp @loop
+:       jsr sfx_play
+        jmp @loop
+@left:  lda ui_sel
+        bne :+
+        dec st_song
+        bpl @chg
+        lda #NSONGS-1
+        sta st_song
+        bne @chg
+:       cmp #1
+        bne @loop
+        dec st_sfx
+        bne @chg
+        lda #NSFX
+        sta st_sfx
+        bne @chg
+@right: lda ui_sel
+        bne :+
+        inc st_song
+        lda st_song
+        cmp #NSONGS
+        bcc @chg
+        lda #0
+        sta st_song
+        beq @chg
+:       cmp #1
+        jne @loop
+        inc st_sfx
+        lda st_sfx
+        cmp #NSFX+1
+        bcc @chg
+        lda #1
+        sta st_sfx
+@chg:   jsr st_values
+        jmp @loop
+@out:   lda #SFX_BACK
+        jsr sfx_play
+        jsr music_stop          ; back to the garage theme
+        lda garage_song
+        jmp music_play
+
+; st_values: "< 2 NEON BOULEVARD   >" and "< 17 EXHAUST >"
+st_values:
+        lda st_song
+        asl a
+        tax
+        lda st_song_names,x
+        sta ptr0
+        lda st_song_names+1,x
+        sta ptr0+1
+        ldx st_song
+        inx
+        txa
+        jsr st_line
+        ldx #12
+        ldy #6
+        jsr vb_str
+        jsr wait_frame
+        lda st_sfx
+        asl a
+        tax
+        lda st_sfx_names-2,x
+        sta ptr0
+        lda st_sfx_names-1,x
+        sta ptr0+1
+        lda st_sfx
+        jsr st_line
+        ldx #12
+        ldy #9
+        jmp vb_str
+
+; st_line: A = number, ptr0 = name -> ptr0 = "<17 NAME          >"
+st_line:
+        sta m_a
+        lda #0
+        sta m_a+1
+        lda ptr0
+        pha
+        lda ptr0+1
+        pha
+        jsr num_text
+        lda #'<'
+        sta linebuf
+        ldy #1
+        jsr cat_ptr0
+        lda #' '
+        sta linebuf,y
+        iny
+        pla
+        sta ptr0+1
+        pla
+        sta ptr0
+        jsr cat_ptr0
+:       cpy #18                 ; pad, then ">"
+        bcs :+
+        lda #' '
+        sta linebuf,y
+        iny
+        bne :-
+:       lda #'>'
+        sta linebuf,y
+        iny
+        lda #0
+        sta linebuf,y
+        MOVI16 ptr0, linebuf
+        rts
+
+str_st:      .byte "SOUND TEST", 0
+str_st0:     .byte "MUSIC", 0
+str_st1:     .byte "SOUND", 0
+str_st2:     .byte "STOP", 0
+str_st_help: .byte "LEFT/RIGHT:PICK  A:PLAY", 0
+st_song_names: .word sn0, sn1, sn2, sn3, sn4
+sn0:    .byte "MIDNIGHT GARAGE", 0
+sn1:    .byte "WIN", 0
+sn2:    .byte "LOSE", 0
+sn3:    .byte "SHOWDOWN", 0
+sn4:    .byte "NEON BOULEVARD", 0
+st_sfx_names:
+        .word sf1, sf2, sf3, sf4, sf5, sf6, sf7, sf8, sf9
+        .word sf10, sf11, sf12, sf13, sf14, sf15, sf16, sf17
+sf1:    .byte "MOVE", 0
+sf2:    .byte "SELECT", 0
+sf3:    .byte "BACK", 0
+sf4:    .byte "BUY", 0
+sf5:    .byte "ERROR", 0
+sf6:    .byte "AMBER LIGHT", 0
+sf7:    .byte "GREEN LIGHT", 0
+sf8:    .byte "SHIFT", 0
+sf9:    .byte "BLOW-OFF", 0
+sf10:   .byte "NITROUS", 0
+sf11:   .byte "CRATE", 0
+sf12:   .byte "LEVEL UP", 0
+sf13:   .byte "CRASH", 0
+sf14:   .byte "FOUL", 0
+sf15:   .byte "TICK", 0
+sf16:   .byte "ENGINE REV", 0
+sf17:   .byte "EXHAUST", 0
 
 ; dbg_values: car name and boss name next to their items
 dbg_values:
@@ -2792,6 +3025,7 @@ str_dbg1:      .byte "BOSS RACE", 0
 str_dbg2:      .byte "ADD $100000", 0
 str_dbg3:      .byte "ADD 100 GEMS", 0
 str_dbg4:      .byte "BACK", 0
+str_dbg5:      .byte "SOUND TEST", 0
 str_dbg_help:  .byte "LEFT/RIGHT:PICK  A:DO IT", 0
 str_dbg_help2: .byte "B:BACK", 0
 str_dbg_added: .byte "CAR ADDED TO YOUR GARAGE", 0

@@ -42,6 +42,7 @@ With `PEKYXYAA` entered, press **SELECT** on the garage screen:
 | BOSS RACE | LEFT/RIGHT picks any of the 11 ladder bosses or the secret 12th boss. **A** starts the race; for a ladder boss it also moves your ladder progress to that boss. |
 | ADD $100000 | Adds $100,000. |
 | ADD 100 GEMS | Adds 100 gems. |
+| SOUND TEST | MUSIC: LEFT/RIGHT picks one of the 5 songs, **A** plays it (even with music switched off). SOUND: LEFT/RIGHT picks one of the 17 sound effects, **A** plays it. STOP silences the music. Leaving goes back to the garage theme. |
 
 Everything the debug menu does is saved, just like normal play.
 

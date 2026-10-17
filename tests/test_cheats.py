@@ -70,12 +70,46 @@ class Cheats(unittest.TestCase):
         self.assertEqual(s.wram(SV_CASH, 3), 3000)
         self.assertEqual(s.mem('ui_count'), 10, 'still the garage menu')
 
+    def test_sound_test(self):
+        s = sim_with(DEBUG)
+        new_game(s)
+        s.press(SELECT)
+        s.step(40)
+        s.list_goto('ui_sel', 4)                     # SOUND TEST
+        s.press(A)
+        s.step(40)
+        self.assertEqual(s.mem('ui_count'), 4)
+        s.press(LEFT)                                # songs wrap: 0 -> 4
+        s.step(5)
+        self.assertEqual(s.mem('st_song'), 4)
+        s.press(A)
+        s.step(10)
+        self.assertEqual(s.mem('mus_song'), 4, 'NEON BOULEVARD playing')
+        self.assertTrue(any(s.mem('mus_act', i) for i in range(4)))
+        s.list_goto('ui_sel', 1)                     # effects: 1 -> 17 -> 16
+        s.press(LEFT)
+        s.step(5)
+        s.press(LEFT)
+        s.step(5)
+        self.assertEqual(s.mem('st_sfx'), 16)
+        s.press(A, hold=2, release=1)
+        rev = s.sym['sfxd_rev']
+        self.assertTrue(rev <= s.mem16('sfx2_ptr') < rev + 80, 'engine rev playing')
+        s.list_goto('ui_sel', 2)                     # STOP
+        s.press(A)
+        s.step(5)
+        self.assertFalse(s.mem('mus_on'))
+        s.press(B)
+        s.step(40)
+        self.assertEqual(s.mem('ui_count'), 6, 'back in the debug menu')
+        self.assertTrue(s.mem('mus_on'), 'garage theme again')
+
     def test_debug_menu(self):
         s = sim_with(DEBUG)
         new_game(s)
         s.press(SELECT)
         s.step(40)
-        self.assertEqual(s.mem('ui_count'), 5, 'debug menu open')
+        self.assertEqual(s.mem('ui_count'), 6, 'debug menu open')
         # add car: pick model 12 (left from 0 wraps to the last car)
         s.press(LEFT)
         s.step(5)

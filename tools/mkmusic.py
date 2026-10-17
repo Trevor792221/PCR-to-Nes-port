@@ -138,6 +138,40 @@ _BEAT = 'K:2 H:1 H:1 S:2 H:2 K:2 K:2 S:2 H:2 '
 _FILL = 'K:2 H:2 S:2 H:2 S:1 S:1 S:2 S:2 S:2 '
 BOSS_DRUM = (_BEAT * 3 + _FILL) * 2
 
+# ---------------------------------------------------------------------------
+# "Neon Boulevard" -- second garage theme (picked at random after races).
+# G major, 16 bars:  G Em C D G Em C-D G | Am D G Em C D Bm-Em Am-D
+# ---------------------------------------------------------------------------
+NEON_LEAD = '''
+I0 D5:2 G5:2 B5:2 D6:2 B5:4 A5:2 G5:2 | E5:2 G5:2 B5:4 A5:2 G5:2 E5:4
+   C5:2 E5:2 G5:2 C6:2 B5:4 G5:2 E5:2 | F#5:4 A5:4 D6:4 C6:2 A5:2
+   B5:2 D6:2 B5:2 G5:2 A5:4 B5:4 | G5:2 E5:2 G5:2 B5:2 E6:8
+   C6:4 B5:2 A5:2 B5:4 A5:2 F#5:2 | G5:12 R:4
+I3 A5:3 G5:1 E5:4 C5:4 E5:4 | F#5:3 E5:1 D5:4 A4:4 D5:4
+   G5:3 F#5:1 D5:4 B4:4 D5:4 | E5:3 D5:1 B4:4 G4:4 B4:4
+   C5:4 E5:4 G5:4 C6:4 | D6:4 C6:4 A5:4 F#5:4
+   B5:4 A5:4 G5:4 E5:4 | A5:4 B5:2 C6:2 D6:8
+'''
+def _stab(a, b, c=None, d=None):
+    c, d = c or a, d or b
+    return 'R:2 %s:2 R:2 %s:2 R:2 %s:2 R:2 %s:2 ' % (a, b, c, d)
+NEON_HARM = 'I1 ' + ''.join([
+    _stab('B4', 'D5'), _stab('G4', 'B4'), _stab('E4', 'G4'), _stab('F#4', 'A4'),
+    _stab('B4', 'D5'), _stab('G4', 'B4'), _stab('E4', 'G4', 'F#4', 'A4'), _stab('B4', 'D5'),
+    _stab('C5', 'E5'), _stab('F#4', 'A4'), _stab('B4', 'D5'), _stab('G4', 'B4'),
+    _stab('E4', 'G4'), _stab('F#4', 'A4'), _stab('D4', 'F#4', 'E4', 'G4'), _stab('A4', 'C5', 'F#4', 'A4')])
+def _oct(r1, r2=None):
+    r2 = r2 or r1
+    lo1, hi1 = r1 + '2', r1 + '3'
+    lo2, hi2 = r2 + '2', r2 + '3'
+    return '%s:2 %s:2 %s:2 %s:2 %s:2 %s:2 %s:2 %s:2 ' % (lo1, hi1, lo1, hi1, lo2, hi2, lo2, hi2)
+NEON_BASS = 'I2 ' + ''.join([
+    _oct('G'), _oct('E'), _oct('C'), _oct('D'), _oct('G'), _oct('E'), _oct('C', 'D'), _oct('G'),
+    _oct('A'), _oct('D'), _oct('G'), _oct('E'), _oct('C'), _oct('D'), _oct('B', 'E'), _oct('A', 'D')])
+_NB = 'K:2 H:2 S:2 H:2 K:2 H:2 S:2 H:2 '
+_NF = 'K:2 H:2 S:2 H:2 S:1 S:1 S:2 K:2 S:2 '
+NEON_DRUM = (_NB * 7 + _NF) * 2
+
 # short jingles (do not loop)
 WIN_LEAD = 'I9 C5:1 E5:1 G5:1 C6:3 R:1 A5:1 C6:6'
 WIN_HARM = 'I1 E4:1 G4:1 C5:1 E5:3 R:1 F5:1 E5:6'
@@ -156,6 +190,8 @@ SONGS = [
                    (LOSE_BASS, False, False), (SILENT, False, True)]),
     ('song_boss', [(BOSS_LEAD, True, False), (BOSS_HARM, True, False),
                    (BOSS_BASS, True, False), (BOSS_DRUM, True, True)]),
+    ('song_neon', [(NEON_LEAD, True, False), (NEON_HARM, True, False),
+                   (NEON_BASS, True, False), (NEON_DRUM, True, True)]),
 ]
 
 
@@ -197,6 +233,7 @@ def main():
     lines.append('SONG_WIN = 1')
     lines.append('SONG_LOSE = 2')
     lines.append('SONG_BOSS = 3')
+    lines.append('SONG_NEON = 4')
     open(sys.argv[1], 'w').write('\n'.join(lines) + '\n')
 
 

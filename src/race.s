@@ -120,6 +120,8 @@ race_main:
 
 ; ---------------------------------------------------------------------------
 race_setup:
+        lda #1                  ; back in the garage: a random theme
+        sta new_song
         jsr rng_stir
         lda #NTHEMES            ; random background: day, sunset or night
         jsr rand_below

@@ -1925,7 +1925,7 @@ options_screen:
         jmp :++
 :       lda mus_on
         bne :+
-        lda #SONG_GARAGE
+        lda garage_song
         jsr music_play
 :       jsr op_values
         jmp @loop

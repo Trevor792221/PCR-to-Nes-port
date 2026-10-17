@@ -98,6 +98,8 @@ res_mph:    .res 2          ; trap speed in mph (for the stats page)
 tmp_rec:    .res 32         ; scratch car record (dealer, crates)
 race_theme: .res 1          ; 0 day, 1 sunset, 2 night (picked per race)
 copy_bank:  .res 1          ; source bank for chr_copy / bank0_copy (0 = graphics)
+garage_song: .res 1         ; garage theme in use (SONG_GARAGE or SONG_NEON)
+new_song:   .res 1          ; set by a race: the garage picks a theme again
 
 ; ---------------------------------------------------------------------------
 .include "header.s"
