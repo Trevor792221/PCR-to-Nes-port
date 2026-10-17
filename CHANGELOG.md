@@ -51,6 +51,12 @@ Every version of Pixel Racer NES, newest first. Downloads are on the
 * OPTIONS > PASSWORD shows them; TITLE > PASSWORD enters them.
 * Note: battery saves from v2.x are not read. Write your passwords down before updating.
 
+## v2.5: Bridge to passwords (2026-10-17)
+
+* For players with a battery save from v1.0 to v2.4: OPTIONS > PASSWORD shows the two passwords that v3.1 and later accept.
+* Load your old save in this version, write both passwords down, then enter them in the latest version (TITLE > PASSWORD) to carry on with your cars, money, bosses and stats.
+* Otherwise the same as v2.4 (battery save). Use the latest release for new games.
+
 ## v2.4: Intercooler and aero (2026-10-16)
 
 * Two new parts: intercooler (more power, much more with a turbo) and aero kit (less drag, more grip).

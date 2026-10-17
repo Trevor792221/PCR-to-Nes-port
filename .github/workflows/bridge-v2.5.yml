@@ -1,0 +1,56 @@
+name: bridge-v2.5
+# Publishes v2.5, the bridge release for battery saves (v1.0-v2.4): v2.4 plus
+# release/bridge/v2.5.patch, which adds OPTIONS > PASSWORD showing the v3.1+
+# passwords. It is tagged v2.5 on its own commit off v2.4 and is never marked
+# the latest release, so the download buttons keep pointing at v3.x.
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  bridge:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Apply the v2.5 patch to v2.4
+        run: |
+          cp release/bridge/v2.5.patch /tmp/v2.5.patch
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout --detach v2.4
+          git am --keep-cr /tmp/v2.5.patch
+      - name: Install toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cc65 zip
+          pip install cynes py65 numpy pillow
+      - name: Build and test
+        run: |
+          make
+          make test
+      - name: Tag v2.5
+        run: |
+          git tag -f v2.5
+          git push -f origin v2.5
+      - name: Package
+        run: |
+          mkdir -p dist
+          cp build/pxracer.nes dist/pxracer.nes
+          python3 tools/render_wav.py dist/soundtrack
+          (cd dist && zip -r pixel-racer-soundtrack.zip soundtrack)
+          cp dist/soundtrack/*.wav dist/
+          cat release/notes/v2.5.md release/RELEASE_NOTES.md > dist/body.md
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v2.5
+          name: Pixel Racer NES v2.5
+          body_path: dist/body.md
+          make_latest: false
+          files: |
+            dist/pxracer.nes
+            dist/pixel-racer-soundtrack.zip
+            dist/01-midnight-garage.wav
+            dist/02-win.wav
+            dist/03-lose.wav

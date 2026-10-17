@@ -1,0 +1,1632 @@
+From 8edcb6fa97c661bf8c97fe37aadcdd342beb8d18 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 17 Oct 2026 19:23:27 +0000
+Subject: [PATCH] v2.5: bridge battery saves to v3.x passwords
+
+Built on v2.4 for players with a battery save from v1.0-v2.4 (v2.4
+already converts v1.x-v2.3 saves on load). OPTIONS > PASSWORD (in place
+of ERASE SAVE) shows the PLAYER (32 letters, with stats) and GARAGE
+passwords in the v3.1+ format, using the v3.x password encoder in bank 5.
+The release is published with make_latest: false so the download buttons
+keep pointing at the newest version.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Pa1irVVgbhgX6AcbsKKncE
+---
+ .github/workflows/release.yml |    8 +-
+ cfg/pxracer.cfg               |    1 +
+ release/notes/v2.5.md         |    6 +
+ release/pxracer.nes           |  Bin 131088 -> 131088 bytes
+ src/defs.inc                  |    1 +
+ src/main.s                    |    3 +
+ src/menus2.s                  |   16 +-
+ src/password.s                | 1134 +++++++++++++++++++++++++++++++++
+ tests/test_bridge.py          |   51 ++
+ tools/password.py             |  231 +++++++
+ 10 files changed, 1437 insertions(+), 14 deletions(-)
+ create mode 100644 release/notes/v2.5.md
+ create mode 100644 src/password.s
+ create mode 100644 tests/test_bridge.py
+ create mode 100644 tools/password.py
+
+diff --git a/.github/workflows/release.yml b/.github/workflows/release.yml
+index 6d29a7d..c304d24 100644
+--- a/.github/workflows/release.yml
++++ b/.github/workflows/release.yml
+@@ -34,12 +34,18 @@ jobs:
+           python3 tools/render_wav.py dist/soundtrack
+           (cd dist && zip -r pixel-racer-soundtrack.zip soundtrack)
+           cp dist/soundtrack/*.wav dist/
++      - name: Release notes
++        run: |
++          TAG="${{ inputs.tag || github.ref_name }}"
++          if [ -f "release/notes/$TAG.md" ]; then cat "release/notes/$TAG.md" > dist/body.md; fi
++          cat release/RELEASE_NOTES.md >> dist/body.md
+       - uses: softprops/action-gh-release@v2
+         with:
+           tag_name: ${{ inputs.tag || github.ref_name }}
+           target_commitish: ${{ github.sha }}
+           name: Pixel Racer NES ${{ inputs.tag || github.ref_name }}
+-          body_path: release/RELEASE_NOTES.md
++          body_path: dist/body.md
++          make_latest: false        # v2.5 is a bridge: the download buttons stay on v3.x
+           files: |
+             dist/pxracer.nes
+             dist/pixel-racer-soundtrack.zip
+diff --git a/cfg/pxracer.cfg b/cfg/pxracer.cfg
+index 4c99301..04d193f 100644
+--- a/cfg/pxracer.cfg
++++ b/cfg/pxracer.cfg
+@@ -34,6 +34,7 @@ SEGMENTS {
+     BANK2:    load = PRG2,   type = ro;
+     BANK3:    load = PRG3,   type = ro;
+     BANK4:    load = PRG4,   type = ro;
++    BANK5:    load = PRG5,   type = ro;
+     FIXED:    load = PRG7,   type = ro, align = $100;
+     STUB0:    load = STB0,   type = ro;
+     STUB1:    load = STB1,   type = ro;
+diff --git a/release/notes/v2.5.md b/release/notes/v2.5.md
+new file mode 100644
+index 0000000..0c8011a
+--- /dev/null
++++ b/release/notes/v2.5.md
+@@ -0,0 +1,6 @@
++## v2.5: Bridge to passwords
++
++* For players with a battery save from v1.0 to v2.4: OPTIONS > PASSWORD shows the two passwords that v3.1 and later accept.
++* Load your old save in this version, write both passwords down, then enter them in the latest version (TITLE > PASSWORD) to carry on with your cars, money, bosses and stats.
++* Otherwise the same as v2.4 (battery save). Use the latest release for new games.
++
+diff --git a/release/pxracer.nes b/release/pxracer.nes
+index 65f9de9fdeb963cfd04972e6ddd7d3ee15cb2368..8c318a8c000a0428217e01aa6f0af2a01e8b7551 100644
+GIT binary patch
+delta 3282
+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
+
+delta 476
+zcmbQxz%ikLV}tDFaF<q&l~Y?e6_n4c^noxJu`FO!m~?Dq1f0tb;>N+boFHx%oXZX3
+zR>8TvAa3d8lFN$qx1oZ}3xq&|FX3Ea5SIzaoz}{^h<Sksh${`}ih{VhaIP4LYXj$s
+zgSa5KLG((1xH)jHB#7Gy;ew2o0`Zqlmc3%B{cwuH>O%@g4=J2Js~~swB+~_EpSx2|
+zGJfDb$@W3)B>M*;ACD<(eOOMie#n{Jctx1;-sGuQRO%m20SYTDeY}#P)jVP4A)v{?
+z&{`m%pm}Zshk^%GxELth4iuJAU_A#^p1{b&vX(DF6KM9zi4Yw=zo)G1fG`&c0mJw8
+zF^~c#pn}Cv1u|1t&Vnmohbmy<2ddZ(Rbe}I<(kPlSB<$`gB*ih6@neZTsNm*&C%NY
+P;lF~za)Aa$Fwp=24Nb<s
+
+diff --git a/src/defs.inc b/src/defs.inc
+index 9ea2d3f..7cafb67 100644
+--- a/src/defs.inc
++++ b/src/defs.inc
+@@ -58,6 +58,7 @@ BANK_MENU  = 1
+ BANK_RACE  = 2
+ BANK_MENU2 = 3
+ BANK_SCENE = 4                  ; race background themes
++BANK_PW    = 5                  ; passwords (bridge to v3.x)
+ 
+ ; --- game modes (index into mode table in main.s) ----------------------------
+ MODE_TITLE   = 0
+diff --git a/src/main.s b/src/main.s
+index dbf031d..dab7a3a 100644
+--- a/src/main.s
++++ b/src/main.s
+@@ -137,6 +137,9 @@ cheat_debug:     .byte 0        ; $FFC2  non-zero: SELECT in the garage = debug
+ .segment "BANK2"
+ .include "race.s"
+ 
++.segment "BANK5"
++.include "password.s"
++
+ ; ---------------------------------------------------------------------------
+ ; Reset stubs: identical in every bank so the console boots no matter which
+ ; bank MMC1 maps at $C000 on power-up.
+diff --git a/src/menus2.s b/src/menus2.s
+index 88e39ed..73f66e3 100644
+--- a/src/menus2.s
++++ b/src/menus2.s
+@@ -1918,18 +1918,8 @@ options_screen:
+         lda #MODE_TITLE
+         sta next_mode
+         rts
+-@erase: MOVI16 ptr0, str_op_sure
+-        ldy #16
+-        jsr confirm
+-        bcs :+
+-        jsr new_game
+-        lda #MODE_TITLE
+-        sta next_mode
+-        rts
+-:       MOVI16 ptr0, str_blank2
+-        ldy #28
+-        jsr vb_msg
+-        jmp @loop
++@erase: FARCALL BANK_PW, pw_show   ; v3.x passwords for this save
++        jmp options_screen
+ @back:  rts
+ 
+ op_bits: .byte OPT_KMH, OPT_NOMUSIC, OPT_AUTO
+@@ -1967,7 +1957,7 @@ str_options:  .byte "OPTIONS", 0
+ str_op0:      .byte "SPEED UNITS", 0
+ str_op1:      .byte "MUSIC", 0
+ str_op2:      .byte "GEAR SHIFTS", 0
+-str_op3:      .byte "ERASE SAVE", 0
++str_op3:      .byte "PASSWORD", 0
+ str_op4:      .byte "BACK", 0
+ str_op5:      .byte "QUIT TO TITLE", 0
+ str_ov_mph:   .byte "< MPH  >", 0
+diff --git a/src/password.s b/src/password.s
+new file mode 100644
+index 0000000..4a7b0b4
+--- /dev/null
++++ b/src/password.s
+@@ -0,0 +1,1134 @@
++; ===========================================================================
++; password.s -- v2.5 bridge: shows the v3.1+ passwords for a battery save
++; (bank 5).  Copied from v3.x; only pw_show is used here.
++;
++; PLAYER (32 chars): version 2 | cash 24 | gems 12 | level 7 | xp 12 |
++;                    ladder 4 | secret 1 | options 3 | races 12 | wins 12 |
++;                    losses 12 | crates 10 | street wins 8 | best 1/4 15 |
++;                    its car 4 | top mph 10 | its car 4 | checksum 8
++;                    (15-char version 1 passwords from v3.0 stop after
++;                    options and still work)
++; GARAGE (11-66 chars): version 2 | cars-1 3 | car in use 3 |
++;                    per car: model 4, parts as 6 pairs (a*5+b) x 5 bits,
++;                    body colour 5 | checksum 8
++; Bits go MSB first; each 5 bits is one character XORed with a mask that
++; steps by 13 per position.  The checksum (rotate left, add) runs over every
++; field and is seeded differently per password.  tools/password.py is the
++; reference implementation.
++; ===========================================================================
++
++.segment "BSS"
++pw_byte:    .res 1          ; bit buffer position: byte index
++pw_bit:     .res 1          ;   and bit mask ($80 .. $01)
++pw_v:       .res 1
++pw_cnt:     .res 1
++pw_chk:     .res 1
++pw_want:    .res 1
++pw_lo:      .res 1
++pw_len:     .res 1          ; characters in PW_TEXT
++pw_max:     .res 1
++pw_sel:     .res 1          ; letter grid cursor
++pw_kind:    .res 1          ; 0 player, 1 garage
++pw_m:       .res 1
++pw_i:       .res 1
++pw_j:       .res 1
++pw_s:       .res 1
++pw_row:     .res 1
++pw_hb:      .res 1
++pw_mode:    .res 1          ; checksum: 0 field sum (version 1), 1 CRC-8
++pw_crcon:   .res 1          ; $80 while a field's bits go through the CRC
++pw_tb:      .res 1
++pw_ver:     .res 1
++
++.segment "BANK5"
++
++PW_BUF    = DYNO_BMP            ; 48-byte bit buffer (dyno work area)
++PW_BUFSZ  = 48
++PW_TEXT   = DYNO_BMP + $40      ; up to 72 symbols (0-31)
++PW_PL     = DYNO_BMP + $90      ; decoded player fields (25 bytes, see pw_apply)
++PW_N      = DYNO_BMP + $B0      ; decoded garage: cars
++PW_CUR    = DYNO_BMP + $B1      ;   car in use
++PW_CARS   = DYNO_BMP + $C0      ;   8 x 14: model, 12 parts, colour index
++
++PW_PL_SIZE   = 25
++SEED_PLAYER  = $5A
++SEED_GARAGE  = $C3
++PLAYER_LEN   = 15               ; version 1 (v3.0): no stats
++PLAYER_LEN2  = 32               ; version 2: with stats
++GARAGE_MAX   = 66
++
++pw_alpha:   .byte "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
++garage_len: .byte 11, 19, 27, 35, 43, 50, 58, 66    ; (16 + 39*cars + 4) / 5
++garage_pad: .byte 0, 1, 2, 3, 4, 0, 1, 2            ; 5*len - (16 + 39*cars)
++
++; ---------------------------------------------------------------------------
++; Bit buffer
++; ---------------------------------------------------------------------------
++pw_reset:
++        lda #0
++        ldx #PW_BUFSZ-1
++:       sta PW_BUF,x
++        dex
++        bpl :-
++pw_rewind:
++        lda #0
++        sta pw_byte
++        lda #$80
++        sta pw_bit
++        rts
++
++; pw_sum: checksum = rol(checksum) + A.  Keeps A.
++pw_sum:
++        pha
++        lda pw_chk
++        asl a
++        adc #0
++        sta pw_chk
++        pla
++        pha
++        clc
++        adc pw_chk
++        sta pw_chk
++        pla
++        rts
++
++; pw_crc_bit: CRC-8 (poly $07) step for the data bit in A (0/1).  Keeps X, Y.
++pw_crc_bit:
++        sta pw_tb
++        lda pw_chk
++        rol a                   ; C = top bit
++        lda #0
++        rol a
++        eor pw_tb               ; feedback
++        asl pw_chk
++        lsr a
++        bcc :+
++        lda pw_chk
++        eor #$07
++        sta pw_chk
++:       rts
++
++; pw_put: write the low X bits of A, MSB first, and run it through the
++; checksum (pw_mode).  pw_putb: no checksum.  Clobbers X, Y.
++pw_put:
++        pha
++        lda pw_mode
++        bne @crc
++        pla
++        jsr pw_sum
++        jmp pw_putb
++@crc:   lda #$80
++        sta pw_crcon
++        pla
++        jsr pw_putb
++        lda #0
++        sta pw_crcon
++        rts
++pw_putb:
++        sta pw_v
++        stx pw_cnt
++        lda #8
++        sec
++        sbc pw_cnt
++        tax
++        beq :++
++:       asl pw_v                ; left-align the field
++        dex
++        bne :-
++:       ldx pw_cnt
++@b:     asl pw_v
++        lda #0
++        rol a                   ; A = the bit
++        bit pw_crcon
++        bpl :+
++        pha
++        jsr pw_crc_bit
++        pla
++:       tay
++        beq @z
++        ldy pw_byte
++        lda PW_BUF,y
++        ora pw_bit
++        sta PW_BUF,y
++@z:     lsr pw_bit
++        bne :+
++        ror pw_bit              ; carry from the lsr: back to $80
++        inc pw_byte
++:       dex
++        bne @b
++        rts
++
++; pw_get: read X bits -> A and run it through the checksum.  pw_getb: no
++; checksum.  Clobbers X, Y.
++pw_get:
++        lda pw_mode
++        bne @crc
++        jsr pw_getb
++        jmp pw_sum
++@crc:   lda #$80
++        sta pw_crcon
++        jsr pw_getb
++        ldy #0
++        sty pw_crcon
++        tay                     ; flags from the value
++        rts
++pw_getb:
++        lda #0
++        sta pw_v
++@b:     ldy pw_byte
++        lda PW_BUF,y
++        and pw_bit
++        cmp #1                  ; carry = the bit
++        rol pw_v
++        bit pw_crcon
++        bpl :+
++        lda pw_v
++        and #1
++        jsr pw_crc_bit
++:       lsr pw_bit
++        bne :+
++        ror pw_bit
++        inc pw_byte
++:       dex
++        bne @b
++        lda pw_v
++        rts
++
++; pw_to_text: buffer -> pw_len symbols in PW_TEXT
++pw_to_text:
++        jsr pw_rewind
++        lda #7
++        sta pw_m
++        lda #0
++        sta pw_i
++@c:     ldx #5
++        jsr pw_getb
++        eor pw_m
++        ldx pw_i
++        sta PW_TEXT,x
++        jsr pw_next_mask
++        inc pw_i
++        lda pw_i
++        cmp pw_len
++        bne @c
++        rts
++
++; pw_from_text: PW_TEXT -> buffer, rewound for reading
++pw_from_text:
++        jsr pw_reset
++        lda #7
++        sta pw_m
++        lda #0
++        sta pw_i
++@c:     ldx pw_i
++        lda PW_TEXT,x
++        eor pw_m
++        ldx #5
++        jsr pw_putb
++        jsr pw_next_mask
++        inc pw_i
++        lda pw_i
++        cmp pw_len
++        bne @c
++        jmp pw_rewind
++
++pw_next_mask:
++        lda pw_m
++        clc
++        adc #13
++        and #31
++        sta pw_m
++        rts
++
++; pw_put_w: (X+8)-bit field: A = high byte (X bits), pw_lo = low byte.
++; Values too big for the field are clamped to its maximum.
++pw_put_w:
++        stx pw_hb
++        cpx #8
++        bcs @ok
++        cmp pw_lim,x
++        bcc @ok
++        lda #$FF
++        sta pw_lo
++        lda pw_lim,x
++        sec
++        sbc #1
++@ok:    ldx pw_hb
++        jsr pw_put
++        lda pw_lo
++        ldx #8
++        jmp pw_put
++pw_lim: .byte 1, 2, 4, 8, 16, 32, 64, 128
++
++; pw_get_w: read an (X+8)-bit field -> A = high byte, pw_lo = low byte
++pw_get_w:
++        jsr pw_get
++        pha
++        ldx #8
++        jsr pw_get
++        sta pw_lo
++        pla
++        rts
++
++; ---------------------------------------------------------------------------
++; PLAYER password
++; ---------------------------------------------------------------------------
++pw_enc_player:
++        jsr pw_reset
++        lda #1
++        sta pw_mode
++        lda #SEED_PLAYER
++        sta pw_chk
++        lda #2                  ; version 2: with stats
++        ldx #2
++        jsr pw_put
++        lda SV_CASH+2
++        ldx #8
++        jsr pw_put
++        lda SV_CASH+1
++        ldx #8
++        jsr pw_put
++        lda SV_CASH
++        ldx #8
++        jsr pw_put
++        lda SV_GEMS
++        sta pw_lo
++        lda SV_GEMS+1
++        ldx #4
++        jsr pw_put_w
++        lda SV_LEVEL
++        ldx #7
++        jsr pw_put
++        lda SV_XP
++        sta pw_lo
++        lda SV_XP+1
++        ldx #4
++        jsr pw_put_w
++        lda SV_LADDER
++        and #15
++        ldx #4
++        jsr pw_put
++        lda SV_SECRET
++        and #1
++        ldx #1
++        jsr pw_put
++        lda SV_OPTIONS
++        and #7
++        ldx #3
++        jsr pw_put
++        ; stats
++        lda SV_RACES
++        sta pw_lo
++        lda SV_RACES+1
++        ldx #4
++        jsr pw_put_w
++        lda SV_WINS
++        sta pw_lo
++        lda SV_WINS+1
++        ldx #4
++        jsr pw_put_w
++        lda SV_LOSSES
++        sta pw_lo
++        lda SV_LOSSES+1
++        ldx #4
++        jsr pw_put_w
++        lda SV_CRATES
++        sta pw_lo
++        lda SV_CRATES+1
++        ldx #2
++        jsr pw_put_w
++        lda SV_STREET
++        ldx #8
++        jsr pw_put
++        lda SV_PBEST
++        sta pw_lo
++        lda SV_PBEST+1
++        ldx #7
++        jsr pw_put_w
++        lda SV_PBCAR
++        and #15
++        ldx #4
++        jsr pw_put
++        lda SV_TOPSPD           ; top speed: mph (10 bits), then its car
++        sta pw_lo
++        lda SV_TOPSPD+1
++        and #3
++        ldx #2
++        jsr pw_put_w
++        lda SV_TOPSPD+1
++        lsr a
++        lsr a
++        lsr a
++        lsr a
++        ldx #4
++        jsr pw_put
++        lda pw_chk
++        ldx #8
++        jsr pw_putb
++        lda #PLAYER_LEN2
++        sta pw_len
++        jmp pw_to_text
++
++; pw_dec_player: PW_TEXT -> PW_PL.  Carry set if the password is wrong.
++; 32 letters (version 2, with stats) or 15 (version 1 from v3.0: no stats).
++pw_dec_player:
++        ldx #1
++        lda pw_len
++        cmp #PLAYER_LEN
++        beq :+
++        inx
++        cmp #PLAYER_LEN2
++        jne pw_bad
++:       stx pw_ver
++        dex                     ; version 2 checks with the CRC
++        stx pw_mode
++        jsr pw_from_text
++        lda #SEED_PLAYER
++        sta pw_chk
++        ldx #2
++        jsr pw_get
++        cmp pw_ver
++        jne pw_bad
++        ldx #8
++        jsr pw_get
++        sta PW_PL+2             ; cash
++        ldx #8
++        jsr pw_get
++        sta PW_PL+1
++        ldx #8
++        jsr pw_get
++        sta PW_PL
++        ldx #4
++        jsr pw_get
++        sta PW_PL+4             ; gems
++        ldx #8
++        jsr pw_get
++        sta PW_PL+3
++        ldx #7
++        jsr pw_get
++        sta PW_PL+5             ; level
++        ldx #4
++        jsr pw_get
++        sta PW_PL+7             ; xp
++        ldx #8
++        jsr pw_get
++        sta PW_PL+6
++        ldx #4
++        jsr pw_get
++        sta PW_PL+8             ; ladder
++        ldx #1
++        jsr pw_get
++        sta PW_PL+9             ; secret boss
++        ldx #3
++        jsr pw_get
++        sta PW_PL+10            ; options
++        ldx #PW_PL_SIZE-12      ; stats: none in a version 1 password
++        lda #0
++:       sta PW_PL+11,x
++        dex
++        bpl :-
++        lda pw_ver
++        cmp #2
++        jne @sum
++        ldx #4
++        jsr pw_get_w
++        sta PW_PL+12            ; races
++        lda pw_lo
++        sta PW_PL+11
++        ldx #4
++        jsr pw_get_w
++        sta PW_PL+14            ; wins
++        lda pw_lo
++        sta PW_PL+13
++        ldx #4
++        jsr pw_get_w
++        sta PW_PL+16            ; losses
++        lda pw_lo
++        sta PW_PL+15
++        ldx #2
++        jsr pw_get_w
++        sta PW_PL+18            ; crates
++        lda pw_lo
++        sta PW_PL+17
++        ldx #8
++        jsr pw_get
++        sta PW_PL+19            ; street wins
++        ldx #7
++        jsr pw_get_w
++        sta PW_PL+21            ; best 1/4 ms
++        lda pw_lo
++        sta PW_PL+20
++        ldx #4
++        jsr pw_get
++        sta PW_PL+22            ; its car
++        cmp #NCARS
++        jcs pw_bad
++        ldx #2
++        jsr pw_get_w
++        sta PW_PL+24            ; top speed (mph high bits)
++        lda pw_lo
++        sta PW_PL+23
++        ldx #4
++        jsr pw_get              ; its car
++        cmp #NCARS
++        jcs pw_bad
++        asl a
++        asl a
++        asl a
++        asl a
++        ora PW_PL+24
++        sta PW_PL+24
++@sum:   lda pw_chk
++        sta pw_want
++        ldx #8
++        jsr pw_getb
++        cmp pw_want
++        jne pw_bad
++        lda pw_ver              ; version 1 has 2 spare bits; they must be 0
++        cmp #2
++        beq :+
++        ldx #2
++        jsr pw_getb
++        jne pw_bad
++:
++        lda PW_PL+5             ; level 1-99
++        beq pw_bad
++        cmp #100
++        bcs pw_bad
++        lda PW_PL+8             ; 11 bosses
++        cmp #12
++        bcs pw_bad
++        lda #<CASH_MAX          ; cash <= CASH_MAX
++        cmp PW_PL
++        lda #>CASH_MAX
++        sbc PW_PL+1
++        lda #^CASH_MAX
++        sbc PW_PL+2
++        bcc pw_bad
++        clc
++        rts
++pw_bad: sec
++        rts
++
++; ---------------------------------------------------------------------------
++; GARAGE password
++; ---------------------------------------------------------------------------
++pw_enc_garage:
++        jsr pw_reset
++        lda #1
++        sta pw_mode
++        lda #SEED_GARAGE
++        sta pw_chk
++        lda #2                  ; version 2: CRC
++        ldx #2
++        jsr pw_put
++        ; count the cars and find the one in use
++        lda #0
++        sta pw_i
++        sta pw_j
++        sta pw_s
++@cnt:   lda pw_s
++        jsr slot_ptr
++        ldy #CR_MODEL
++        lda (ptr1),y
++        cmp #$FF
++        beq @cn
++        lda pw_s
++        cmp SV_CURCAR
++        bne :+
++        lda pw_i
++        sta pw_j
++:       inc pw_i
++@cn:    inc pw_s
++        lda pw_s
++        cmp #NSLOTS
++        bne @cnt
++        lda pw_i
++        sec
++        sbc #1
++        ldx #3
++        jsr pw_put
++        lda pw_j
++        ldx #3
++        jsr pw_put
++        ; the cars
++        lda #0
++        sta pw_s
++@car:   lda pw_s
++        jsr slot_ptr
++        ldy #CR_MODEL
++        lda (ptr1),y
++        cmp #$FF
++        beq @next
++        ldx #4
++        jsr pw_put
++        lda #CR_PARTS
++        sta pw_j
++@pair:  ldy pw_j                ; a*5 + b
++        lda (ptr1),y
++        sta pw_lo
++        asl a
++        asl a
++        adc pw_lo
++        iny
++        adc (ptr1),y
++        iny
++        sty pw_j
++        ldx #5
++        jsr pw_put
++        lda pw_j
++        cmp #CR_PARTS+NPARTS
++        bne @pair
++        ldy #CR_PAINT           ; body colour -> paint_list index
++        lda (ptr1),y
++        ldx #23
++:       cmp paint_list,x
++        beq :+
++        dex
++        bpl :-
++        ldx #0
++:       txa
++        ldx #5
++        jsr pw_put
++@next:  inc pw_s
++        lda pw_s
++        cmp #NSLOTS
++        bne @car
++        lda pw_chk
++        ldx #8
++        jsr pw_putb
++        ldx pw_i
++        lda garage_len-1,x
++        sta pw_len
++        jmp pw_to_text
++
++; pw_dec_garage: PW_TEXT -> PW_N, PW_CUR, PW_CARS.  Carry set if wrong.
++pw_dec_garage:
++        lda pw_len
++        cmp #11
++        jcc pw_bad
++        jsr pw_from_text
++        ldx #2                  ; version 1 (v3.0) field sum, 2 CRC
++        jsr pw_getb
++        sta pw_ver
++        beq @bad
++        cmp #3
++        bcs @bad
++        sec
++        sbc #1
++        sta pw_mode
++        jsr pw_rewind
++        lda #SEED_GARAGE
++        sta pw_chk
++        ldx #2
++        jsr pw_get
++        cmp pw_ver
++        beq :+
++@bad:   jmp pw_bad
++:
++        ldx #3
++        jsr pw_get
++        tax
++        inx
++        stx PW_N
++        lda garage_len-1,x
++        cmp pw_len
++        jne pw_bad
++        ldx #3
++        jsr pw_get
++        sta PW_CUR
++        cmp PW_N
++        jcs pw_bad
++        MOVI16 ptr2, PW_CARS
++        lda #0
++        sta pw_s
++@car:   ldx #4
++        jsr pw_get
++        ldy #0
++        sta (ptr2),y
++        cmp #NCARS
++        jcs pw_bad
++        lda #1
++        sta pw_j
++@pair:  ldx #5
++        jsr pw_get
++        cmp #25
++        jcs pw_bad
++        ldx #0                  ; a = v / 5, b = v mod 5
++:       cmp #5
++        bcc :+
++        sbc #5
++        inx
++        bne :-
++:       ldy pw_j
++        pha
++        txa
++        sta (ptr2),y
++        iny
++        pla
++        sta (ptr2),y
++        iny
++        sty pw_j
++        cpy #1+NPARTS
++        bne @pair
++        ldx #5
++        jsr pw_get
++        ldy #13
++        sta (ptr2),y
++        cmp #24
++        jcs pw_bad
++        clc
++        lda ptr2
++        adc #14
++        sta ptr2
++        bcc :+
++        inc ptr2+1
++:       inc pw_s
++        lda pw_s
++        cmp PW_N
++        bne @car
++        lda pw_chk
++        sta pw_want
++        ldx #8
++        jsr pw_getb
++        cmp pw_want
++        jne pw_bad
++        ldx PW_N                ; the spare bits in the last letter must be 0
++        lda garage_pad-1,x
++        beq :+
++        tax
++        jsr pw_getb
++        jne pw_bad
++:       clc
++        rts
++
++; pw_apply: start a fresh game, then load the decoded passwords into it
++pw_apply:
++        jsr new_game
++        ldx #2
++:       lda PW_PL,x
++        sta SV_CASH,x
++        dex
++        bpl :-
++        lda PW_PL+3
++        sta SV_GEMS
++        lda PW_PL+4
++        sta SV_GEMS+1
++        lda PW_PL+5
++        sta SV_LEVEL
++        lda PW_PL+6
++        sta SV_XP
++        lda PW_PL+7
++        sta SV_XP+1
++        lda PW_PL+8
++        sta SV_LADDER
++        lda PW_PL+9
++        sta SV_SECRET
++        lda PW_PL+10
++        sta SV_OPTIONS
++        lda PW_PL+11
++        sta SV_RACES
++        lda PW_PL+12
++        sta SV_RACES+1
++        lda PW_PL+13
++        sta SV_WINS
++        lda PW_PL+14
++        sta SV_WINS+1
++        lda PW_PL+15
++        sta SV_LOSSES
++        lda PW_PL+16
++        sta SV_LOSSES+1
++        lda PW_PL+17
++        sta SV_CRATES
++        lda PW_PL+18
++        sta SV_CRATES+1
++        lda PW_PL+19
++        sta SV_STREET
++        lda PW_PL+20
++        sta SV_PBEST
++        lda PW_PL+21
++        sta SV_PBEST+1
++        lda PW_PL+22
++        sta SV_PBCAR
++        lda PW_PL+23
++        sta SV_TOPSPD
++        lda PW_PL+24
++        sta SV_TOPSPD+1
++        MOVI16 ptr2, PW_CARS
++        lda #0
++        sta pw_s
++@slot:  lda pw_s
++        jsr slot_ptr
++        lda pw_s
++        cmp PW_N
++        bcc @car
++        ldy #CR_MODEL           ; past the last car: empty
++        lda #$FF
++        sta (ptr1),y
++        jmp @next
++@car:   lda ptr2+1
++        pha
++        lda ptr2
++        pha
++        ldy #0
++        lda (ptr2),y
++        jsr init_record         ; stock gearing, default rim/glass colours
++        pla                     ; (init_record uses ptr2)
++        sta ptr2
++        pla
++        sta ptr2+1
++        ldy #1
++:       lda (ptr2),y            ; parts: same offsets in both
++        sta (ptr1),y
++        iny
++        cpy #1+NPARTS
++        bne :-
++        ldy #13
++        lda (ptr2),y
++        tax
++        lda paint_list,x
++        ldy #CR_PAINT
++        sta (ptr1),y
++        clc
++        lda ptr2
++        adc #14
++        sta ptr2
++        bcc @next
++        inc ptr2+1
++@next:  inc pw_s
++        lda pw_s
++        cmp #NSLOTS
++        bne @slot
++        lda PW_CUR
++        sta SV_CURCAR
++        jmp save_write
++
++; ---------------------------------------------------------------------------
++; Screens
++; ---------------------------------------------------------------------------
++; pw_show: both passwords for the current game (from OPTIONS)
++pw_show:
++        lda #0
++        jsr screen_begin
++        jsr use_menu_palette
++        lda #$20
++        sta text_attr
++        PRINT str_pw_yours, 2, 3
++        PRINT str_pw_player, 2, 5
++        PRINT str_pw_garage, 2, 12
++        lda #0
++        sta text_attr
++        jsr pw_enc_player
++        lda #7
++        jsr pw_print_rows
++        jsr pw_enc_garage
++        lda #14
++        jsr pw_print_rows
++        PRINT str_pw_note1, 2, 24
++        PRINT str_pw_note2, 2, 25
++        PRINT str_pw_back, 2, 27
++        jsr attr_upload
++        lda #0
++        sta oam_idx
++        jsr oam_clear
++        jsr ppu_on
++:       jsr wait_frame
++        jsr read_pad
++        lda pad_new
++        and #BTN_A|BTN_B|BTN_START
++        beq :-
++        lda #SFX_BACK
++        jmp sfx_play
++
++; pw_print_rows: print PW_TEXT (pw_len) from row A, 16 per row in groups of
++; 4, two rows apart.  PPU off.
++pw_print_rows:
++        sta pw_row
++        lda #0
++        sta pw_i
++@row:   ldy #0
++        ldx pw_i
++@ch:    lda PW_TEXT,x
++        sty pw_v
++        tay
++        lda pw_alpha,y
++        ldy pw_v
++        sta linebuf,y
++        iny
++        inx
++        cpx pw_len
++        beq @out
++        txa
++        and #3
++        bne :+
++        txa
++        and #15
++        beq @out                ; 16 per row
++        lda #' '
++        sta linebuf,y
++        iny
++:       jmp @ch
++@out:   stx pw_i
++        lda #0
++        sta linebuf,y
++        MOVI16 ptr0, linebuf
++        ldx #6
++        ldy pw_row
++        jsr print
++        inc pw_row
++        inc pw_row
++        lda pw_i
++        cmp pw_len
++        bne @row
++        rts
++
++; pw_title: TITLE > PASSWORD.  A = 0 when both passwords were taken and the
++; game is loaded, 1 if the player backed out.  (A, not carry: farcall's bank
++; switch shifts through the carry.)
++pw_title:
++        lda #0
++        sta pw_kind
++        jsr pw_enter
++        bcs @no
++        lda #1
++        sta pw_kind
++        jsr pw_enter
++        bcs @no
++        jsr pw_apply
++        lda #0
++        rts
++@no:    lda #1
++        rts
++
++; pw_enter: type password pw_kind.  Carry clear when it decodes.
++pw_enter:
++        lda #0
++        jsr screen_begin
++        jsr use_menu_palette
++        lda #$20
++        sta text_attr
++        ldx pw_kind
++        lda pw_titles_lo,x
++        sta ptr0
++        lda pw_titles_hi,x
++        sta ptr0+1
++        ldx #2
++        ldy #3
++        jsr print
++        lda #0
++        sta text_attr
++        ldx pw_kind
++        lda pw_hints_lo,x
++        sta ptr0
++        lda pw_hints_hi,x
++        sta ptr0+1
++        ldx #2
++        ldy #4
++        jsr print
++        ; letter grid: 4 rows of 8
++        lda #0
++        sta pw_i
++@g:     ldx pw_i
++        lda pw_alpha,x
++        sta linebuf
++        lda #0
++        sta linebuf+1
++        MOVI16 ptr0, linebuf
++        jsr pw_grid_xy
++        jsr print
++        inc pw_i
++        lda pw_i
++        cmp #32
++        bne @g
++        PRINT str_pw_help1, 2, 26
++        PRINT str_pw_help2, 2, 27
++        jsr attr_upload
++        lda #0
++        sta oam_idx
++        jsr oam_clear
++        jsr ppu_on
++        lda #0
++        sta pw_len
++        sta pw_sel
++        lda #PLAYER_LEN2
++        ldx pw_kind
++        beq :+
++        lda #GARAGE_MAX
++:       sta pw_max
++@loop:  jsr wait_frame
++        jsr read_pad
++        lda pw_sel
++        sta pw_i
++        jsr pw_grid_xy
++        dex
++        jsr ui_cursor
++        lda pad_rpt
++        and #BTN_RIGHT
++        beq :+
++        lda pw_sel
++        tax
++        and #$18
++        sta pw_v
++        inx
++        txa
++        and #7
++        ora pw_v
++        jmp @mv
++:       lda pad_rpt
++        and #BTN_LEFT
++        beq :+
++        lda pw_sel
++        tax
++        and #$18
++        sta pw_v
++        dex
++        txa
++        and #7
++        ora pw_v
++        jmp @mv
++:       lda pad_rpt
++        and #BTN_DOWN
++        beq :+
++        lda pw_sel
++        clc
++        adc #8
++        and #31
++        jmp @mv
++:       lda pad_rpt
++        and #BTN_UP
++        beq :+
++        lda pw_sel
++        sec
++        sbc #8
++        and #31
++        jmp @mv
++:       lda pad_new
++        and #BTN_A
++        bne @add
++        lda pad_new
++        and #BTN_B
++        bne @del
++        lda pad_new
++        and #BTN_START
++        bne @done
++        lda pad_new
++        and #BTN_SELECT
++        beq @loop
++        lda #SFX_BACK
++        jsr sfx_play
++        sec
++        rts
++@mv:    sta pw_sel
++        lda #SFX_MOVE
++        jsr sfx_play
++        jmp @loop
++@add:   ldx pw_len
++        cpx pw_max
++        bcs @err
++        lda pw_sel
++        sta PW_TEXT,x
++        tay
++        lda pw_alpha,y
++        jsr pw_show_char
++        inc pw_len
++        lda #SFX_SELECT
++        jsr sfx_play
++        jsr pw_clear_msg
++        jmp @loop
++@del:   ldx pw_len
++        jeq @loop
++        dex
++        stx pw_len
++        lda #' '
++        jsr pw_show_char
++        lda #SFX_BACK
++        jsr sfx_play
++        jsr pw_clear_msg
++        jmp @loop
++@done:  lda pw_kind
++        bne :+
++        jsr pw_dec_player
++        jmp :++
++:       jsr pw_dec_garage
++:       bcs @err
++        lda #SFX_BUY
++        jsr sfx_play
++        lda #20
++        jsr wait_frames
++        clc
++        rts
++@err:   lda #SFX_ERROR
++        jsr sfx_play
++        MOVI16 ptr0, str_pw_wrong
++        ldx #2
++        ldy #24
++        jsr vb_str
++        jmp @loop
++
++pw_clear_msg:
++        MOVI16 ptr0, str_pw_clear
++        ldx #2
++        ldy #24
++        jmp vb_str
++
++; pw_show_char: A = character for typed position X (rows 6-14, 16 per row)
++pw_show_char:
++        sta linebuf
++        lda #0
++        sta linebuf+1
++        txa
++        lsr a
++        lsr a
++        lsr a
++        and #$FE                ; (X / 16) * 2
++        clc
++        adc #6
++        tay
++        txa
++        and #15
++        sta pw_v
++        lsr a
++        lsr a
++        clc
++        adc pw_v
++        adc #6
++        tax
++        MOVI16 ptr0, linebuf
++        jmp vb_str
++
++; pw_grid_xy: letter pw_i -> X = column, Y = row (rows 16-22, 3 columns apart)
++pw_grid_xy:
++        lda pw_i
++        and #7
++        sta pw_v
++        asl a
++        adc pw_v
++        adc #6
++        tax
++        lda pw_i
++        lsr a
++        lsr a
++        and #$FE
++        clc
++        adc #16
++        tay
++        rts
++
++pw_titles_lo: .byte <str_pw_t1, <str_pw_t2
++pw_titles_hi: .byte >str_pw_t1, >str_pw_t2
++pw_hints_lo:  .byte <str_pw_h1, <str_pw_h2
++pw_hints_hi:  .byte >str_pw_h1, >str_pw_h2
++str_pw_t1:     .byte "PASSWORD 1: PLAYER", 0
++str_pw_t2:     .byte "PASSWORD 2: GARAGE", 0
++str_pw_h1:     .byte "32 LETTERS", 0
++str_pw_h2:     .byte "11 LETTERS, MORE WITH MORE CARS", 0
++str_pw_help1:  .byte "A:ADD  B:DELETE  START:DONE", 0
++str_pw_help2:  .byte "SELECT:BACK TO THE TITLE", 0
++str_pw_wrong:  .byte "WRONG PASSWORD, CHECK IT", 0
++str_pw_clear:  .byte "                        ", 0
++str_pw_yours:  .byte "YOUR PASSWORDS", 0
++str_pw_player: .byte "1: PLAYER", 0
++str_pw_garage: .byte "2: GARAGE", 0
++str_pw_note1:  .byte "ENTER THESE IN V3.1 OR LATER:", 0
++str_pw_note2:  .byte "TITLE > PASSWORD", 0
++str_pw_back:   .byte "B:BACK", 0
+diff --git a/tests/test_bridge.py b/tests/test_bridge.py
+new file mode 100644
+index 0000000..e3ca7f8
+--- /dev/null
++++ b/tests/test_bridge.py
+@@ -0,0 +1,51 @@
++"""v2.5 bridge: a battery save shows the passwords v3.1+ accepts."""
++import os
++import sys
++import unittest
++
++HERE = os.path.dirname(os.path.abspath(__file__))
++sys.path.insert(0, HERE)
++sys.path.insert(0, os.path.join(HERE, '..', 'tools'))
++import password as pw          # noqa: E402
++from harness import *          # noqa: E402,F401,F403
++from test_game import new_game, SV_CASH, SV_CARS, G_OPTIONS   # noqa: E402
++from test_features import give_car, set_cash                 # noqa: E402
++
++
++def state(s):
++    cars, cur = [], 0
++    for slot in range(8):
++        b = SV_CARS + slot * 32
++        if s.wram(b) == 0xFF:
++            continue
++        if slot == s.wram(0x600D):
++            cur = len(cars)
++        cars.append((s.wram(b), [s.wram(b + 1 + i) for i in range(12)], s.wram(b + 13)))
++    return cars, cur
++
++
++class Bridge(unittest.TestCase):
++    def test_passwords_for_a_battery_save(self):
++        s = new_game()
++        set_cash(s, 777777)
++        give_car(s, 2, 11, 3)
++        give_car(s, 5, 4, 2)
++        s.nes[SV_CARS + 5 * 32 + 13] = 0x28
++        s.nes[0x600D] = 5
++        s.garage_goto(G_OPTIONS)
++        s.press(A)
++        s.step(30)
++        s.list_goto('ui_sel', 3)                     # PASSWORD
++        s.press(A)
++        s.step(40)
++        cars, cur = state(s)
++        rom = ''.join(pw.ALPHABET[s.nes[0x6840 + i]] for i in range(s.mem('pw_len')))
++        self.assertEqual(rom, pw.encode_garage(cars, cur))
++        self.assertEqual(pw.decode_garage(rom), dict(cars=cars, cur=cur))
++        s.press(B)
++        s.step(40)
++        self.assertEqual(s.mem('game_mode'), 1)
++
++
++if __name__ == '__main__':
++    unittest.main()
+diff --git a/tools/password.py b/tools/password.py
+new file mode 100644
+index 0000000..5a4de41
+--- /dev/null
++++ b/tools/password.py
+@@ -0,0 +1,231 @@
++#!/usr/bin/env python3
++"""Reference encoder/decoder for Pixel Racer's two passwords (mirrors
++src/password.s bit for bit).
++
++PLAYER password, 32 characters:
++    version 2 | cash 24 | gems 12 | level 7 | xp 12 | ladder 4 | secret 1 |
++    options 3 | races 12 | wins 12 | losses 12 | crates 10 | street wins 8 |
++    best 1/4 ms 15 | its car 4 | top mph 10 | its car 4 | checksum 8
++  (15-character version-1 passwords from v3.0, without the stats after
++  options, are still accepted.)
++GARAGE password, 11-66 characters (grows with the number of cars):
++    version 2 | cars-1 3 | car in use 3 |
++    per car: model 4, parts as 6 pairs (a*5+b) of 5 bits, body colour 5 |
++    checksum 8
++
++Bits are written MSB first.  Every 5 bits become one character, XORed with a
++mask that changes per position (7, 20, 1, 14, ... : +13 mod 32).  The
++checksum is a rotate-left-and-add over every field value, seeded differently
++for the two passwords so they can't be swapped.
++
++    python3 tools/password.py PLAYERPASSWORD GARAGEPASSWORD   # decode
++"""
++import sys
++
++ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
++SEED_PLAYER, SEED_GARAGE = 0x5A, 0xC3
++PLAYER_LEN = 15             # version 1 (v3.0): no stats
++PLAYER_LEN2 = 32            # version 2: with stats
++NPARTS = 12
++NCARS = 13
++CASH_MAX = 9999999
++PAINT_LIST = [0x16, 0x06, 0x26, 0x27, 0x17, 0x28, 0x38, 0x2A, 0x1A, 0x0A, 0x2C, 0x1C,
++              0x21, 0x11, 0x12, 0x02, 0x13, 0x14, 0x24, 0x07, 0x00, 0x10, 0x30, 0x2D]
++
++
++def garage_len(ncars):
++    return (16 + 39 * ncars + 4) // 5
++
++
++class Bits:
++    """crc=True: CRC-8 (poly $07) over every field bit -- catches any one
++    wrong letter.  crc=False: the version-1 rotate-and-add field sum."""
++
++    def __init__(self, seed, crc=True):
++        self.bits = []
++        self.pos = 0
++        self.chk = seed
++        self.crc = crc
++
++    def _sum(self, v):
++        self.chk = ((self.chk << 1) | (self.chk >> 7)) & 0xFF
++        self.chk = (self.chk + v) & 0xFF
++
++    def _crc_bit(self, bit):
++        fb = (self.chk >> 7) ^ bit
++        self.chk = (self.chk << 1) & 0xFF
++        if fb:
++            self.chk ^= 0x07
++
++    def put(self, v, n, chk=True):
++        assert 0 <= v < (1 << n), (v, n)
++        bits = [(v >> (n - 1 - i)) & 1 for i in range(n)]
++        if chk:
++            if self.crc:
++                for bit in bits:
++                    self._crc_bit(bit)
++            else:
++                self._sum(v)
++        self.bits += bits
++
++    def get(self, n, chk=True):
++        v = 0
++        for _ in range(n):
++            bit = self.bits[self.pos] if self.pos < len(self.bits) else 0
++            v = v << 1 | bit
++            self.pos += 1
++            if chk and self.crc:
++                self._crc_bit(bit)
++        if chk and not self.crc:
++            self._sum(v)
++        return v
++
++    def text(self, nchars):
++        self.bits += [0] * (nchars * 5 - len(self.bits))
++        self.pos = 0
++        out, m = '', 7
++        for _ in range(nchars):
++            out += ALPHABET[self.get(5, chk=False) ^ m]
++            m = (m + 13) & 31
++        return out
++
++    @classmethod
++    def from_text(cls, s, seed, crc=True):
++        b = cls(seed, crc)
++        m = 7
++        for c in s:
++            b.put(ALPHABET.index(c) ^ m, 5, chk=False)
++            m = (m + 13) & 31
++        b.chk = seed
++        return b
++
++
++STATS = (('races', 12), ('wins', 12), ('losses', 12), ('crates', 10), ('street', 8),
++         ('pbest', 15), ('pbcar', 4), ('topmph', 10), ('topcar', 4))
++
++
++def put_w(b, v, n):
++    """n-bit field (n >= 8): high n-8 bits, then the low byte.  Clamped."""
++    v = min(v, (1 << n) - 1)
++    if n > 8:
++        b.put(v >> 8, n - 8)
++    b.put(v & 0xFF, 8)
++
++
++def get_w(b, n):
++    v = b.get(n - 8) << 8 if n > 8 else 0
++    return v | b.get(8)
++
++
++def encode_player(cash, gems, level, xp, ladder, secret, options, stats=None):
++    """With stats: version 2, 32 letters.  Without: version 1, 15 letters."""
++    b = Bits(SEED_PLAYER, crc=bool(stats))
++    b.put(2 if stats else 1, 2)
++    for sh in (16, 8, 0):
++        b.put(cash >> sh & 0xFF, 8)
++    put_w(b, gems, 12)
++    b.put(level, 7)
++    put_w(b, xp, 12)
++    b.put(ladder, 4)
++    b.put(secret & 1, 1)
++    b.put(options & 7, 3)
++    if stats:
++        for name, n in STATS:
++            if n < 8:
++                b.put(stats[name] & ((1 << n) - 1), n)
++            else:
++                put_w(b, stats[name], n)
++    b.put(b.chk, 8, chk=False)
++    return b.text(PLAYER_LEN2 if stats else PLAYER_LEN)
++
++
++def decode_player(s):
++    if len(s) not in (PLAYER_LEN, PLAYER_LEN2):
++        return None
++    b = Bits.from_text(s, SEED_PLAYER, crc=len(s) == PLAYER_LEN2)
++    ver = b.get(2)
++    if ver != (1 if len(s) == PLAYER_LEN else 2):
++        return None
++    cash = b.get(8) << 16
++    cash |= b.get(8) << 8
++    cash |= b.get(8)
++    gems = get_w(b, 12)
++    level = b.get(7)
++    xp = get_w(b, 12)
++    ladder, secret, options = b.get(4), b.get(1), b.get(3)
++    stats = None
++    if ver == 2:
++        stats = {name: (b.get(n) if n < 8 else get_w(b, n)) for name, n in STATS}
++    want = b.chk
++    if b.get(8, chk=False) != want:
++        return None
++    pad = len(s) * 5 - b.pos
++    if pad and b.get(pad, chk=False):                           # padding must be 0
++        return None
++    if cash > CASH_MAX or not 1 <= level <= 99 or ladder > 11:
++        return None
++    out = dict(cash=cash, gems=gems, level=level, xp=xp, ladder=ladder,
++               secret=secret, options=options)
++    if stats:
++        if stats['pbcar'] >= NCARS or stats['topcar'] >= NCARS:
++            return None
++        out['stats'] = stats
++    return out
++
++
++def encode_garage(cars, cur, version=2):
++    """cars: list of (model, parts[12], body colour byte); cur: index.
++    Version 2 uses the CRC; version 1 (v3.0) the field sum."""
++    b = Bits(SEED_GARAGE, crc=version == 2)
++    b.put(version, 2)
++    b.put(len(cars) - 1, 3)
++    b.put(cur, 3)
++    for model, parts, paint in cars:
++        b.put(model, 4)
++        for k in range(0, NPARTS, 2):
++            b.put(parts[k] * 5 + parts[k + 1], 5)
++        b.put(PAINT_LIST.index(paint) if paint in PAINT_LIST else 0, 5)
++    b.put(b.chk, 8, chk=False)
++    return b.text(garage_len(len(cars)))
++
++
++def decode_garage(s):
++    ver = Bits.from_text(s, SEED_GARAGE).get(2, chk=False)
++    if ver not in (1, 2):
++        return None
++    b = Bits.from_text(s, SEED_GARAGE, crc=ver == 2)
++    b.get(2)
++    n = b.get(3) + 1
++    cur = b.get(3)
++    if len(s) != garage_len(n) or cur >= n:
++        return None
++    cars = []
++    for _ in range(n):
++        model = b.get(4)
++        parts = []
++        for _ in range(NPARTS // 2):
++            v = b.get(5)
++            if v > 24:
++                return None
++            parts += [v // 5, v % 5]
++        col = b.get(5)
++        if model >= NCARS or col > 23:
++            return None
++        cars.append((model, parts, PAINT_LIST[col]))
++    want = b.chk
++    if b.get(8, chk=False) != want:
++        return None
++    pad = len(s) * 5 - b.pos
++    if pad and b.get(pad, chk=False):                           # padding must be 0
++        return None
++    return dict(cars=cars, cur=cur)
++
++
++if __name__ == '__main__':
++    if len(sys.argv) == 3:
++        print(decode_player(sys.argv[1].upper()))
++        print(decode_garage(sys.argv[2].upper()))
++    else:
++        p = encode_player(3000, 5, 1, 0, 0, 0, 0, dict.fromkeys(dict(STATS), 0))
++        g = encode_garage([(0, [0] * 12, 0x27)], 0)
++        print('new game:', p, g)
+-- 
+2.43.0
+

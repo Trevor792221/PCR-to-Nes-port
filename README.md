@@ -6,6 +6,11 @@
 Every version is on the [Releases page](https://github.com/Trevor792221/PCR-to-Nes-port/releases).
 What changed in each one: [patch notes](CHANGELOG.md).
 
+**Have a battery save from v1.0 to v2.4?** Load it in
+[v2.5](https://github.com/Trevor792221/PCR-to-Nes-port/releases/tag/v2.5),
+open OPTIONS > PASSWORD and write down the two passwords, then enter them
+in the latest version (TITLE > PASSWORD).
+
 An NES demake of the drag-racing and car-building game style made popular by
 **Pixel Car Racer** on Android. It's written from scratch in 6502 assembly and
 runs on real NES / Famicom hardware or any accurate emulator.
