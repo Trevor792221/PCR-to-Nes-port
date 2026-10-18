@@ -1395,6 +1395,35 @@ dyno_screen:
         jsr attr_rect
         PRINT str_dy_hp, 3, 8
         PRINT str_dy_tq, 25, 8
+        ; a key: an orange swatch by HP, a blue one by TQ (the curves' colours)
+        lda #>($2000 + 8*32 + 6)
+        ldx #<($2000 + 8*32 + 6)
+        jsr vram_addr
+        lda #$14                ; bar tile, all colour 2
+        sta PPUDATA
+        lda #>($2000 + 8*32 + 28)
+        ldx #<($2000 + 8*32 + 28)
+        jsr vram_addr
+        lda #$0C                ; bar tile, all colour 3
+        sta PPUDATA
+        lda #3                  ; graph palette on both: columns 6-7, 28-29
+        sta tmp0
+        lda #4
+        sta tmp1
+        lda #1
+        sta tmp2
+        sta tmp3
+        lda #3
+        jsr attr_rect
+        lda #14
+        sta tmp0
+        lda #4
+        sta tmp1
+        lda #1
+        sta tmp2
+        sta tmp3
+        lda #3
+        jsr attr_rect
         PRINT str_dy_rpm, 11, 16
         PRINT str_dy_help, 2, 26
         ; clear the graph tiles in CHR

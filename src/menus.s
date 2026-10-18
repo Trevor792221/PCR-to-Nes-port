@@ -1182,6 +1182,7 @@ boss_intro:
         ldy #23
         jsr print
         PRINT str_bi_help, 2, 26
+        jsr bi_stage
         jsr attr_upload
         lda #0
         sta oam_idx
@@ -1212,7 +1213,7 @@ boss_intro:
         bne :+
         lda #96
         sta sp_x
-        lda #67
+        lda #63                 ; on the stage, rows 8-11
         sta sp_y
         lda #$40
         sta sp_tile
@@ -1235,6 +1236,49 @@ boss_intro:
 @go:    lda #SFX_SELECT
         jsr sfx_play
         clc
+        rts
+
+; bi_stage: a lit stage behind the boss's car (PPU off), so a black or grey
+; car still stands out: a dark grey wall (rows 8-10) and a grey floor (row
+; 11), columns 6-25, in BG palette 3
+BI_STAGE_X = 6
+BI_STAGE_W = 20
+bi_stage:
+        lda #8
+        sta tmp7
+@row:   ldx #BI_STAGE_X
+        ldy tmp7
+        jsr nt_addr
+        lda ptr3+1
+        ldx ptr3
+        jsr vram_addr
+        lda #$01                ; wall: colour 1
+        ldy tmp7
+        cpy #11
+        bne :+
+        lda #$02                ; floor: colour 2
+:       ldx #BI_STAGE_W
+:       sta PPUDATA
+        dex
+        bne :-
+        inc tmp7
+        lda tmp7
+        cmp #12
+        bne @row
+        lda #BI_STAGE_X/2
+        sta tmp0
+        lda #4
+        sta tmp1
+        lda #BI_STAGE_W/2
+        sta tmp2
+        lda #2
+        sta tmp3
+        lda #3
+        jsr attr_rect
+        lda #$2D                ; palette 3: dark grey wall, light grey floor
+        sta palette+$0D
+        lda #$10
+        sta palette+$0E
         rts
 
 str_bi_boss:   .byte "BOSS ", 0

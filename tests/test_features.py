@@ -425,6 +425,36 @@ class Features(unittest.TestCase):
             self.assertTrue(cross, 'model %d: the curves cross' % model)
             self.assertAlmostEqual(rpm(cross[0]), 5252, delta=(lim - 1000) / 128 + 30)
 
+    def test_dyno_key(self):
+        s = new_game()
+        s.garage_goto(G_DYNO)
+        s.press(A)
+        s.step(60)
+        hp, tq = s.frame[66, 50], s.frame[66, 226]   # the swatches by HP and TQ
+        self.assertTrue(hp[0] > 150 and hp[2] < 100, 'orange like the power curve')
+        self.assertTrue(tq[2] > 150 and tq[0] < 120, 'blue like the torque curve')
+
+    def test_boss_cars_stand_out(self):
+        """Every boss car, black ones too, is drawn on a lit stage."""
+        for ladder in range(11):
+            s = new_game()
+            s.nes[0x600B], s.nes[0x600C] = 30, ladder
+            s.nes[s.sym['map_region']] = 6
+            s.garage_goto(G_RACE)
+            s.press(A)
+            s.step(30)
+            s.press(A)
+            s.step(30)
+            s.press(A)
+            s.step(120)
+            self.assertEqual(s.mem('bi_boss'), ladder)
+            stage = s.frame[64:96, 56:200].astype(int).sum(axis=2)
+            wall = stage[2, 2]                       # top left of the stage
+            self.assertGreater(wall, 60, 'the stage is lit')
+            car = stage[:, 40:104]                   # the car, x 96-159
+            self.assertGreater(int((abs(car - wall) > 40).sum()), 400,
+                               'boss %d: the car stands out from the stage' % ladder)
+
     def test_boss_intro_back_and_race(self):
         s = new_game()
         s.garage_goto(G_RACE)

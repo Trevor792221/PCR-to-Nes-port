@@ -12,6 +12,8 @@ Every version of Pixel Racer NES, newest first. Downloads are on the
 * Weather depends on the region. Rain and clouds can come anywhere. Snow only falls in Gunma and Sapporo, and Sapporo snows more often than not. Elsewhere clear skies are the most common.
 * There's no sun, moon or stars when it's cloudy, raining or snowing.
 * The dyno now shows torque in lb-ft, and plots power and torque on one shared scale, so the two curves cross at 5252 rpm like a real dyno sheet.
+* The dyno has a colour key: an orange square by HP and a blue square by TQ, matching the two curves.
+* Boss cars on the boss intro screen now sit on a lit stage, so black and dark grey cars no longer disappear into the black background.
 * Fixed glitches in the dyno graph. The bottom strip was drawn in the wrong colours, the power line turned blue where it crossed the grid, and steep parts of a curve (a big turbo coming on boost) broke into dashes. Both curves are now smooth, unbroken lines in their own colours.
 
 ## v5.0: Engine and drivetrain swaps (2026-10-18)
