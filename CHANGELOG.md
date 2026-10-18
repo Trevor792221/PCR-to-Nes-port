@@ -3,6 +3,11 @@
 Every version of Pixel Racer NES, newest first. Downloads are on the
 [Releases page](https://github.com/Trevor792221/PCR-to-Nes-port/releases).
 
+## v4.5: Wheelie bars for every car (2026-10-18)
+
+* FWD cars can now fit wheelie bars too: they stop the rear from squatting and keep weight on the front wheels at launch. Every level adds +3 launch grip on FWD and AWD, +5 on RWD.
+* They show on FWD cars in the garage and in races like on any other car.
+
 ## v4.4: Eclipse in Tokyo, visible wheelie bars (2026-10-18)
 
 * The secret boss Eclipse now only shows up in race select in the Tokyo region (still only while you drive the Zenith X400).

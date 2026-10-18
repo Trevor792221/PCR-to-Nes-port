@@ -15,7 +15,7 @@
 ;           power multiplier; the others scale their part of the torque
 ;           curve down from there.
 ;   tires   psi from 32: -2 grip and -1 rolling drag per psi
-;   wheelie bars: launch grip per level (RWD 5, AWD 3, FWD none)
+;   wheelie bars: launch grip per level (RWD 5, FWD and AWD 3)
 ;   2-step  launch rpm (needs an ECU upgrade)
 ; ===========================================================================
 

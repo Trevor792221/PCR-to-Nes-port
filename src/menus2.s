@@ -139,11 +139,10 @@ pt_chassis:  .byte P_GEARBOX, P_TIRES, P_SUSP, P_WEIGHT, P_AERO, P_WHEELIE
 pt_sizes:    .byte 8, 6
 
 ; pt_locked: A = part -> carry set if the car in use can't take it, with
-; ptr0 = why.  Intercoolers need a turbo; wheelie bars need RWD or AWD.
-; Keeps tmp4-tmp6.
+; ptr0 = why.  Intercoolers need a turbo.  Keeps tmp4-tmp6.
 pt_locked:
         cmp #P_ICOOL
-        bne @wb
+        bne @ok
         jsr cur_car_ptr
         ldy #CR_PARTS+P_TURBO
         lda (ptr1),y
@@ -151,19 +150,9 @@ pt_locked:
         MOVI16 ptr0, str_pl_turbo
         sec
         rts
-@wb:    cmp #P_WHEELIE
-        bne @ok
-        jsr cur_car_ptr
-        tax
-        lda car_drive,x
-        bne @ok                 ; FWD = 0
-        MOVI16 ptr0, str_pl_fwd
-        sec
-        rts
 @ok:    clc
         rts
 str_pl_turbo: .byte "NEEDS A TURBO FIRST", 0
-str_pl_fwd:   .byte "RWD AND AWD CARS ONLY", 0
 str_locked2:  .byte "LOCKED", 0
 pt_titles_lo: .byte <str_pt_eng, <str_pt_chs
 pt_titles_hi: .byte >str_pt_eng, >str_pt_chs
@@ -327,7 +316,7 @@ str_pd8: .byte "+4 GRIP AT LAUNCH PER LEVEL", 0
 str_pd9: .byte "-4% WEIGHT PER LEVEL", 0
 str_pd10: .byte "MORE BOOST, LESS KNOCK", 0
 str_pd11: .byte "LESS DRAG, +3 GRIP PER LEVEL", 0
-str_pd12: .byte "LAUNCH GRIP: RWD +5, AWD +3", 0
+str_pd12: .byte "LAUNCH GRIP: RWD +5, OTHERS +3", 0
 str_pd13: .byte "FUEL TO RUN LEAN OR OVERBOOST", 0
 
 ; ===========================================================================

@@ -166,11 +166,11 @@ class Tune(unittest.TestCase):
         s.list_goto('ui_sel', 5)
         s.press(A)
         s.step(20)
-        self.assertEqual(s.wram(SV_CARS + CR_PARTS + P_WHEELIE), 0, 'FWD: no wheelie bars')
+        self.assertEqual(s.wram(SV_CARS + CR_PARTS + P_WHEELIE), 1, 'FWD cars can fit them too')
 
     def test_wheelie_bar_graphics(self):
         oam = lambda s: [(s.nes[0x200 + i + 1], s.nes[0x200 + i + 2]) for i in range(0, 256, 4)]
-        for model, bars, shown in ((8, 2, True), (8, 0, False), (1, 3, False)):  # RWD; FWD
+        for model, bars, shown in ((8, 2, True), (8, 0, False), (1, 3, True)):  # RWD; FWD
             s = car_with(model, wheelie=bars)
             start_race(s, 4)
             s.step(30)

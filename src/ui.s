@@ -282,21 +282,13 @@ paint_list:
 region_lv:  .byte 1, 2, 4, 6, 8, 11, 14         ; level that opens each region
 
 ; has_wheelie: ptr1 = car record -> Z clear (A = 1) if it has wheelie bars
-; that do something (any level, not on a FWD car)
 T_WBAR  = $28                   ; sprite tile: wheelie bars (races)
 has_wheelie:
         ldy #CR_PARTS+P_WHEELIE
         lda (ptr1),y
         beq @no
-        ldy #CR_MODEL
-        lda (ptr1),y
-        tay
-        lda car_drive,y
-        beq @no                 ; FWD
         lda #1
-        rts
-@no:    lda #0
-        rts
+@no:    rts
 
 ; region_max: A = the last region open at the player's level
 region_max:

@@ -148,7 +148,8 @@ TIRE_PSI = 32
 TIREP_MIN, TIREP_MAX = -14, 8
 OVERBOOST_HP = 6             # *256ths per psi over stock boost
 LEAN_STEP = 3                # lean / overboost headroom per injector level
-WHEELIE_GRIP = [0, 5, 3, 3]  # launch grip per level by drive (FWD gets none)
+WHEELIE_GRIP = [3, 5, 3, 3]  # launch grip per level by drive: FWD (less squat keeps
+                             # weight on the front), RWD, AWD
 
 
 class Tune:

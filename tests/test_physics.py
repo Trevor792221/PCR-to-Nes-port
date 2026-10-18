@@ -169,7 +169,8 @@ class Physics(unittest.TestCase):
         self.assertGreater(soft.roll, gd.ROLL)
         bars = gd.Car(8, [0] * 12 + [4, 0])
         self.assertGreater(bars.trac, gd.Car(8, [0] * 14).trac, 'wheelie bars (RWD)')
-        self.assertEqual(gd.Car(1, [0] * 12 + [4, 0]).trac, gd.Car(1, [0] * 14).trac, 'FWD: none')
+        self.assertGreater(gd.Car(1, [0] * 12 + [4, 0]).trac, gd.Car(1, [0] * 14).trac,
+                           'FWD too: less squat keeps weight on the front')
         two = gd.Car(8, [0, 0, 1] + [0] * 11, tune=gd.Tune(launch=40))
         two.throttle = True
         for _ in range(200):
