@@ -216,7 +216,8 @@ def sky_sunset(rnd, overcast=False):
                     or (y >= 24 and x % 2 == 0 and y % 2 == 0)
                     or (y >= 16 and x % 4 == 0 and y % 4 == 0)):
                 pix[y][x] = '2'
-    _disc(pix, 168, 40, 17, '3')                  # big low sun
+    if not overcast:                              # (no sun behind rain or snow)
+        _disc(pix, 168, 40, 17, '3')              # big low sun
     for y in (36, 42, 47, 51):                    # haze bands across it
         for x in range(150, 187):
             if pix[y][x] == '3':

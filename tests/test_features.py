@@ -408,6 +408,23 @@ class Features(unittest.TestCase):
                     near = {y + d for y in rows[x - 1] for d in (-1, 0, 1)}
                     self.assertTrue(rows[x] & near, '%s: broken at column %d' % (name, x))
 
+    def test_dyno_curves_cross_at_5252(self):
+        """hp and lb-ft on one scale meet at 5252 rpm, as on any dyno sheet."""
+        for model, lvl in ((0, 0), (4, 0), (5, 3), (12, 4)):
+            s = new_game()
+            give_car(s, 0, model, lvl)
+            s.garage_goto(G_DYNO)
+            s.press(A)
+            s.step(400)
+            base = 0x6400                            # WBUF: DY_HP, then DY_TQ
+            hp = [s.wram(base + 2 * x, 2) for x in range(128)]
+            tq = [s.wram(base + 256 + 2 * x, 2) for x in range(128)]
+            lim = s.mem('ph_lim_l', 1) | s.mem('ph_lim_h', 1) << 8
+            rpm = lambda x: 1000 + x * (lim - 1000) / 128
+            cross = [x for x in range(1, 128) if (hp[x - 1] < tq[x - 1]) != (hp[x] < tq[x])]
+            self.assertTrue(cross, 'model %d: the curves cross' % model)
+            self.assertAlmostEqual(rpm(cross[0]), 5252, delta=(lim - 1000) / 128 + 30)
+
     def test_boss_intro_back_and_race(self):
         s = new_game()
         s.garage_goto(G_RACE)

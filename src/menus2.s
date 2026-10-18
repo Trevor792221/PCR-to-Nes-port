@@ -1432,7 +1432,10 @@ dyno_screen:
         rts
 @again: jmp @run
 
-; dyno_compute: torque and power for 128 columns from 1000 rpm to the limiter
+LBFT_K = 48337                  ; lb-ft per Nm * 65536
+
+; dyno_compute: torque (lb-ft) and power for 128 columns from 1000 rpm to
+; the limiter
 dyno_compute:
         jsr cur_car_ptr
         jsr car_setup           ; slot 1 (dyno_text measures the peak)
@@ -1539,9 +1542,18 @@ dyno_compute:
         lda ph_teff_h,x
         sta m_b+1
         jsr mul16
-        lda m_r+1
-        sta tmp2
+        lda m_r+1               ; -> lb-ft (x 0.73756): plotted against hp
+        sta m_a                 ; on one scale, the two cross at 5252 rpm
+        lda m_r+2               ; as on a real dyno sheet
+        sta m_a+1
+        lda #<LBFT_K
+        sta m_b
+        lda #>LBFT_K
+        sta m_b+1
+        jsr mul16
         lda m_r+2
+        sta tmp2
+        lda m_r+3
         sta tmp3
         ; store torque
         lda dy_x
@@ -1565,7 +1577,7 @@ dyno_compute:
         sta dy_peak_tr
         lda dy_rpm+1
         sta dy_peak_tr+1
-:       ; hp = Nm * rpm / 7121
+:       ; hp = lb-ft * rpm / 5252
         lda tmp2
         sta m_a
         lda tmp3
@@ -1575,9 +1587,9 @@ dyno_compute:
         lda dy_rpm+1
         sta m_b+1
         jsr mul16
-        lda #<7121
+        lda #<5252
         sta m_b
-        lda #>7121
+        lda #>5252
         sta m_b+1
         jsr div32
         lda dy_x
@@ -1710,10 +1722,7 @@ dyno_plot:
         sta m_a
         lda DY_HP+1,y
         sta m_a+1
-        lda dy_peak_hp
-        sta m_b
-        lda dy_peak_hp+1
-        sta m_b+1
+        jsr dy_shared
         jsr dyno_scale
         lda dy_ph
         sta dy_py
@@ -1729,10 +1738,7 @@ dyno_plot:
         sta m_a
         lda DY_TQ+1,y
         sta m_a+1
-        lda dy_peak_tq
-        sta m_b
-        lda dy_peak_tq+1
-        sta m_b+1
+        jsr dy_shared
         jsr dyno_scale
         lda dy_pt
         sta dy_py
@@ -1745,6 +1751,25 @@ dyno_plot:
         lda tmp4
         cmp #128
         bne @cx
+        rts
+
+; dy_shared: m_b = the bigger of peak hp and peak lb-ft: both curves on one
+; scale (so they cross at 5252 rpm)
+dy_shared:
+        lda dy_peak_hp
+        cmp dy_peak_tq
+        lda dy_peak_hp+1
+        sbc dy_peak_tq+1
+        bcc :+
+        lda dy_peak_hp
+        sta m_b
+        lda dy_peak_hp+1
+        sta m_b+1
+        rts
+:       lda dy_peak_tq
+        sta m_b
+        lda dy_peak_tq+1
+        sta m_b+1
         rts
 
 ; dyno_scale: Y = 63 - m_a*60/m_b  (m_b != 0)
@@ -1917,9 +1942,18 @@ dyno_text:
         MOVI16 ptr1, str_dy_hp
         ldy #18
         jsr dyno_line
-        lda ep_tq
+        lda ep_tq               ; Nm -> lb-ft
         sta m_a
         lda ep_tq+1
+        sta m_a+1
+        lda #<LBFT_K
+        sta m_b
+        lda #>LBFT_K
+        sta m_b+1
+        jsr mul16
+        lda m_r+2
+        sta m_a
+        lda m_r+3
         sta m_a+1
         lda ep_tq_rpm
         sta tmp2
@@ -1997,7 +2031,7 @@ str_dy_tq:    .byte "TQ", 0
 str_dy_rpm:   .byte "RPM ->", 0
 str_dy_help:  .byte "A:RUN AGAIN  B:BACK", 0
 str_dy_peak:  .byte " PEAK ", 0
-str_dy_nm:    .byte "NM", 0
+str_dy_nm:    .byte "LB-FT", 0
 str_dy_at:    .byte " AT ", 0
 str_dy_rpm2:  .byte " RPM", 0
 
