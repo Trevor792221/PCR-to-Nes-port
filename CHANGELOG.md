@@ -6,6 +6,7 @@ Every version of Pixel Racer NES, newest first. Downloads are on the
 ## v4.8: New wheelie bars (2026-10-18)
 
 * Wheelie bars are redrawn as an angled truss down to a small wheel. In races the struts are painted in your car's colour.
+* Filled the see-through pixel beside each wheel on every car and traffic vehicle, so the background no longer shows through the body.
 
 ## v4.7: New highway traffic (2026-10-18)
 
