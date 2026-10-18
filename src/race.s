@@ -646,7 +646,7 @@ speed_unit_r:
 
 ; traffic vehicle types: body shape, sprite tile, speed range (px/frame*64)
 NTRTYPE = 5
-tr_shape:   .byte 2, 0, 4, 7, 8         ; sedan, hatch, pickup, van, box truck
+tr_shape:   .byte 13, 14, 15, 16, 17    ; sedan, hatch, pickup, van, box truck (art.py)
 tr_tile:    .byte $40, $4C, $58, $64, $70
 tr_smin:    .byte 56, 60, 48, 48, 36    ; box trucks crawl, hatches nip along
 tr_srng:    .byte 44, 48, 40, 32, 28

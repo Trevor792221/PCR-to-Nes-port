@@ -3,6 +3,25 @@
 Every version of Pixel Racer NES, newest first. Downloads are on the
 [Releases page](https://github.com/Trevor792221/PCR-to-Nes-port/releases).
 
+## v4.6: Every car redesigned (2026-10-18)
+
+* All 13 cars have a new, original sprite of their own (they used to share 7 body shapes):
+  * Pukku Mini: kei box
+  * Komet 1.6: hot hatch with a roof spoiler
+  * Sakura S2: roadster
+  * Vantra RS: rally estate with a roof rack
+  * Hollis SS: 70s notchback
+  * Okami 300: twin-turbo GT with a wing
+  * Torro 4x4: off-roader
+  * Zephir GT-X: AWD coupe with a short wing
+  * Brennan 427: modern V8 coupe
+  * Raijin R: sleek ducktail with a lip spoiler
+  * Veloce V12: 80s wedge
+  * Nova Hyper: electric-era hypercar
+  * Zenith X400: land-speed streamliner
+* The new sprites appear everywhere: races, the garage, the dealer and the boss intros.
+* Highway traffic keeps its own generic cars, so it never looks like a car you can buy.
+
 ## v4.5: Wheelie bars for every car (2026-10-18)
 
 * FWD cars can now fit wheelie bars too: they stop the rear from squatting and keep weight on the front wheels at launch. Every level adds +3 launch grip on FWD and AWD, +5 on RWD.

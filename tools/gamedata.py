@@ -53,7 +53,6 @@ DRIVE_NAMES = ['FWD', 'RWD', 'AWD', 'AWD']
 DRIVE_FACTOR = [180, 225, 290, 8000]
 DRIVE_K = [df * 457 >> 6 for df in DRIVE_FACTOR]   # traction per grip point *256
 
-SHAPES = ['HATCH', 'COUPE', 'SEDAN', 'MUSCLE', 'TRUCK', 'SUPER']
 
 GEARSETS = {
     4: [2.97, 1.94, 1.34, 1.00],
@@ -62,7 +61,8 @@ GEARSETS = {
     7: [3.10, 2.25, 1.75, 1.40, 1.15, 0.95, 0.80],
 }
 
-# name, shape, hp, kg, redline, curve, gears, final, drive, CdA, price, gems, level
+# name, old body shape (unused: each car has its own sprite now, art.CAR_BODIES),
+# hp, kg, redline, curve, gears, final, drive, CdA, price, gems, level
 CARS = [
     ('PUKKU MINI',  0,  72,  760, 6800, 0, 4, 4.10, FWD, .60,    400,  0,  1),
     ('KOMET 1.6',   0, 125, 1020, 7800, 0, 5, 4.25, FWD, .62,   7000,  0,  1),

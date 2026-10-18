@@ -29,8 +29,8 @@ def main():
     o('car_names:')
     for c in gd.CARS:
         o('        .byte "%s", 0' % c[0].ljust(12))
-    o('car_shape:')
-    o(bytes_line([c[1] for c in gd.CARS]))
+    o('car_shape:')                     # every car has its own sprite (art.CAR_BODIES)
+    o(bytes_line(list(range(gd.NCARS))))
     out += words('car_hp', [c[2] for c in gd.CARS])
     out += words('car_mass', [c[3] for c in gd.CARS])
     out += words('car_redline', [c[4] for c in gd.CARS])

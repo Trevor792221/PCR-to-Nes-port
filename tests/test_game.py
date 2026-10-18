@@ -163,7 +163,7 @@ class Game(unittest.TestCase):
         s.step(40)
         for _ in range(gd.NDEALER):
             model = s.mem('dl_model')
-            shape = gd.CARS[model][1]
+            shape = model                            # every car has its own sprite
             wbuf = bytes(s.nes[0x6400 + i] for i in range(512))
             self.assertEqual(wbuf, big[shape * 512:shape * 512 + 512], 'model %d' % model)
             s.press(RIGHT)
