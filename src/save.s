@@ -92,6 +92,7 @@ save_old:
 ; new_game: wipe the save and give the player a starter car
 new_game:
         lda #0
+        sta map_region              ; map: back to the first region
         tax
 @z:     sta $6000,x
         sta $6100,x

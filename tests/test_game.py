@@ -30,6 +30,8 @@ def start_race(s, item):
     s.garage_goto(G_RACE)
     s.press(A)
     s.step(30)
+    s.press(A)                  # the map: race in the region shown
+    s.step(30)
     s.list_goto('rs_sel', item)
     s.press(A)
     s.step(5)

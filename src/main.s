@@ -101,6 +101,7 @@ copy_bank:  .res 1          ; source bank for chr_copy / bank0_copy (0 = graphic
 garage_song: .res 1         ; garage theme in use (SONG_GARAGE or SONG_NEON)
 new_song:   .res 1          ; set by a race: the garage picks a theme again
 garage_night: .res 1        ; 1: the garage is shown at night
+map_region: .res 1          ; map region the races are in (0 FUKUOKA .. 6 TOKYO)
 
 ; ---------------------------------------------------------------------------
 .include "header.s"
@@ -145,6 +146,9 @@ cheat_debug:     .byte 0        ; $FFC2  non-zero: SELECT in the garage = debug 
 
 .segment "BANK5"
 .include "password.s"
+
+.segment "BANK6"
+.include "map.s"
 
 ; ---------------------------------------------------------------------------
 ; Reset stubs: identical in every bank so the console boots no matter which

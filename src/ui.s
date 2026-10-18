@@ -275,6 +275,43 @@ paint_list:
         .byte $16, $06, $26, $27, $17, $28, $38, $2A, $1A, $0A, $2C, $1C
         .byte $21, $11, $12, $02, $13, $14, $24, $07, $00, $10, $30, $2D
 
+; ---------------------------------------------------------------------------
+; World map regions (see map.s).  Each one opens at a level; rivals there
+; are tougher and pay more.
+; ---------------------------------------------------------------------------
+region_lv:  .byte 1, 2, 4, 6, 8, 11, 14         ; level that opens each region
+
+; region_max: A = the last region open at the player's level
+region_max:
+        ldx #NREGIONS-1
+@l:     lda SV_LEVEL
+        cmp region_lv,x
+        bcs @d
+        dex
+        bne @l
+@d:     txa
+        rts
+
+; region_name_ptr: A = region -> ptr0 = its name
+region_name_ptr:
+        asl a
+        tax
+        lda region_names,x
+        sta ptr0
+        lda region_names+1,x
+        sta ptr0+1
+        rts
+
+region_names:
+        .word str_rg0, str_rg1, str_rg2, str_rg3, str_rg4, str_rg5, str_rg6
+str_rg0:    .byte "FUKUOKA", 0
+str_rg1:    .byte "HIROSHIMA", 0
+str_rg2:    .byte "OSAKA", 0
+str_rg3:    .byte "NAGOYA", 0
+str_rg4:    .byte "GUNMA", 0
+str_rg5:    .byte "SAPPORO", 0
+str_rg6:    .byte "TOKYO", 0
+
 str_gems:   .byte "GEMS", 0
 str_lv:     .byte "LV", 0
 

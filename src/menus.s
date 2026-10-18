@@ -249,8 +249,11 @@ garage_jump:
         .word g_race-1, g_parts-1, g_mycars-1, g_tune-1, g_dealer-1
         .word g_paint-1, g_crates-1, g_dyno-1, g_options-1, g_stats-1
 
-g_race: jsr race_select
-        bcs :+
+g_race: FARCALL BANK_MAP, map_screen    ; pick a region first
+        cmp #0
+        bne :+
+        jsr race_select         ; B: back to the map
+        bcs g_race
         lda #MODE_RACE
         sta next_mode
         rts
@@ -471,7 +474,17 @@ race_select:
         lda #0
         jsr screen_begin
         jsr use_menu_palette
-        MOVI16 ptr0, str_rsel
+        MOVI16 ptr0, str_rs_in  ; "RACE: OSAKA"
+        ldy #0
+        jsr cat_ptr0
+        sty tmp7
+        lda map_region
+        jsr region_name_ptr
+        ldy tmp7
+        jsr cat_ptr0
+        lda #0
+        sta linebuf,y
+        MOVI16 ptr0, linebuf
         jsr draw_header
         PRINT str_rs0, 4, 4
         PRINT str_rs1, 4, 6
@@ -583,6 +596,9 @@ race_select:
 @pick:  lda ui_sel
         cmp #7
         beq @back
+        jsr rs_locked           ; a boss above the player's level
+        jcs @lock
+        lda ui_sel
         cmp #2
         beq :+                  ; distance row: nothing to start
         jsr rev_play            ; picking a race revs the engine
@@ -627,8 +643,10 @@ race_select:
 :       jsr setup_test
         clc
         rts
+@lock:  jsr lock_line
+        jmp @msg
 @poor:  MOVI16 ptr0, str_poor
-        lda #28
+@msg:   lda #28
         jsr pad_ptr0
         ldx #2
         ldy #26
@@ -696,7 +714,12 @@ rs_refresh:
         bne @n0
         ; ladder: next boss
         jsr boss_index
+        jsr boss_open
+        bcc @lk
+        jsr boss_index
         jsr boss_line
+        jmp @show
+@lk:    jsr lock_line
         jmp @show
 @n0:    cmp #5
         bne :+
@@ -724,6 +747,9 @@ rs_refresh:
         jmp @show
 @n1:    cmp #8
         bne @n2
+        lda #BOSS_SECRET
+        jsr boss_open
+        bcc @lk
         MOVI16 ptr0, str_i6b
         jmp @show
 @n2:    MOVI16 ptr0, str_blank
@@ -739,7 +765,55 @@ has_zenith:
         cmp #CRATE_CAR
         rts
 
+; rs_locked: carry set if the race-select row picked is a boss the player's
+; level doesn't allow yet (tmp6 = the level needed)
+rs_locked:
+        lda ui_sel
+        bne :+
+        jsr boss_index
+        jmp @chk
+:       cmp #8
+        bne @open
+        lda #BOSS_SECRET
+@chk:   jsr boss_open
+        bcc @shut
+@open:  clc
+        rts
+@shut:  sec
+        rts
+
+; boss_open: A = boss -> carry set if the player's level allows the race,
+; tmp6 = the level needed (the level that opens the boss's home region)
+boss_open:
+        tax
+        ldy boss_home,x
+        lda region_lv,y
+        sta tmp6
+        lda SV_LEVEL
+        cmp tmp6
+        rts
+
+; lock_line: ptr0 = "LOCKED: REACH LEVEL 11" for tmp6
+lock_line:
+        MOVI16 ptr0, str_locked
+        ldy #0
+        jsr cat_ptr0
+        sty tmp7
+        lda tmp6
+        sta m_a
+        lda #0
+        sta m_a+1
+        jsr num_text
+        ldy tmp7
+        jsr cat_ptr0
+        lda #0
+        sta linebuf,y
+        MOVI16 ptr0, linebuf
+        rts
+
 str_rsel:   .byte "RACE", 0
+str_rs_in:  .byte "RACE: ", 0
+str_locked: .byte "LOCKED: REACH LEVEL ", 0
 str_rs0:    .byte "LADDER BOSS", 0
 str_rs1:    .byte "QUICK RACE", 0
 str_rs2:    .byte "DISTANCE", 0
@@ -767,7 +841,7 @@ traf_names: .word str_traf, str_notraf
 str_traf:   .byte "< TRAFFIC >", 0
 str_notraf: .byte "< NO CARS >", 0
 rs_info:    .word str_i0, str_i1, str_i2, str_i3, str_i4, str_i7, str_i8, str_i5, str_i6
-str_i0:     .byte "BEAT THE 10 STREET BOSSES", 0
+str_i0:     .byte "BEAT THE 11 STREET BOSSES", 0
 str_i1:     .byte "RANDOM RIVAL, WIN THE BET", 0
 str_i2:     .byte "LEFT/RIGHT: RACE LENGTH", 0
 str_i3:     .byte "1/2 MILE WITH TRAFFIC", 0
@@ -789,9 +863,22 @@ calc_bet:
         sta m_a+1
         lda #0
         sta m_a+2
-        rts
+        ldy map_region              ; x1, x1.5, x2 ... x4 across the map
+        beq @d
+@l:     clc
+        lda m_a
+        adc bet_half_lo,x
+        sta m_a
+        lda m_a+1
+        adc bet_half_hi,x
+        sta m_a+1
+        dey
+        bne @l
+@d:     rts
 bet_lo: .byte <300, <1000, <2500
 bet_hi: .byte >300, >1000, >2500
+bet_half_lo: .byte <150, <500, <1250
+bet_half_hi: .byte >150, >500, >1250
 
 ; ---------------------------------------------------------------------------
 ; Ladder bosses (all names made up)
@@ -800,6 +887,7 @@ NBOSS = 11                      ; ladder bosses
 BOSS_SECRET = 11                ; the hidden 12th boss (table index)
 boss_model: .byte 0, 1, 2, 4, 3, 5, 6, 7, 8, 9, 11, CRATE_CAR
 boss_level: .byte 0, 1, 1, 1, 2, 3, 3, 3, 4, 4, 4, 4
+boss_home:  .byte 0, 0, 1, 1, 2, 2, 3, 4, 5, 6, 6, 6       ; map region (sets the level needed)
 boss_paint: .byte $2A, $11, $30, $14, $12, $28, $07, $3C, $0F, $00, $25, $13
 boss_skill: .byte 40, 70, 90, 110, 130, 150, 170, 190, 210, 230, 250, 255
 boss_cash0: .byte <800, <1500, <2500, <4000, <6000, <9000, <12000, <18000, <26000, <40000, <(100000 & $FFFF), <(500000 & $FFFF)
@@ -840,8 +928,10 @@ boss_intro:
         lda bi_boss
         cmp #BOSS_SECRET
         bne :+
-        PRINT str_bi_secret, 2, 4
-        jmp @name
+        MOVI16 ptr0, str_bi_secret
+        ldy #0
+        jsr cat_ptr0
+        jmp @home
 :       ldy #0
 :       lda str_bi_boss,y
         beq :+
@@ -865,11 +955,21 @@ boss_intro:
         ldx #0
 :       lda str_bi_of,x
         sta linebuf,y
-        beq :+
+        beq @home
         iny
         inx
         bne :-
-:       MOVI16 ptr0, linebuf
+@home:  MOVI16 ptr0, str_bi_from    ; "BOSS 3 OF 11 - HIROSHIMA"
+        jsr cat_ptr0
+        sty tmp7
+        ldx bi_boss
+        lda boss_home,x
+        jsr region_name_ptr
+        ldy tmp7
+        jsr cat_ptr0
+        lda #0
+        sta linebuf,y
+        MOVI16 ptr0, linebuf
         ldx #2
         ldy #4
         jsr print
@@ -990,6 +1090,7 @@ boss_intro:
 
 str_bi_boss:   .byte "BOSS ", 0
 str_bi_of:     .byte " OF 11", 0
+str_bi_from:   .byte " - ", 0
 str_bi_secret: .byte "SECRET BOSS", 0
 str_bi_prize:  .byte "WIN ", 0
 str_bi_help:   .byte "A:RACE  B:BACK", 0
@@ -1327,6 +1428,10 @@ set_dist:
         sta race_dist+1
         rts
 
+.segment "BSS"
+mr_parts:   .res 1          ; rival's part level
+.segment "BANK1"
+
 ; make_rival: random opponent near the player's car for race_diff
 make_rival:
         jsr cur_car_ptr
@@ -1357,16 +1462,24 @@ make_rival:
         sbc #1
         bpl :+
         lda #0
-:       cmp #5
+:       sta tmp6                ; later regions: better tuned cars
+        lda map_region
+        lsr a
+        clc
+        adc tmp6
+        cmp #5
         bcc :+
         lda #4
-:       sta tmp6
+:       sta mr_parts            ; (rand_below uses tmp6)
         ; model: player model + rand(-1..1) + (diff - 1)
         lda #3
         jsr rand_below
         clc
         adc tmp7
         adc race_diff
+        ldx map_region              ; and faster models
+        clc
+        adc rg_model,x
         sec
         sbc #2
         bpl :+
@@ -1375,6 +1488,8 @@ make_rival:
         bcc :+
         lda #NDEALER-2
 :       pha
+        ldx mr_parts
+        stx tmp6
         jsr opp_from_model
         ; random paint from the paint list
         lda #NPAINTS
@@ -1398,12 +1513,24 @@ make_rival:
         adc #>rival_names
         sta ptr0+1
         jsr copy_opp_name
+        lda map_region              ; and sharper drivers
+        asl a
+        asl a
+        asl a
+        sta tmp5
         ldx race_diff
         lda diff_skill,x
-        sta opp_skill
+        clc
+        adc tmp5
+        bcs :+
+        cmp #251
+        bcc :++
+:       lda #250
+:       sta opp_skill
         rts
 
 diff_skill: .byte 60, 140, 215
+rg_model:   .byte 0, 0, 1, 1, 1, 2, 2
 NRIVALS = 12
 rival_names:
         .byte "ACE         ", 0
@@ -2091,6 +2218,8 @@ str_full:     .byte "GARAGE FULL - SELL A CAR", 0
 rw_cash:    .res 3
 rw_xp:      .res 2
 rw_lvup:    .res 1
+rw_newreg:  .res 1          ; region + 1 when this race's XP opened one
+rw_reg0:    .res 1
 rw_best:    .res 1
 .segment "BANK1"
 
@@ -2256,9 +2385,27 @@ results_main:
         lda #$20
         sta text_attr
         PRINT str_r_lvup, 4, 22
+        lda rw_newreg
+        beq :+
+        MOVI16 ptr0, str_r_newreg   ; "NEW REGION: OSAKA"
+        ldy #0
+        jsr cat_ptr0
+        sty tmp7
+        ldx rw_newreg
+        dex
+        txa
+        jsr region_name_ptr
+        ldy tmp7
+        jsr cat_ptr0
         lda #0
+        sta linebuf,y
+        MOVI16 ptr0, linebuf
+        ldx #4
+        ldy #24
+        jsr print
+:       lda #0
         sta text_attr
-:       lda rw_best
+        lda rw_best
         beq @help
         PRINT str_r_best, 4, 23
 @help:  PRINT str_r_help, 2, 26
@@ -2398,6 +2545,7 @@ speed_unit:
 ; apply_rewards: money, xp, best time, ladder progress, stats; then save
 apply_rewards:
         lda #0
+        sta rw_newreg
         sta rw_cash
         sta rw_cash+1
         sta rw_cash+2
@@ -2519,6 +2667,7 @@ apply_rewards:
         sta rw_cash+1
         lda race_bet+2
         sta rw_cash+2
+        jsr region_xp
         jmp @pay
 @street:
         ; street: 1200 + 600 * rival tier
@@ -2541,9 +2690,30 @@ apply_rewards:
         sta rw_cash+1
         lda #0
         sta rw_cash+2
-        inc SV_STREET
+        lda rw_cash+1           ; x1, x1.5, x2 ... x4 across the map:
+        lsr a                   ; add half the prize once per region
+        sta m_r+1
+        lda rw_cash
+        ror a
+        sta m_r
+        ldx map_region
+        beq @sx
+@sr:    clc
+        lda rw_cash
+        adc m_r
+        sta rw_cash
+        lda rw_cash+1
+        adc m_r+1
+        sta rw_cash+1
+        lda rw_cash+2
+        adc #0
+        sta rw_cash+2
+        dex
+        bne @sr
+@sx:    inc SV_STREET
         lda #120
         sta rw_xp
+        jsr region_xp
         jmp @pay
 @secret:
         ; hidden boss: $500,000, 300 xp, 25 gems the first time
@@ -2575,7 +2745,9 @@ apply_rewards:
         lda rw_cash+2
         sta m_a+2
         jsr cash_add
-@xp:    lda rw_xp
+@xp:    jsr region_max
+        sta rw_reg0
+        lda rw_xp
         sta m_a
         lda rw_xp+1
         sta m_a+1
@@ -2583,7 +2755,27 @@ apply_rewards:
         lda #0
         rol a
         sta rw_lvup
-        jmp save_write
+        jsr region_max          ; a new region on the map?
+        cmp rw_reg0
+        beq :+
+        tax
+        inx
+        stx rw_newreg
+:       jmp save_write
+
+; region_xp: rw_xp += 10 per region (quick and street wins)
+region_xp:
+        ldx map_region
+        beq @d
+@l:     clc
+        lda rw_xp
+        adc #10
+        sta rw_xp
+        bcc :+
+        inc rw_xp+1
+:       dex
+        bne @l
+@d:     rts
 
 str_results:  .byte "RESULTS", 0
 str_r_win:    .byte "YOU WIN!", 0
@@ -2602,6 +2794,7 @@ str_r_opp:    .byte "RIVAL", 0
 str_r_cash:   .byte "CASH", 0
 str_r_xp:     .byte "XP", 0
 str_r_lvup:   .byte "LEVEL UP! BONUS GEMS", 0
+str_r_newreg: .byte "NEW REGION: ", 0
 str_r_best:   .byte "NEW PERSONAL BEST!", 0
 str_r_help:   .byte "A:GARAGE", 0
 str_r_help2:  .byte "START:RACE AGAIN", 0

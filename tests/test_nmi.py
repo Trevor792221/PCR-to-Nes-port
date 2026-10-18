@@ -68,6 +68,8 @@ class NMIBudget(unittest.TestCase):
         s.garage_goto(0)
         s.press(A)
         s.step(30)
+        s.press(A)                  # the map
+        s.step(30)
         s.list_goto('rs_sel', 6)
         s.press(A)
         worst, f, gears = 0, 0, set()
@@ -100,6 +102,8 @@ class NMIBudget(unittest.TestCase):
         s.step(40)
         s.garage_goto(0)
         s.press(A)
+        s.step(30)
+        s.press(A)                  # the map
         s.step(30)
         s.list_goto('rs_sel', 3)
         s.press(A)

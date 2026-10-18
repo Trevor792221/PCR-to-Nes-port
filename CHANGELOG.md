@@ -3,6 +3,14 @@
 Every version of Pixel Racer NES, newest first. Downloads are on the
 [Releases page](https://github.com/Trevor792221/PCR-to-Nes-port/releases).
 
+## v4.0: World map of Japan (2026-10-18)
+
+* RACE now opens a map of Japan. Pick the region you race in: Fukuoka, Hiroshima, Osaka, Nagoya, Gunma, Sapporo and Tokyo open at levels 1, 2, 4, 6, 8, 11 and 14.
+* Later regions have tougher quick and street rivals (better-tuned and faster cars, sharper drivers). They also pay more: bets and street prizes scale from x1 up to x4 in Tokyo, and wins give extra XP.
+* Every ladder boss now comes from a region and needs the level that opens it. The boss intro shows where they're from, and race select shows the level you need.
+* The results screen tells you when a race opens a new region. Entering a password puts you on the furthest region you've opened.
+* Fixed quick and street rivals always having every part at level 3, whatever the difficulty. They now match your car and the difficulty, as intended.
+
 ## v3.9: Player 2 HUD and a shift marker (2026-10-17)
 
 * 2 PLAYER races now show a full HUD for both players: each gets a rev counter with its own red zone, gear, speed and nitrous bar, with the race clock in the middle.

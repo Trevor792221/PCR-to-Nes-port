@@ -24,6 +24,7 @@ runs on real NES / Famicom hardware or any accurate emulator.
 ![Splash](docs/splash.png) ![Title](docs/title.png) ![Garage](docs/garage.png)
 ![Race](docs/race.png) ![Dyno](docs/dyno.png)
 ![Parts](docs/parts.png) ![Tune](docs/tune.png) ![Stats](docs/stats.png)
+![World map](docs/map.png)
 
 ## What carried over from the Android game
 
@@ -41,8 +42,9 @@ runs on real NES / Famicom hardware or any accurate emulator.
 | Launch / wheelspin | Clutch-dump launch model: too many revs spin the tires (with smoke), too few bog the engine |
 | Street racing | Half-mile street race on 3 lanes with traffic. Change lanes to dodge cars; crashing costs you your speed. Traffic is a mix of sedans, hatchbacks, pickups, minivans and box trucks, each with its own speed range (trucks crawl, hatchbacks nip along). Traffic colours change from race to race, and cruise traffic comes in two colours at once |
 | Race scenery | Every race picks one of three backgrounds at random: **day** (pale sky, clouds, grey city), **sunset** (purple-to-orange sky, low sun, black skyline) or **night** (navy sky, moon, lit windows) |
-| Story / ladder progression | Ladder of 10 street bosses, plus a final "Legend" boss. A hidden 12th boss, **Eclipse**, appears in race select only while you drive the Zenith X400. Beating it pays $500,000 and, the first time, 25 gems. Before every boss race an intro screen shows the boss, their car in its colours with its HP, a short bio and the prize; B backs out. The intro plays its own theme, "Showdown" |
-| Quick races with bets | Random rival on Easy, Medium or Hard, betting $300, $1,000 or $2,500 |
+| World map | Garage → RACE opens a map of **Japan**: pick the region you race in. Seven regions open as you level up: Fukuoka (level 1), Hiroshima (2), Osaka (4), Nagoya (6), Gunma (8), Sapporo (11) and Tokyo (14). Quick and street rivals in later regions drive better-tuned, faster cars and react quicker, and they pay more: bets and street prizes go from x1 in Fukuoka up to x4 in Tokyo, and wins give +10 XP per region. The results screen says when a race opens a new region. The coastline is drawn from [Natural Earth](https://www.naturalearthdata.com/) data (public domain) |
+| Story / ladder progression | Ladder of 10 street bosses, plus a final "Legend" boss. Every boss comes from a region on the map and needs the level that opens it (bosses 1-2 Fukuoka, 3-4 Hiroshima, 5-6 Osaka, 7 Nagoya, 8 Gunma, 9 Sapporo, 10-11 and Eclipse Tokyo). A hidden 12th boss, **Eclipse**, appears in race select only while you drive the Zenith X400. Beating it pays $500,000 and, the first time, 25 gems. Before every boss race an intro screen shows the boss, their car in its colours with its HP, a short bio and the prize; B backs out. The intro plays its own theme, "Showdown" |
+| Quick races with bets | Random rival on Easy, Medium or Hard, betting $300, $1,000 or $2,500 (more in later map regions) |
 | Free roam | **Cruise**: endless driving on the 3-lane road, no rival and no finish line. Press Left/Right on CRUISE to turn traffic on or off. Nitrous is unlimited: the bottle refills as soon as a shot ends. START pauses, then SELECT returns to the garage |
 | Multiplayer | **2 PLAYER** in race select: a head-to-head drag race on one console. Player 2 uses controller 2 with the same buttons (A gas, Right launch/shift up, Left shift down, B nitrous) and drives any car from your garage (Left/Right on the 2 PLAYER row picks it). Distance follows the DISTANCE setting. Either player can foul by launching early. The HUD splits in two: each player has a rev counter, gear, speed and nitrous bar, with the clock in the middle. The camera keeps both cars on screen until the leader is far ahead. No money, XP or stats are at stake. Online play from the Android game isn't possible on an NES |
 | Practice / test runs | Solo test run with elapsed time, trap speed, reaction time and 0-60 time. The best 1/4-mile time is kept per car |
@@ -141,6 +143,7 @@ physics runs at 50 Hz.
 | 3 | Parts, tune, paint, crates, dyno, options |
 | 4 | Race scenery (day, sunset, night) and the boot splash screen |
 | 5 | Passwords (encode, decode, entry and display screens) |
+| 6 | World map (Japan tiles, nametable, region screen) |
 | 7 (fixed) | Reset/NMI, PPU helpers, math, physics, sound, game state, car data |
 
 ### Label art
@@ -230,7 +233,7 @@ bleed edge to the edge of the label recess.
 
 ```
 src/        6502 source (main.s includes everything)
-tools/      graphics (mkchr.py, art.py), data (gamedata.py, mkdata.py), music (mkmusic.py)
+tools/      graphics (mkchr.py, art.py, mkmap.py), data (gamedata.py, mkdata.py), music (mkmusic.py)
 cfg/        ld65 memory map
 tests/      emulator test suites
 docs/       screenshots

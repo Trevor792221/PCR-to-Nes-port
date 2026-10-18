@@ -59,6 +59,8 @@ BANK_RACE  = 2
 BANK_MENU2 = 3
 BANK_SCENE = 4                  ; race background themes
 BANK_PW    = 5                  ; passwords
+BANK_MAP   = 6                  ; world map
+NREGIONS   = 7                  ; map regions (FUKUOKA .. TOKYO)
 
 ; --- game modes (index into mode table in main.s) ----------------------------
 MODE_TITLE   = 0

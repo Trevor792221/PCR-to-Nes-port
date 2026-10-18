@@ -800,6 +800,8 @@ pw_apply:
         bne @slot
         lda PW_CUR
         sta SV_CURCAR
+        jsr region_max          ; back on the map at the furthest open region
+        sta map_region
         jmp save_write
 
 ; ---------------------------------------------------------------------------

@@ -97,6 +97,8 @@ class Features(unittest.TestCase):
         s.garage_goto(G_RACE)
         s.press(A)
         s.step(30)
+        s.press(A)                  # the map: race in the region shown
+        s.step(30)
         return s.mem('ui_count')
 
     def test_secret_boss_hidden_without_zenith(self):
@@ -106,6 +108,7 @@ class Features(unittest.TestCase):
     def test_secret_boss_race_and_reward(self):
         s = new_game()
         give_car(s, 0, 12, 4)
+        s.nes[0x600B] = 14                           # level for Tokyo, the boss's home
         self.assertEqual(self.race_select_count(s), 9)
         s.list_goto('rs_sel', 8)
         s.press(A)
@@ -198,6 +201,8 @@ class Features(unittest.TestCase):
         s.garage_goto(G_RACE)
         s.press(A)
         s.step(30)
+        s.press(A)                  # the map: race in the region shown
+        s.step(30)
         s.list_goto('rs_sel', 5)
         s.press(A)
         s.step(40)
@@ -230,6 +235,8 @@ class Features(unittest.TestCase):
         s.garage_goto(G_RACE)
         s.press(A)
         s.step(30)
+        s.press(A)                  # the map: race in the region shown
+        s.step(30)
         s.list_goto('rs_sel', 5)
         s.press(A)
         s.step(40)
@@ -253,6 +260,8 @@ class Features(unittest.TestCase):
         s.garage_goto(G_RACE)
         s.press(A)
         s.step(30)
+        s.press(A)                  # the map: race in the region shown
+        s.step(30)
         s.list_goto('rs_sel', 5)
         s.press(RIGHT)                               # traffic off
         s.step(5)
@@ -274,6 +283,8 @@ class Features(unittest.TestCase):
         s = new_game()
         s.garage_goto(G_RACE)
         s.press(A)
+        s.step(30)
+        s.press(A)                  # the map: race in the region shown
         s.step(30)
         s.list_goto('rs_sel', 5)
         s.press(A)
@@ -299,6 +310,8 @@ class Features(unittest.TestCase):
         s = new_game()
         s.garage_goto(G_RACE)
         s.press(A)
+        s.step(30)
+        s.press(A)                  # the map: race in the region shown
         s.step(30)
         s.list_goto('rs_sel', 2)
         s.press(LEFT)                                # 1/4 -> 1 mile
@@ -356,6 +369,8 @@ class Features(unittest.TestCase):
         s.garage_goto(G_RACE)
         s.press(A)
         s.step(30)
+        s.press(A)                  # the map: race in the region shown
+        s.step(30)
         s.press(A)                                   # LADDER BOSS
         s.step(45)
         self.assertEqual(s.mem('bi_boss'), 0)
@@ -396,6 +411,8 @@ class Features(unittest.TestCase):
     def start_two(self, s, p2_next=0):
         s.garage_goto(G_RACE)
         s.press(A)
+        s.step(30)
+        s.press(A)                  # the map: race in the region shown
         s.step(30)
         s.list_goto('rs_sel', 6)
         for _ in range(p2_next):
@@ -448,6 +465,8 @@ class Features(unittest.TestCase):
         s = new_game()
         s.garage_goto(G_RACE)
         s.press(A)
+        s.step(30)
+        s.press(A)                  # the map: race in the region shown
         s.step(30)
         s.press(A)                                   # boss intro: boss theme
         s.step(60)
