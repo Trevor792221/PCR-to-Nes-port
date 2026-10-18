@@ -65,10 +65,12 @@ class Features(unittest.TestCase):
         self.assertEqual(s.wram(SV_CASH, 3), CASH_MAX)
 
     # --- secret boss ----------------------------------------------------------
-    def race_select_count(self, s):
+    def race_select_count(self, s, region=None):
         s.garage_goto(G_RACE)
         s.press(A)
         s.step(30)
+        if region is not None:
+            s.list_goto('ui_sel', region)
         s.press(A)                  # the map: race in the region shown
         s.step(30)
         return s.mem('ui_count')
@@ -77,11 +79,22 @@ class Features(unittest.TestCase):
         s = new_game()
         self.assertEqual(self.race_select_count(s), 8)
 
+    def test_secret_boss_only_in_tokyo(self):
+        s = new_game()
+        give_car(s, 0, 12, 4)
+        s.nes[0x600B] = 14
+        for region, rows in ((2, 8), (5, 8), (6, 9)):
+            self.assertEqual(self.race_select_count(s, region), rows, 'region %d' % region)
+            s.press(B)                               # race select -> map
+            s.step(40)
+            s.press(B)                               # map -> garage
+            s.step(60)
+
     def test_secret_boss_race_and_reward(self):
         s = new_game()
         give_car(s, 0, 12, 4)
         s.nes[0x600B] = 14                           # level for Tokyo, the boss's home
-        self.assertEqual(self.race_select_count(s), 9)
+        self.assertEqual(self.race_select_count(s, 6), 9)
         s.list_goto('rs_sel', 8)
         s.press(A)
         s.step(45)

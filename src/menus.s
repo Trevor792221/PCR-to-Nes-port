@@ -318,6 +318,7 @@ garage_draw:
         MOVI16 ptr0, str_garage
         jsr draw_header
         jsr draw_showroom
+        jsr draw_wheelie_bg
         ; car info
         jsr cur_car_ptr
         jsr car_name_ptr
@@ -425,6 +426,43 @@ best_line:
 :       MOVI16 ptr0, linebuf
         rts
 
+; draw_wheelie_bg: wheelie bars behind the showroom car, drawn into the
+; backdrop (PPU off).  The car is 8 sprites wide: sprites next to it would
+; go over the 8-per-line limit.  Tiles from tools/mkchr.py.
+draw_wheelie_bg:
+        jsr cur_car_ptr
+        jsr has_wheelie
+        beq @r
+        lda #0
+        sta tmp7                ; row 0-2: nametable rows 9-11, columns 10-12
+@row:   ldx tmp7
+        lda wb_nt,x
+        tax
+        lda #>($2000 + 9*32)
+        jsr vram_addr
+        lda tmp7                ; Y = row * 3
+        asl a
+        adc tmp7
+        tay
+        lda #3
+        sta tmp6
+@t:     lda wb_day,y
+        ldx garage_night
+        beq :+
+        lda wb_night,y
+:       sta PPUDATA
+        iny
+        dec tmp6
+        bne @t
+        inc tmp7
+        lda tmp7
+        cmp #3
+        bne @row
+@r:     rts
+wb_nt:      .byte <($2000 + 9*32 + 10), <($2000 + 10*32 + 10), <($2000 + 11*32 + 10)
+wb_day:     .byte T_WBAR_DAY_MAP
+wb_night:   .byte T_WBAR_NIGHT_MAP
+
 ; draw_showroom: wall rows 4-10, floor rows 11-12 (PPU off)
 draw_showroom:
         jmp draw_garage_bg
@@ -497,7 +535,10 @@ race_select:
         jsr mp_check
         lda #8
         sta ui_count
-        jsr has_zenith
+        jsr has_zenith          ; Eclipse: an X400, and only in Tokyo
+        bne :+
+        lda map_region
+        cmp #NREGIONS-1
         bne :+
         lda #$20
         sta text_attr

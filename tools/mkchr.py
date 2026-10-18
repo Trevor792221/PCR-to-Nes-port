@@ -299,7 +299,33 @@ def big_letter(ch):
     return [''.join(r) for r in pix]
 
 
-def build_garage(ts, night=False):
+WBAR = ['........', '........', '........', '.1111111', '.1......', '111.....', '131.....', '111.....']
+FLOOR_A_ROWS = ['33333333', '22222222', '22222222', '22222222', '11111111', '11111111', '11111111', '11111111']
+WB_COL, WB_ROW = 10, 9           # garage: 3x3 tiles behind the showroom car's rear
+
+
+def garage_wheelie(pix, ts):
+    """The garage tiles under the 2x wheelie bars (16x16 at x 84, screen y
+    76, 12 pixels behind the showroom car) with the bars drawn in black.
+    The showroom car is 8 sprites wide, so the bars can't be sprites there."""
+    big = [''.join(c * 2 for c in r) for r in WBAR for _ in (0, 1)]
+    out = []
+    for ty in range(3):
+        for tx in range(3):
+            rows = []
+            for y in range(8):
+                py = (WB_ROW - 4 + ty) * 8 + y               # garage rows start at 4
+                row = list(pix[py][(WB_COL + tx) * 8:(WB_COL + tx) * 8 + 8])
+                for x in range(8):
+                    bx, by = (WB_COL + tx) * 8 + x - 84, py + 32 - 76
+                    if 0 <= bx < 16 and 0 <= by < 16 and big[by][bx] == '1':
+                        row[x] = '0'
+                rows.append(''.join(row))
+            out.append(ts.add(tile(rows)))
+    return out
+
+
+def build_garage(ts, night=False):  # noqa: C901
     """Garage backdrop behind the showroom car: nametable rows 4-12.
     night=True: the roll-up door is open on a night sky (moon, stars, a lit
     skyline) drawn in palette 1; the night colours are set in code.
@@ -399,14 +425,17 @@ def build_garage(ts, night=False):
             for x in range(cx - 2, cx + 3):
                 pix[y][x] = '0'
     # --- floor (rows 11-12): same tiles as before
+    floor_a = tile(['33333333', '22222222', '22222222', '22222222', '11111111', '11111111', '11111111', '11111111'])
+    under = [list(r) for r in pix[:56]] + [list(r * 32) for r in FLOOR_A_ROWS]  # row 11 is floor
+    wheelie = garage_wheelie(under, ts)
     rows = [''.join(r) for r in pix]
     gmap = []
     for ty in range(7):
         for tx in range(32):
             gmap.append(ts.add(tile([rows[ty * 8 + y][tx * 8:tx * 8 + 8] for y in range(8)])))
-    floor_a = tile(['33333333', '22222222', '22222222', '22222222', '11111111', '11111111', '11111111', '11111111'])
     floor_b = tile(['11111111', '11111111', '11111111', '11111111', '22222222', '22222222', '22222222', '22222222'])
     gmap += [ts.add(floor_a)] * 32 + [ts.add(floor_b)] * 32
+    build_garage.wheelie[night] = wheelie
     # palettes per 16x16 block: block rows 2..6 (nametable rows 4-13)
     attr = []
     for by in range(5):
@@ -420,6 +449,9 @@ def build_garage(ts, night=False):
             else:
                 attr.append(3)
     return bytes(gmap), bytes(attr)
+
+
+build_garage.wheelie = {}
 
 
 def _night_door(pix):
@@ -479,6 +511,8 @@ def build_menu():
     gmap, gattr = build_garage(ts)
     specials['GARAGE'] = (gmap, gattr)
     specials['GARAGE_NIGHT'] = build_garage(ts, night=True)
+    specials['WBAR_DAY'] = build_garage.wheelie[False]
+    specials['WBAR_NIGHT'] = build_garage.wheelie[True]
     # crate 4x4 (32x32)
     crate = [
         '11111111111111111111111111111111',
@@ -539,6 +573,9 @@ def build_sprites():
     t[0x0D] = tile(['33......'] * 8)                                        # perfect-shift mark on the tach
     t[0x0E] = tile(['........', '..1111..', '.122221.', '.122221.', '.122221.', '.122221.', '..1111..', '........'])  # map: open city
     t[0x0F] = tile(['........', '..1111..', '.133331.', '.131131.', '.131131.', '.133331.', '..1111..', '........'])  # map: locked city
+    # wheelie bars: a strut from the rear bumper to a small wheel, next to
+    # the car's lower half (colours 1 outline, 3 rims)
+    t[0x28] = tile(WBAR)
     return b''.join(t)
 
 

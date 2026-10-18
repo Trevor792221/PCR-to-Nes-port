@@ -168,6 +168,14 @@ class Tune(unittest.TestCase):
         s.step(20)
         self.assertEqual(s.wram(SV_CARS + CR_PARTS + P_WHEELIE), 0, 'FWD: no wheelie bars')
 
+    def test_wheelie_bar_graphics(self):
+        oam = lambda s: [(s.nes[0x200 + i + 1], s.nes[0x200 + i + 2]) for i in range(0, 256, 4)]
+        for model, bars, shown in ((8, 2, True), (8, 0, False), (1, 3, False)):  # RWD; FWD
+            s = car_with(model, wheelie=bars)
+            start_race(s, 4)
+            s.step(30)
+            self.assertEqual((0x28, 1) in oam(s), shown, 'model %d bars %d' % (model, bars))
+
     def test_a_safe_tune_makes_more_power(self):
         s = car_with(9, turbo=3, icool=3, inject=3, ecu=2)
         open_tune(s)

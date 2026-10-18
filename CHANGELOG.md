@@ -3,6 +3,11 @@
 Every version of Pixel Racer NES, newest first. Downloads are on the
 [Releases page](https://github.com/Trevor792221/PCR-to-Nes-port/releases).
 
+## v4.4: Eclipse in Tokyo, visible wheelie bars (2026-10-18)
+
+* The secret boss Eclipse now only shows up in race select in the Tokyo region (still only while you drive the Zenith X400).
+* Wheelie bars now show on the car: a bar behind the rear wheel with a small wheel at the end, in races and in the garage showroom. Rivals with wheelie bars show them too.
+
 ## v4.3: Tunes in a password (2026-10-18)
 
 * Tuned cars now get a third password, **PASSWORD 3: TUNES**. It holds each tuned car's fuel map, ignition timing, boost, tire pressure, 2-step and gear ratios. OPTIONS → PASSWORD shows it: press A on the first page.

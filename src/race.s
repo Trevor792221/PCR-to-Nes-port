@@ -49,6 +49,7 @@ ai_launch:  .res 2
 ai_shift:   .res 2
 ai_react:   .res 1
 car_y:      .res 2          ; sprite y of each car
+wb_on:      .res 2          ; 1: draw wheelie bars on this car
 car_lane:   .res 2          ; target lane
 flame_t:    .res 2
 crash_t:    .res 2
@@ -226,6 +227,12 @@ race_setup:
         lda car_shape,x
         ldx #$1C
         jsr load_car_chr
+        jsr cur_car_ptr         ; who has wheelie bars to draw
+        jsr has_wheelie
+        sta wb_on
+        MOVI16 ptr1, opp_rec
+        jsr has_wheelie
+        sta wb_on+1
         ; traffic vehicles: sprite tiles $40, $4C, $58, $64, $70
         ldx #NTRTYPE-1
 :       stx tmp7
@@ -2539,6 +2546,8 @@ spr_cars:
         sta tmp1
         jsr draw_car_s
         ldx #0
+        jsr wb_sprite
+        ldx #0
         jsr car_fx
 @opp:   lda rc_opp
         beq @r
@@ -2570,8 +2579,34 @@ spr_cars:
         sta tmp1
         jsr draw_car_s
         ldx #1
+        jsr wb_sprite
+        ldx #1
         jsr car_fx
 @r:     rts
+
+; wb_sprite: wheelie bars behind car X's rear wheel, if it has them.
+; sx_l/sx_h = car x (from draw_car_s), car_y,x = y.
+wb_sprite:
+        lda wb_on,x
+        beq @r
+        sec                     ; 6 left of the car: the bar meets the bumper
+        lda sx_l
+        sbc #6
+        sta sp_x
+        lda sx_h
+        sbc #0
+        bne @r                  ; off screen
+        lda car_y,x
+        clc
+        adc #8
+        sta sp_y
+        lda wb_attr,x
+        sta sp_attr
+        lda #T_WBAR
+        sta sp_tile
+        jmp spr_add
+@r:     rts
+wb_attr:    .byte 1, 2          ; each car's lower-half palette
 
 ; wheel_frame: X = car -> A = 0/1
 wheel_frame:
