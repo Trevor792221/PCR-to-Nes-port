@@ -1393,34 +1393,27 @@ dyno_screen:
         sta tmp3
         lda #3
         jsr attr_rect
+        ; the key, left of the graph: HP with an orange swatch, TQ below
+        ; it with a blue one (the curves' colours)
         PRINT str_dy_hp, 3, 8
-        PRINT str_dy_tq, 25, 8
-        ; a key: an orange swatch by HP, a blue one by TQ (the curves' colours)
+        PRINT str_dy_tq, 3, 10
         lda #>($2000 + 8*32 + 6)
         ldx #<($2000 + 8*32 + 6)
         jsr vram_addr
         lda #$14                ; bar tile, all colour 2
         sta PPUDATA
-        lda #>($2000 + 8*32 + 28)
-        ldx #<($2000 + 8*32 + 28)
+        lda #>($2000 + 10*32 + 6)
+        ldx #<($2000 + 10*32 + 6)
         jsr vram_addr
         lda #$0C                ; bar tile, all colour 3
         sta PPUDATA
-        lda #3                  ; graph palette on both: columns 6-7, 28-29
+        lda #3                  ; graph palette on both: columns 6-7, rows 8-11
         sta tmp0
         lda #4
         sta tmp1
         lda #1
         sta tmp2
-        sta tmp3
-        lda #3
-        jsr attr_rect
-        lda #14
-        sta tmp0
-        lda #4
-        sta tmp1
-        lda #1
-        sta tmp2
+        lda #2
         sta tmp3
         lda #3
         jsr attr_rect

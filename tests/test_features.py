@@ -430,7 +430,8 @@ class Features(unittest.TestCase):
         s.garage_goto(G_DYNO)
         s.press(A)
         s.step(60)
-        hp, tq = s.frame[66, 50], s.frame[66, 226]   # the swatches by HP and TQ
+        hp, tq = s.frame[66, 50], s.frame[82, 50]    # swatches by HP (row 8), TQ (row 10)
+        self.assertFalse((s.frame[56:120, 200:256] > 64).any(), 'nothing right of the graph')
         self.assertTrue(hp[0] > 150 and hp[2] < 100, 'orange like the power curve')
         self.assertTrue(tq[2] > 150 and tq[0] < 120, 'blue like the torque curve')
 
