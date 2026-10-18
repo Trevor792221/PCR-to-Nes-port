@@ -45,7 +45,7 @@ class Tune(unittest.TestCase):
         return signed(s.wram(SV_CARS + off))
 
     def test_ignition_and_tire_pressure_limits(self):
-        s = car_with(9)
+        s = car_with(9, ecu=1)
         open_tune(s)
         nudge(s, IGN, 2)
         self.assertEqual(self.rec(s, CR_TIMING), 2)
@@ -87,7 +87,7 @@ class Tune(unittest.TestCase):
         self.assertEqual(s.wram(SV_CARS + CR_LAUNCH), 0, 'off again')
 
     def test_fuel_map(self):
-        s = car_with(9, inject=1)
+        s = car_with(9, inject=1, ecu=1)
         open_tune(s)
         s.list_goto('ui_sel', 1)
         s.press(A)
@@ -116,6 +116,24 @@ class Tune(unittest.TestCase):
         s.press(B)
         s.step(60)
         self.assertEqual(s.mem('ui_count'), 8, 'back on the tune screen')
+
+    def test_timing_and_fuel_map_need_the_ecu(self):
+        s = car_with(9, inject=1)
+        open_tune(s)
+        nudge(s, IGN, 2)
+        self.assertEqual(self.rec(s, CR_TIMING), 0, 'no ECU: no timing')
+        s.list_goto('ui_sel', 1)
+        s.press(A)
+        s.step(60)
+        self.assertEqual(s.mem('ui_count'), 8, 'no ECU: the fuel map stays shut')
+        s.nes[SV_CARS + CR_TIMING] = 5               # e.g. from a TUNE password
+        for k in range(8):
+            s.nes[SV_CARS + CR_FUEL + k] = 5
+        s.list_goto('ui_sel', TIRE)                  # re-measure the car
+        s.press(RIGHT)
+        s.step(45)
+        self.assertEqual((s.mem('tn_knock'), s.mem('tn_lean')), (0, 0), 'ignored without one')
+        self.assertEqual(s.mem16('tn_hpm'), 0)
 
     def test_two_step_holds_the_revs_on_the_line(self):
         s = car_with(8, ecu=1)

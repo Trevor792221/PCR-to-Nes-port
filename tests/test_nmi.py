@@ -47,6 +47,7 @@ class NMIBudget(unittest.TestCase):
         s.press(A)
         self.check('parts', self.watch(s, 3, 120, lambda i: A if i == 40 else (DOWN if i % 10 == 0 else 0)))
         self.leave(s)
+        s.nes[0x6020 + 1 + 2] = 1                    # an ECU: timing and the fuel map
         s.garage_goto(3)
         s.press(A)
         self.check('tune', self.watch(s, 3, 80))

@@ -68,7 +68,13 @@ tune_screen:
         cpx #ET_N
         bne @lab
         PRINT str_et_open, ET_VX, ET_Y0
-        PRINT str_et_open, ET_VX, ET_Y0+2
+        MOVI16 ptr0, str_et_needecu ; the fuel map needs an ECU upgrade
+        jsr et_ecu
+        beq :+
+        MOVI16 ptr0, str_et_open
+:       ldx #ET_VX
+        ldy #ET_Y0+2
+        jsr print
         BOX 1, 22, 30, 7
         jsr attr_upload
         lda #0
@@ -122,7 +128,12 @@ tune_screen:
         jmp tune_screen
 :       cmp #ET_FUEL
         bne :+
-        jsr fuel_screen
+        jsr et_ecu
+        bne @fuel
+        MOVI16 ptr0, str_et_ecufuel
+        jsr et_refuse
+        jmp @loop
+@fuel:  jsr fuel_screen
         jmp tune_screen
 :       cmp #ET_BACK
         beq et_exit
@@ -142,7 +153,7 @@ tune_screen:
         jmp @loop
 @adj:   sta et_val
         jsr et_adjust
-        bcc @loop
+        jcc @loop
         jsr save_write
         lda #SFX_TICK
         jsr sfx_play
@@ -156,8 +167,12 @@ et_exit:
 et_adjust:
         lda et_sel
         cmp #ET_IGN
+        bne :++
+        jsr et_ecu
         bne :+
-        ldy #CR_TIMING
+        MOVI16 ptr0, str_et_ecuign
+        jmp et_refuse
+:       ldy #CR_TIMING
         lda #<-5
         ldx #5
         jmp et_step
@@ -198,9 +213,7 @@ et_adjust:
 @launch:
         cmp #ET_LAUNCH
         bne @no
-        jsr cur_car_ptr
-        ldy #CR_PARTS+P_ECU
-        lda (ptr1),y
+        jsr et_ecu
         bne :+
         MOVI16 ptr0, str_et_noecu
         jmp et_refuse
@@ -353,10 +366,16 @@ et_status:
         jsr et_msg
         jmp wait_frame
 
+et_needecu:
+        MOVI16 ptr0, str_et_needecu
+        rts
+
 ; et_value: A = row -> ptr0 = its value ("< +2 DEG >")
 et_value:
         cmp #ET_IGN
         bne :+
+        jsr et_ecu
+        beq et_needecu
         ldy #CR_TIMING
         jsr et_rec
         jsr et_open
@@ -384,13 +403,9 @@ et_value:
         MOVI16 ptr0, str_et_psi
         jmp et_close
 @launch:
-        jsr cur_car_ptr
-        ldy #CR_PARTS+P_ECU
-        lda (ptr1),y
-        bne :+
-        MOVI16 ptr0, str_et_needecu
-        rts
-:       ldy #CR_LAUNCH
+        jsr et_ecu
+        beq et_needecu
+        ldy #CR_LAUNCH
         lda (ptr1),y
         bne :+
         jsr et_open
@@ -412,6 +427,13 @@ et_value:
         sty tmp6
         MOVI16 ptr0, str_et_rpm
         jmp et_close
+
+; et_ecu: A = ECU level of the car in use (Z set: stock ECU).  ptr1 = record.
+et_ecu:
+        jsr cur_car_ptr
+        ldy #CR_PARTS+P_ECU
+        lda (ptr1),y
+        rts
 
 ; et_rec: A = record byte Y of the car in use
 et_rec:
@@ -521,6 +543,8 @@ str_et_none:     .byte "NO TURBO", 0
 str_et_needecu:  .byte "NEEDS ECU", 0
 str_et_noturbo:  .byte "BUY A TURBO TO SET BOOST", 0
 str_et_noecu:    .byte "UPGRADE THE ECU FOR 2-STEP", 0
+str_et_ecuign:   .byte "UPGRADE THE ECU FOR TIMING", 0
+str_et_ecufuel:  .byte "UPGRADE THE ECU TO MAP FUEL", 0
 str_et_peak:     .byte "PEAK ", 0
 str_et_hp:       .byte "HP", 0
 str_et_ok:       .byte "ENGINE HAPPY", 0

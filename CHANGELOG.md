@@ -3,6 +3,10 @@
 Every version of Pixel Racer NES, newest first. Downloads are on the
 [Releases page](https://github.com/Trevor792221/PCR-to-Nes-port/releases).
 
+## v4.9: ECU tuning (2026-10-18)
+
+* The fuel map and ignition timing now need an ECU upgrade, like the 2-step. On a stock ECU the TUNE screen shows NEEDS ECU for both. Fuel and timing values a car already has (from a save or a TUNE password) are kept, but they only take effect once the car has an ECU upgrade.
+
 ## v4.8: New wheelie bars (2026-10-18)
 
 * Wheelie bars are redrawn as an angled truss down to a small wheel. In races the struts are painted in your car's colour.

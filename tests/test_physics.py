@@ -142,7 +142,7 @@ class Physics(unittest.TestCase):
         self.run_race(9, [2, 2, 2, 4, 2, 2, 2, 3, 2, 2, 4, 2, 2, 4], launch=6000,
                       tune=T([0, 0, 1, 2, 3, 3, 3, 3], 3, -6, 6, 0))
         # knock and lean everywhere, boost turned down, hard tires
-        self.run_race(7, [0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], launch=5000,
+        self.run_race(7, [0, 0, 1, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], launch=5000,
                       tune=T([5] * 8, 5, 8, -5, 0))
         # 2-step launch control, wheelie bars, soft tires on a RWD car
         self.run_race(8, [1, 1, 2, 0, 1, 1, 1, 2, 1, 1, 0, 0, 4, 0], launch=9000,
@@ -177,6 +177,10 @@ class Physics(unittest.TestCase):
             two.step()
         self.assertEqual(two.rpm, 4000, '2-step holds the launch rpm')
         self.assertEqual(gd.Car(8, [0] * 14, tune=gd.Tune(launch=40)).launch, 0, 'needs the ECU')
+        noecu = base[:2] + [0] + base[3:]
+        for tune in (gd.Tune(timing=3), gd.Tune(fuel=[-3] * 8), gd.Tune(timing=5, fuel=[5] * 8)):
+            self.assertEqual(gd.Car(9, noecu, tune=tune).tune, gd.Car(9, noecu).tune,
+                             'timing and the fuel map need the ECU')
 
     def test_intercooler_and_aero_help(self):
         base = gd.Car(9, [0, 0, 0, 4] + [0] * 8)

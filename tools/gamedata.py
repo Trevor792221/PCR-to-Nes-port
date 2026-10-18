@@ -172,10 +172,11 @@ def tune_calc(model, parts, tune):
         if psi < d:
             bmul = psi * 256 // d
     start = TURBO_START[tl]
-    t = tune.timing
+    ecu = parts[P_ECU]                # timing and the fuel map need an ECU
+    t = tune.timing if ecu else 0
     ds, knock, lean = [], 0, 0
     for k in range(NCELLS):
-        f = tune.fuel[k]
+        f = tune.fuel[k] if ecu else 0
         obk = ob if tl and 4 * k + 3 >= start else 0
         ln = max(0, f + obk - LEAN_STEP * inj)
         lim = 3 + ic + ((-f) >> 1 if f < 0 else 0) - (obk >> 1) - ln

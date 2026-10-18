@@ -5,6 +5,7 @@
 ;
 ;   boost   psi = turbo's own psi + setting (3 .. the turbo's max).  Over its
 ;           own psi: +6/256 power per psi.  Under: the boost curve shrinks.
+;   (the fuel map and timing only count with an ECU upgrade)
 ;   fuel    per cell k (an eighth of the redline): f = -5 rich .. +5 lean.
 ;           lean = max(0, f + overboost - 3 * injector level)  (overboost
 ;           only counts where the turbo has spooled)
@@ -37,6 +38,8 @@ tn_lim:     .res 1
 tn_top:     .res 1
 tn_bit:     .res 1          ; this cell's bit
 tn_tmp:     .res 1
+tn_ecu:     .res 1          ; ECU level (0: fuel map and timing stay stock)
+tn_t:       .res 1          ; timing in use
 tn_acc:     .res 2
 tn_d:       .res NCELLS
 .segment "BANK6"
@@ -105,7 +108,10 @@ tune_calc:
         lda m_r
         sta tn_bmul
 @nb:
-        ; --- fuel map and timing, cell by cell ----------------------------------
+        ; --- fuel map and timing, cell by cell (both need an ECU upgrade) ------
+        ldy #CR_PARTS+P_ECU
+        lda (ptr0),y
+        sta tn_ecu
         lda #0
         sta tn_knock
         sta tn_lean
@@ -129,13 +135,15 @@ tune_calc:
         bcc :+
         lda tn_ob
         sta tn_obk
-:       ; f
+:       ; f (0 without an ECU upgrade)
+        lda tn_ecu
+        beq @f
         lda tn_k
         clc
         adc #CR_FUEL
         tay
         lda (ptr0),y
-        sta tn_f
+@f:     sta tn_f
         ; lean = max(0, f + obk - 3*inj)
         ldy #CR_PARTS+P_INJECT
         lda (ptr0),y
@@ -176,15 +184,18 @@ tune_calc:
         sbc tn_ln
         sta tn_lim
         ; timing: t <= L: 3t, else 3L - 12(t-L) and the cell knocks
+        lda tn_ecu              ; (0 without an ECU upgrade)
+        beq :+
         ldy #CR_TIMING
         lda (ptr0),y
+:       sta tn_t
         jsr tn_le_lim
         bcc @knock
-        lda (ptr0),y
+        lda tn_t
         jsr tn_adds
-        lda (ptr0),y
+        lda tn_t
         jsr tn_adds
-        lda (ptr0),y
+        lda tn_t
         jsr tn_adds
         jmp @fuel
 @knock: lda tn_bit
@@ -197,7 +208,7 @@ tune_calc:
         lda tn_lim
         jsr tn_adds
         sec                     ; -12 per step past the limit
-        lda (ptr0),y
+        lda tn_t
         sbc tn_lim
         tax
 :       lda #<-12
