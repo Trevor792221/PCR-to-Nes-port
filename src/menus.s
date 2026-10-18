@@ -376,6 +376,7 @@ garage_draw:
         inx
         cpx #G_N
         bne @items
+        jsr draw_xp
         jsr attr_upload
         ; big car
         jsr cur_car_ptr
@@ -403,6 +404,100 @@ garage_draw:
         lda #2
         sta ui_dy
         rts
+
+; draw_xp: "XP 120/140" and a bar to the next level, inside the menu box
+; (PPU off).  At the top level: "XP MAX" and a full bar.
+.segment "BSS"
+xp_need:    .res 2
+xp_px:      .res 1
+.segment "BANK1"
+XP_ROW = 27
+XP_BX  = 16                     ; bar: 12 tiles from column 16
+XP_BW  = 12
+draw_xp:
+        jsr xp_needed
+        lda m_r
+        sta xp_need
+        lda m_r+1
+        sta xp_need+1
+        MOVI16 ptr0, str_xp
+        ldy #0
+        jsr cat_ptr0
+        sty tmp6
+        lda #XP_BW*8            ; full bar at the top level
+        sta xp_px
+        lda SV_LEVEL
+        cmp #MAX_LEVEL
+        bcc :+
+        MOVI16 ptr0, str_xpmax
+        ldy tmp6
+        jsr cat_ptr0
+        jmp @txt
+:       lda SV_XP               ; "120/140"
+        sta m_a
+        lda SV_XP+1
+        sta m_a+1
+        jsr num_text
+        ldy tmp6
+        jsr cat_ptr0
+        lda #'/'
+        sta linebuf,y
+        iny
+        sty tmp6
+        lda xp_need
+        sta m_a
+        lda xp_need+1
+        sta m_a+1
+        jsr num_text
+        ldy tmp6
+        jsr cat_ptr0
+        sty tmp6
+        lda SV_XP               ; bar: xp * 96 / needed pixels
+        sta m_a
+        lda SV_XP+1
+        sta m_a+1
+        lda #XP_BW*8
+        sta m_b
+        lda #0
+        sta m_b+1
+        jsr mul16
+        lda xp_need
+        sta m_b
+        lda xp_need+1
+        sta m_b+1
+        jsr div32
+        lda m_r
+        cmp #XP_BW*8
+        bcs :+
+        sta xp_px
+:       ldy tmp6
+@txt:   lda #0
+        sta linebuf,y
+        MOVI16 ptr0, linebuf
+        ldx #3
+        ldy #XP_ROW
+        jsr print
+        lda #>($2000 + XP_ROW*32 + XP_BX)
+        ldx #<($2000 + XP_ROW*32 + XP_BX)
+        jsr vram_addr
+        ldy #XP_BW
+@t:     lda xp_px               ; 8 pixels a tile
+        cmp #8
+        bcc @part
+        sbc #8
+        sta xp_px
+        lda #T_XPBAR+8
+        bne @put
+@part:  ldx #0                  ; then the rest of the bar is empty
+        stx xp_px
+        clc
+        adc #T_XPBAR
+@put:   sta PPUDATA
+        dey
+        bne @t
+        rts
+str_xp:     .byte "XP ", 0
+str_xpmax:  .byte "MAX", 0
 
 ; best_line: ptr0 = "BEST 1/4  12.345" for the current car (or "NO TIME")
 best_line:
@@ -2871,12 +2966,13 @@ debug_screen:
         jsr use_menu_palette
         MOVI16 ptr0, str_dbg
         jsr draw_header
-        PRINT str_dbg0, 4, 6
-        PRINT str_dbg1, 4, 9
-        PRINT str_dbg2, 4, 12
-        PRINT str_dbg3, 4, 15
-        PRINT str_dbg5, 4, 18
-        PRINT str_dbg4, 4, 21
+        PRINT str_dbg0, 4, 5
+        PRINT str_dbg1, 4, 8
+        PRINT str_dbg2, 4, 11
+        PRINT str_dbg3, 4, 14
+        PRINT str_dbg6, 4, 17
+        PRINT str_dbg5, 4, 20
+        PRINT str_dbg4, 4, 23
         PRINT str_dbg_help, 2, 26
         PRINT str_dbg_help2, 2, 27
         jsr attr_upload
@@ -2886,11 +2982,11 @@ debug_screen:
         jsr ppu_on
         lda #0
         sta ui_sel
-        lda #6
+        lda #7
         sta ui_count
         lda #2
         sta ui_x
-        lda #6
+        lda #5
         sta ui_y0
         lda #3
         sta ui_dy
@@ -2910,7 +3006,7 @@ debug_screen:
         cmp #1
         bne @loop
         lda ui_sel
-        beq @addcar
+        jeq @addcar
         cmp #1
         jeq @boss
         cmp #2
@@ -2918,6 +3014,8 @@ debug_screen:
         cmp #3
         jeq @gems
         cmp #4
+        jeq @xp
+        cmp #5
         bne @back
         jsr snd_test
         jmp debug_screen
@@ -2949,7 +3047,7 @@ debug_screen:
 @cset:  sty dbg_car
         jmp @chg
 :       cpx #1
-        bne @loop
+        jne @loop
         ldy dbg_boss
         iny
         cpy #NBOSS+1
@@ -3006,9 +3104,30 @@ debug_screen:
         jsr header_update
         jsr wait_frame
         MOVI16 ptr0, str_dbg_done
-@msg:   ldy #24
+@msg:   ldy #25
         jsr vb_msg
         jmp @loop
+@xp:    lda #<DBG_XP            ; levels up as a race would (gems too)
+        sta m_a
+        lda #>DBG_XP
+        sta m_a+1
+        jsr add_xp
+        jsr save_write
+        lda #SFX_BUY
+        jsr sfx_play
+        jsr header_update
+        jsr wait_frame
+        lda SV_LEVEL            ; and the level in the header
+        jsr fmt_8
+        jsr num_ptr
+        lda #3
+        jsr pad_ptr0
+        ldx #21
+        ldy #2
+        jsr vb_str
+        jsr wait_frame
+        MOVI16 ptr0, str_dbg_done
+        jmp @msg
 
 .segment "BSS"
 st_song:    .res 1
@@ -3236,14 +3355,14 @@ dbg_values:
         lda #12
         jsr pad_ptr0
         ldx #17
-        ldy #6
+        ldy #5
         jsr vb_str
         lda dbg_boss
         jsr boss_line_short
         lda #14
         jsr pad_ptr0
         ldx #17
-        ldy #9
+        ldy #8
         jmp vb_str
 
 ; boss_line_short: A = boss -> ptr0 = "3 MAYA"
@@ -3281,6 +3400,8 @@ str_dbg2:      .byte "ADD $100000", 0
 str_dbg3:      .byte "ADD 100 GEMS", 0
 str_dbg4:      .byte "BACK", 0
 str_dbg5:      .byte "SOUND TEST", 0
+str_dbg6:      .byte "ADD 1000 XP", 0
+DBG_XP = 1000
 str_dbg_help:  .byte "LEFT/RIGHT:PICK  A:DO IT", 0
 str_dbg_help2: .byte "B:BACK", 0
 str_dbg_added: .byte "CAR ADDED TO YOUR GARAGE", 0

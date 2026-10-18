@@ -11,12 +11,14 @@ with the game's logo.  The whole screen is generated here and written as
 
 Palettes (src/splash.s):
   0 scenery/logo  black, red, orange, yellow
-  1 text          black, white, grey, yellow
+  1 text          black, white (PRESS START blinks it), grey, yellow
+The version number (bottom right, grey) is the newest one in CHANGELOG.md.
   3 car           black, red, white, dark grey
 Usage: mksplash.py OUTDIR
 """
 import math
 import os
+import re
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -153,13 +155,20 @@ def car(pix):
                 pix[CAR_Y + y][CAR_X + x] = code[box[y][x]]
 
 
-def text(pix, s, col, row):
+def text(pix, s, col, row, c='1'):
     for i, ch in enumerate(s):
         g = list(font.G[ch]) + ['.....']
         for y in range(8):
             for x in range(5):
                 if g[y][x] == '#':
-                    pix[row * 8 + y][(col + i) * 8 + x] = '1'
+                    pix[row * 8 + y][(col + i) * 8 + x] = c
+
+
+def version():
+    """The newest version in CHANGELOG.md, e.g. 'V5.0'."""
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'CHANGELOG.md')
+    with open(path) as f:
+        return 'V' + re.search(r'^## v([\d.]+)', f.read(), re.M).group(1)
 
 
 def logo(pix, col, row):
@@ -180,6 +189,8 @@ def build():
     car(pix)
     text(pix, 'PRESS START', 10, 24)
     text(pix, 'UNOFFICIAL FAN GAME', 6, 27)
+    ver = version()
+    text(pix, ver, 31 - len(ver), 28, '2')          # bottom right, grey
     rows = [''.join(r) for r in pix]
     ts = TileSet(0x00, limit=256)
     nt = []
@@ -192,6 +203,8 @@ def build():
         for bx in range(16):
             pal = 0
             if by in (12, 13):                    # rows 24-27: text
+                pal = 1
+            if by == 14 and bx >= 12:             # rows 28-29, cols 24-31: version
                 pal = 1
             if 7 <= by <= 9 and 4 <= bx <= 11:    # rows 14-19, cols 8-23: car
                 pal = 3

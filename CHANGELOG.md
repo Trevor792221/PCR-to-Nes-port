@@ -11,6 +11,9 @@ Every version of Pixel Racer NES, newest first. Downloads are on the
 * A rotary engine has its own sound in races.
 * The garage menu is now laid out in three columns, with SWAP as the 11th item.
 * Swaps are saved in the garage password, which becomes 14-85 letters when a car is swapped. Garages with no swaps keep the same passwords as before, and all older passwords still work.
+* The garage now shows your XP towards the next level, as a counter ("XP 120/300") and a progress bar.
+* The debug menu has a new ADD 1000 XP item.
+* The splash screen shows the version number in the bottom right corner.
 
 ## v4.9: ECU tuning (2026-10-18)
 

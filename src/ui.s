@@ -581,7 +581,7 @@ add_xp:
         sbc m_r+1
         bcc @done
         lda SV_LEVEL
-        cmp #99
+        cmp #MAX_LEVEL
         bcs @done
         sec
         lda SV_XP

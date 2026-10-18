@@ -13,7 +13,7 @@ build/tiles.inc: tools/mkchr.py tools/art.py tools/font.py
 	@mkdir -p build
 	$(PYTHON) tools/mkchr.py build
 
-build/splash.nam: tools/mksplash.py tools/mkchr.py tools/font.py
+build/splash.nam: tools/mksplash.py tools/mkchr.py tools/font.py CHANGELOG.md
 	@mkdir -p build
 	$(PYTHON) tools/mksplash.py build
 

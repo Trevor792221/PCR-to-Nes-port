@@ -59,6 +59,33 @@ class Game(unittest.TestCase):
         s.step(40)
         self.assertEqual(s.mem('game_mode'), 0)
 
+    def test_splash_version(self):
+        sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'tools'))
+        import mksplash
+        import re
+        with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'CHANGELOG.md')) as f:
+            log = f.read()
+        self.assertEqual(mksplash.version(), 'V' + re.search(r'^## v([\d.]+)', log, re.M).group(1))
+        s = Sim(boot=1, skip_splash=False)
+        s.step(140)                                  # faded in
+        corner = s.frame[224:232, 200:248]           # bottom right, row 28
+        self.assertGreater(int((corner.max(axis=2) > 64).sum()), 20, 'version drawn')
+
+    def test_xp_bar(self):
+        for level, xp, px in ((1, 70, 48), (5, 0, 0), (5, 299, 95), (99, 0, 96)):
+            s = new_game()
+            s.nes[0x600B], s.nes[0x6009], s.nes[0x600A] = level, xp & 0xFF, xp >> 8
+            s.press(B)                               # redraw the garage
+            s.step(60)
+            s.garage_goto(G_PARTS)
+            s.press(A)
+            s.step(30)
+            s.press(B)
+            s.step(60)
+            row = s.frame[27 * 8 + 3, 128:224]       # the bar: 12 tiles, yellow then grey
+            yellow = (row[:, 0] > 150) & (row[:, 2] < 100)
+            self.assertEqual(int(yellow.sum()), px, 'level %d xp %d' % (level, xp))
+
     def test_new_game_state(self):
         s = new_game()
         self.assertEqual(s.wram(SV_CASH, 3), 3000)

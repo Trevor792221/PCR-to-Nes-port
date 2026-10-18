@@ -551,6 +551,10 @@ def build_menu():
         '11111111111111111111111111111111',
     ]
     specials['CRATE'] = [ts.add(t) for t in grid_tiles(crate, 4, 4)]
+    # XP bar (garage): k = 0..8 pixels filled in yellow (colour 3), the rest grey
+    xp = [ts.add(tile(['........'] + ['3' * k + '2' * (8 - k)] * 6 + ['........'])) for k in range(9)]
+    assert xp == list(range(xp[0], xp[0] + 9)), 'XP bar tiles must be in a row'
+    specials['XPBAR'] = xp[0]
     return ts.blob(), bytes(top + bot), specials, len(ts.tiles)
 
 
