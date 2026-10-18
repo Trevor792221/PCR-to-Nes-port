@@ -14,6 +14,14 @@ GARAGE password, 12-74 characters (grows with the number of cars):
     checksum 8
   (versions 1-2, 11-66 characters, have 12 parts: still accepted, with no
   wheelie bars or injectors.)
+TUNE password (optional, none when every car is stock), any length:
+    version 2 | cars-1 3 |
+    per car, in garage order: engine tuned 1 | gears tuned 1 |
+      engine: fuel map 8 x 4 (cell+5) | timing 4 (+5) | tire psi 5 (+14) |
+              boost 5 (+13) | 2-step 6 (rpm/200)
+      gears:  final drive, then each gear: changed 1 | if so, 10 bits: the
+              change from stock in 3/256 steps (two's complement)
+    checksum 8 (CRC-8)
 
 Bits are written MSB first.  Every 5 bits become one character, XORed with a
 mask that changes per position (7, 20, 1, 14, ... : +13 mod 32).  The
@@ -25,7 +33,7 @@ for the two passwords so they can't be swapped.
 import sys
 
 ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
-SEED_PLAYER, SEED_GARAGE = 0x5A, 0xC3
+SEED_PLAYER, SEED_GARAGE, SEED_TUNE = 0x5A, 0xC3, 0xA5
 PLAYER_LEN = 15             # version 1 (v3.0): no stats
 PLAYER_LEN2 = 32            # version 2: with stats
 NPARTS = 14
@@ -226,6 +234,89 @@ def decode_garage(s):
     if pad and b.get(pad, chk=False):                           # padding must be 0
         return None
     return dict(cars=cars, cur=cur)
+
+
+def _stock_ratios(model):
+    import gamedata as gd
+    return [gd.gear_raw(gd.CARS[model][7])] + [gd.gear_raw(g) for g in gd.car_gears(model)]
+
+
+def encode_tune(cars):
+    """cars: list of (model, tune, final, gears) in garage order, where tune is
+    the 12 signed tune bytes of the record (fuel x8, timing, tire psi, boost,
+    2-step rpm/100) and final/gears the 8.8 ratios.  '' if nothing is tuned."""
+    b = Bits(SEED_TUNE)
+    b.put(1, 2)
+    b.put(len(cars) - 1, 3)
+    any_tune = False
+    for model, tune, final, gears in cars:
+        stock = _stock_ratios(model)
+        ratios = [final] + list(gears[:len(stock) - 1])
+        eng = any(tune)
+        gtuned = ratios != stock
+        any_tune |= eng or gtuned
+        b.put(int(eng), 1)
+        b.put(int(gtuned), 1)
+        if eng:
+            for f in tune[:8]:
+                b.put(f + 5, 4)
+            b.put(tune[8] + 5, 4)
+            b.put(tune[9] + 14, 5)
+            b.put(tune[10] + 13, 5)
+            b.put(tune[11] // 2, 6)
+        if gtuned:
+            for r, s in zip(ratios, stock):
+                if r == s:
+                    b.put(0, 1)
+                else:
+                    assert (r - s) % 3 == 0
+                    b.put(1, 1)
+                    b.put((r - s) // 3 & 0x3FF, 10)
+    if not any_tune:
+        return ''
+    b.put(b.chk, 8, chk=False)
+    return b.text((len(b.bits) + 4) // 5)
+
+
+def decode_tune(s, models):
+    """-> list of (tune or None, ratios or None) per car, or None if wrong.
+    '' (nothing typed) means every car is stock."""
+    if not s:
+        return [(None, None)] * len(models)
+    b = Bits.from_text(s, SEED_TUNE)
+    if b.get(2) != 1 or b.get(3) != len(models) - 1:
+        return None
+    out = []
+    for model in models:
+        stock = _stock_ratios(model)
+        eng, gt = b.get(1), b.get(1)
+        tune = ratios = None
+        if eng:
+            fuel = [b.get(4) - 5 for _ in range(8)]
+            tim, tp, bo, la = b.get(4) - 5, b.get(5) - 14, b.get(5) - 13, b.get(6) * 2
+            if max(fuel) > 5 or tim > 5 or tp > 8 or bo > 9 or (la and la < 20):
+                return None
+            tune = fuel + [tim, tp, bo, la]
+        if gt:
+            ratios = []
+            for i, st in enumerate(stock):
+                r = st
+                if b.get(1):
+                    k = b.get(10)
+                    r = st + 3 * (k - 1024 if k >= 512 else k)
+                lo, hi = (0x200, 0x5FF) if i == 0 else (0x80, 0x4FF)
+                if not lo <= r <= hi:
+                    return None
+                ratios.append(r)
+        out.append((tune, ratios))
+    want = b.chk
+    if b.get(8, chk=False) != want:
+        return None
+    if len(s) != (b.pos + 4) // 5:
+        return None
+    if b.pos < len(s) * 5 and b.get(len(s) * 5 - b.pos, chk=False):
+        return None
+    return out
 
 
 if __name__ == '__main__':

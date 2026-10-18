@@ -40,22 +40,34 @@ pw_mode:    .res 1          ; checksum: 0 field sum (version 1), 1 CRC-8
 pw_crcon:   .res 1          ; $80 while a field's bits go through the CRC
 pw_tb:      .res 1
 pw_ver:     .res 1
+pw_win:     .res 1          ; typed text: first row shown (long passwords scroll)
+pw_tlen:    .res 1          ; length of the tune password (0: none)
+pw_rstep:   .res 1          ; pw_print_rows: rows apart
+pw_any:     .res 1
+pw_ng:      .res 1
+pw_d:       .res 2
 
 .segment "BANK5"
 
-PW_BUF    = DYNO_BMP            ; 48-byte bit buffer (dyno work area)
-PW_BUFSZ  = 48
-PW_TEXT   = DYNO_BMP + $40      ; up to 72 symbols (0-31)
-PW_PL     = DYNO_BMP + $90      ; decoded player fields (25 bytes, see pw_apply)
-PW_N      = DYNO_BMP + $B0      ; decoded garage: cars
-PW_CUR    = DYNO_BMP + $B1      ;   car in use
-PW_CARS   = DYNO_BMP + $C0      ;   8 x 16: model, 14 parts, colour index
+PW_BUF    = DYNO_BMP            ; bit buffer (dyno work area)
+PW_BUFSZ  = 144
+PW_TEXT   = DYNO_BMP + $100     ; up to 255 symbols (0-31)
+PW_PL     = DYNO_BMP + $200     ; decoded player fields (25 bytes, see pw_apply)
+PW_N      = DYNO_BMP + $220     ; decoded garage: cars
+PW_CUR    = DYNO_BMP + $221     ;   car in use
+PW_CARS   = DYNO_BMP + $240     ;   8 x 16: model, 14 parts, colour index
 PWC_SIZE  = 16
 PWC_PAINT = 1 + NPARTS
+PW_TUNE   = DYNO_BMP + $300     ; decoded tunes: 8 x 32
+PWT_SIZE  = 32                  ;   12 tune bytes (as in the record),
+PWT_GEARS = 12                  ;   gears tuned (0/1),
+PWT_RATIO = 13                  ;   final + 7 gears (8.8)
 
 PW_PL_SIZE   = 25
 SEED_PLAYER  = $5A
 SEED_GARAGE  = $C3
+SEED_TUNE    = $A5
+TUNE_MAX     = 230              ; letters (8 fully tuned cars need up to 230)
 PLAYER_LEN   = 15               ; version 1 (v3.0): no stats
 PLAYER_LEN2  = 32               ; version 2: with stats
 GARAGE_MAX   = 74
@@ -70,10 +82,10 @@ garage_pad: .byte 0, 1, 2, 3, 4, 0, 1, 2            ; 5*len - bits (the same for
 ; ---------------------------------------------------------------------------
 pw_reset:
         lda #0
-        ldx #PW_BUFSZ-1
-:       sta PW_BUF,x
+        ldx #PW_BUFSZ
+:       sta PW_BUF-1,x
         dex
-        bpl :-
+        bne :-
 pw_rewind:
         lda #0
         sta pw_byte
@@ -721,6 +733,549 @@ pw_dec_garage:
 :       clc
         rts
 
+; ---------------------------------------------------------------------------
+; TUNE password (optional): engine tunes and gear ratios of tuned cars
+; ---------------------------------------------------------------------------
+; pw_stock: A = model -> ptr3 = its stock gear set (7 words), pw_d = stock
+; final drive
+pw_stock:
+        tax
+        lda car_final_l,x
+        sta pw_d
+        lda car_final_h,x
+        sta pw_d+1
+        txa
+        sta m_a
+        lda #14
+        sta m_b
+        jsr mul8
+        clc
+        lda m_r
+        adc #<car_gearset
+        sta ptr3
+        lda m_r+1
+        adc #>car_gearset
+        sta ptr3+1
+        rts
+
+; pw_stock_ratio: Y = ratio (0 final, 1-7 gears) -> m_b(16) = stock ratio
+pw_stock_ratio:
+        tya
+        bne :+
+        lda pw_d
+        sta m_b
+        lda pw_d+1
+        sta m_b+1
+        rts
+:       sty pw_tb
+        dey
+        tya
+        asl a
+        tay
+        lda (ptr3),y
+        sta m_b
+        iny
+        lda (ptr3),y
+        sta m_b+1
+        ldy pw_tb
+        rts
+
+; pw_ratio_off: Y = ratio index -> record offset (CR_FINAL, CR_GEARS + ...)
+pw_ratio_off:
+        tya
+        asl a
+        clc
+        adc #CR_FINAL           ; (CR_GEARS = CR_FINAL + 2)
+        rts
+
+; pw_bits: m_r = bits used so far in the buffer
+pw_bits:
+        lda pw_byte
+        sta m_r
+        lda #0
+        sta m_r+1
+        asl m_r
+        rol m_r+1
+        asl m_r
+        rol m_r+1
+        asl m_r
+        rol m_r+1
+        lda pw_bit
+        ldx #0
+:       asl a
+        bcs :+
+        inx
+        bne :-
+:       txa
+        clc
+        adc m_r
+        sta m_r
+        bcc :+
+        inc m_r+1
+:       rts
+
+; pw_enc_tune: tunes of the cars in garage order -> PW_TEXT.  pw_len = 0
+; when every car is stock.
+pw_enc_tune:
+        jsr pw_reset
+        lda #1
+        sta pw_mode
+        lda #SEED_TUNE
+        sta pw_chk
+        lda #0
+        sta pw_any
+        lda #1                  ; version 1
+        ldx #2
+        jsr pw_put
+        jsr count_cars
+        sec
+        sbc #1
+        ldx #3
+        jsr pw_put
+        lda #0
+        sta pw_s
+@car:   lda pw_s
+        jsr slot_ptr
+        ldy #CR_MODEL
+        lda (ptr1),y
+        cmp #$FF
+        jeq @next
+        ; engine tuned: any tune byte not 0
+        ldy #CR_FUEL
+        lda #0
+:       ora (ptr1),y
+        iny
+        cpy #CR_LAUNCH+1
+        bne :-
+        cmp #0
+        beq :+
+        lda #1
+:       sta pw_j
+        ora pw_any
+        sta pw_any
+        ; gears tuned: any ratio not stock
+        ldy #CR_MODEL
+        lda (ptr1),y
+        tax
+        lda car_ngears,x
+        sta pw_ng
+        txa
+        jsr pw_stock
+        lda #0
+        sta pw_lo
+        ldy #0
+@gc:    jsr pw_stock_ratio
+        sty pw_i
+        jsr pw_ratio_off
+        tay
+        lda (ptr1),y
+        cmp m_b
+        bne @gt
+        iny
+        lda (ptr1),y
+        cmp m_b+1
+        bne @gt
+        ldy pw_i
+        iny
+        cpy pw_ng
+        beq @gc
+        bcc @gc
+        bcs @gd
+@gt:    lda #1
+        sta pw_lo
+        sta pw_any
+@gd:    lda pw_j
+        ldx #1
+        jsr pw_put
+        lda pw_lo
+        pha
+        ldx #1
+        jsr pw_put
+        lda pw_j
+        beq @noeng
+        ; engine: fuel x8 (+5, 4 bits), timing (+5, 4), tire psi (+14, 5),
+        ; boost (+13, 5), 2-step (rpm/200, 6)
+        lda #CR_FUEL
+        sta pw_i
+:       lda pw_s
+        jsr slot_ptr
+        ldy pw_i
+        lda (ptr1),y
+        clc
+        adc #5
+        ldx #4
+        jsr pw_put
+        inc pw_i
+        lda pw_i
+        cmp #CR_TIMING+1
+        bne :-
+        lda pw_s
+        jsr slot_ptr
+        ldy #CR_TIREP
+        lda (ptr1),y
+        clc
+        adc #14
+        ldx #5
+        jsr pw_put
+        lda pw_s
+        jsr slot_ptr
+        ldy #CR_BOOST
+        lda (ptr1),y
+        clc
+        adc #13
+        ldx #5
+        jsr pw_put
+        lda pw_s
+        jsr slot_ptr
+        ldy #CR_LAUNCH
+        lda (ptr1),y
+        lsr a
+        ldx #6
+        jsr pw_put
+@noeng: pla
+        jeq @next
+        ; gears: per ratio, changed 1 | (change / 3) 10 bits
+        lda pw_s
+        jsr slot_ptr
+        ldy #CR_MODEL
+        lda (ptr1),y
+        jsr pw_stock
+        lda #0
+        sta pw_i
+@gr:    lda pw_s
+        jsr slot_ptr
+        ldy pw_i
+        jsr pw_stock_ratio
+        jsr pw_ratio_off
+        tay
+        sec
+        lda (ptr1),y
+        sbc m_b
+        sta pw_d
+        iny
+        lda (ptr1),y
+        sbc m_b+1
+        sta pw_d+1
+        ora pw_d
+        bne :+
+        ldx #1                  ; unchanged
+        jsr pw_put
+        jmp @gn
+:       lda #1
+        ldx #1
+        jsr pw_put
+        lda pw_d+1              ; |d| / 3, then the sign back
+        php
+        bpl :+
+        sec
+        lda #0
+        sbc pw_d
+        sta pw_d
+        lda #0
+        sbc pw_d+1
+        sta pw_d+1
+:       lda pw_d
+        sta m_r
+        lda pw_d+1
+        sta m_r+1
+        lda #3
+        jsr div16_8
+        plp
+        bpl :+
+        sec
+        lda #0
+        sbc m_r
+        sta m_r
+        lda #0
+        sbc m_r+1
+        sta m_r+1
+:       lda m_r
+        sta pw_lo
+        lda m_r+1
+        and #3
+        ldx #2
+        jsr pw_put_w            ; 10 bits
+@gn:    inc pw_i
+        lda pw_i
+        cmp pw_ng
+        jeq @gr
+        jcc @gr
+@next:  inc pw_s
+        lda pw_s
+        cmp #NSLOTS
+        jne @car
+        lda #0
+        sta pw_len
+        lda pw_any
+        beq @none
+        lda pw_chk
+        ldx #8
+        jsr pw_putb
+        jsr pw_bits             ; letters = (bits + 4) / 5
+        clc
+        lda m_r
+        adc #4
+        sta m_r
+        bcc :+
+        inc m_r+1
+:       lda #5
+        jsr div16_8
+        lda m_r
+        sta pw_len
+        jmp pw_to_text
+@none:  rts
+
+; pw_dec_tune: PW_TEXT -> PW_TUNE for the PW_N cars of the garage password.
+; Nothing typed: every car stock.  Carry set if wrong.
+pw_dec_tune:
+        ldx #0                  ; clear: all stock
+        lda #0
+:       sta PW_TUNE,x
+        inx
+        bne :-
+        lda pw_len
+        bne :+
+        clc
+        rts
+:       lda #1
+        sta pw_mode
+        jsr pw_from_text
+        lda #SEED_TUNE
+        sta pw_chk
+        ldx #2
+        jsr pw_get
+        cmp #1
+        jne pw_bad
+        ldx #3
+        jsr pw_get
+        clc
+        adc #1
+        cmp PW_N
+        jne pw_bad
+        lda #0
+        sta pw_s
+@car:   lda pw_s                ; ptr2 = PW_TUNE + car*32
+        asl a
+        asl a
+        asl a
+        asl a
+        asl a
+        sta ptr2
+        lda #>PW_TUNE
+        sta ptr2+1
+        ldx #1
+        jsr pw_get
+        sta pw_j                ; engine
+        ldx #1
+        jsr pw_get
+        ldy #PWT_GEARS
+        sta (ptr2),y
+        lda pw_j
+        jeq @gears
+        ldy #0
+:       sty pw_i
+        ldx #4
+        jsr pw_get              ; fuel cells and timing: 0-10
+        cmp #11
+        jcs pw_bad
+        sec
+        sbc #5
+        ldy pw_i
+        sta (ptr2),y
+        iny
+        cpy #CR_TIMING-CR_FUEL+1
+        bne :-
+        ldx #5
+        jsr pw_get              ; tire psi: 0-22
+        cmp #23
+        jcs pw_bad
+        sec
+        sbc #14
+        ldy #CR_TIREP-CR_FUEL
+        sta (ptr2),y
+        ldx #5
+        jsr pw_get              ; boost: 0-22
+        cmp #23
+        jcs pw_bad
+        sec
+        sbc #13
+        ldy #CR_BOOST-CR_FUEL
+        sta (ptr2),y
+        ldx #6
+        jsr pw_get              ; 2-step: off, or 2000 rpm and up
+        asl a
+        beq :+
+        cmp #LAUNCH_MIN_PW
+        jcc pw_bad
+:       ldy #CR_LAUNCH-CR_FUEL
+        sta (ptr2),y
+@gears: ldy #PWT_GEARS
+        lda (ptr2),y
+        jeq @next
+        lda pw_s                ; model: PW_CARS + car*16
+        asl a
+        asl a
+        asl a
+        asl a
+        tax
+        lda PW_CARS,x
+        tax
+        lda car_ngears,x
+        sta pw_ng
+        txa
+        jsr pw_stock
+        lda #0
+        sta pw_i
+@gr:    ldy pw_i
+        jsr pw_stock_ratio      ; m_b = stock
+        ldx #1
+        jsr pw_get
+        beq @st
+        ldx #2
+        jsr pw_get_w            ; 10-bit change / 3 (two's complement)
+        cmp #2                  ; sign-extend bit 9
+        bcc :+
+        ora #$FC
+:       sta pw_d+1
+        lda pw_lo
+        sta pw_d
+        ldx #3                  ; m_b += 3 * change
+:       clc
+        lda m_b
+        adc pw_d
+        sta m_b
+        lda m_b+1
+        adc pw_d+1
+        sta m_b+1
+        dex
+        bne :-
+@st:    lda pw_i                ; store at PWT_RATIO + 2i
+        asl a
+        clc
+        adc #PWT_RATIO
+        tay
+        lda m_b
+        sta (ptr2),y
+        iny
+        lda m_b+1
+        sta (ptr2),y
+        ; limits: final 2.00-5.99, gears 0.50-4.99
+        ldx pw_i
+        beq @fin
+        cmp #5
+        jcs pw_bad
+        cmp #0
+        bne @ok
+        lda m_b
+        cmp #$80
+        jcc pw_bad
+        jmp @ok
+@fin:   cmp #2
+        jcc pw_bad
+        cmp #6
+        jcs pw_bad
+@ok:    inc pw_i
+        lda pw_i
+        cmp pw_ng
+        beq @gr
+        jcc @gr
+@next:  inc pw_s
+        lda pw_s
+        cmp PW_N
+        jne @car
+        lda pw_chk
+        sta pw_want
+        ldx #8
+        jsr pw_getb
+        cmp pw_want
+        jne pw_bad
+        jsr pw_bits             ; the length must fit exactly...
+        lda m_r
+        sta pw_d
+        lda m_r+1
+        sta pw_d+1
+        clc
+        lda m_r
+        adc #4
+        sta m_r
+        bcc :+
+        inc m_r+1
+:       lda #5
+        jsr div16_8
+        lda m_r
+        cmp pw_len
+        jne pw_bad
+        lda pw_len              ; ... and the spare bits be 0
+        sta m_a
+        lda #5
+        sta m_b
+        jsr mul8
+        sec
+        lda m_r
+        sbc pw_d
+        beq :+
+        tax
+        jsr pw_getb
+        jne pw_bad
+:       clc
+        rts
+
+LAUNCH_MIN_PW = 20             ; 2-step: 2000 rpm and up
+
+; pw_apply_tune: decoded tunes into the garage the passwords just loaded
+pw_apply_tune:
+        lda #0
+        sta pw_s
+@car:   lda pw_s
+        cmp PW_N
+        bcs @done
+        jsr slot_ptr
+        lda pw_s
+        asl a
+        asl a
+        asl a
+        asl a
+        asl a
+        sta ptr2
+        lda #>PW_TUNE
+        sta ptr2+1
+        ldx #0                  ; 12 tune bytes
+:       txa
+        tay
+        lda (ptr2),y
+        pha
+        txa
+        clc
+        adc #CR_FUEL
+        tay
+        pla
+        sta (ptr1),y
+        inx
+        cpx #12
+        bne :-
+        ldy #PWT_GEARS
+        lda (ptr2),y
+        beq @n
+        ldx #0                  ; final + 7 gears
+:       txa
+        clc
+        adc #PWT_RATIO
+        tay
+        lda (ptr2),y
+        pha
+        txa
+        clc
+        adc #CR_FINAL
+        tay
+        pla
+        sta (ptr1),y
+        inx
+        cpx #16
+        bne :-
+@n:     inc pw_s
+        bne @car
+@done:  jmp save_write
+
 ; pw_apply: start a fresh game, then load the decoded passwords into it
 pw_apply:
         jsr new_game
@@ -829,6 +1384,11 @@ pw_apply:
 ; ---------------------------------------------------------------------------
 ; pw_show: both passwords for the current game (from OPTIONS)
 pw_show:
+        jsr pw_enc_tune         ; is there a third password?
+        lda pw_len
+        sta pw_tlen
+        lda #2
+        sta pw_rstep
         lda #0
         jsr screen_begin
         jsr use_menu_palette
@@ -845,8 +1405,15 @@ pw_show:
         jsr pw_enc_garage
         lda #14
         jsr pw_print_rows
-        PRINT str_pw_note1, 2, 24
-        PRINT str_pw_note2, 2, 25
+        PRINT str_pw_note1, 2, 23
+        PRINT str_pw_note2, 2, 24
+        MOVI16 ptr0, str_pw_notune
+        lda pw_tlen
+        beq :+
+        MOVI16 ptr0, str_pw_tune_a
+:       ldx #2
+        ldy #26
+        jsr print
         PRINT str_pw_back, 2, 27
         jsr attr_upload
         lda #0
@@ -858,6 +1425,40 @@ pw_show:
         lda pad_new
         and #BTN_A|BTN_B|BTN_START
         beq :-
+        and #BTN_A
+        beq pw_show_out
+        lda pw_tlen
+        beq pw_show_out
+        lda #SFX_SELECT
+        jsr sfx_play
+        ; page 2: the tune password, a row of 16 per line
+        lda #0
+        jsr screen_begin
+        jsr use_menu_palette
+        lda #$20
+        sta text_attr
+        PRINT str_pw_t3, 2, 3
+        lda #0
+        sta text_attr
+        jsr pw_enc_tune
+        ldx #2                  ; two rows apart while it fits (160 letters)
+        lda pw_len
+        cmp #161
+        bcc :+
+        dex
+:       stx pw_rstep
+        lda #5
+        jsr pw_print_rows
+        PRINT str_pw_tnote, 2, 26
+        PRINT str_pw_back, 2, 27
+        jsr attr_upload
+        jsr ppu_on
+:       jsr wait_frame
+        jsr read_pad
+        lda pad_new
+        and #BTN_A|BTN_B|BTN_START
+        beq :-
+pw_show_out:
         lda #SFX_BACK
         jmp sfx_play
 
@@ -896,8 +1497,10 @@ pw_print_rows:
         ldx #6
         ldy pw_row
         jsr print
-        inc pw_row
-        inc pw_row
+        clc
+        lda pw_row
+        adc pw_rstep
+        sta pw_row
         lda pw_i
         cmp pw_len
         bne @row
@@ -915,7 +1518,12 @@ pw_title:
         sta pw_kind
         jsr pw_enter
         bcs @no
+        lda #2                  ; tunes (START with nothing typed: none)
+        sta pw_kind
+        jsr pw_enter
+        bcs @no
         jsr pw_apply
+        jsr pw_apply_tune
         lda #0
         rts
 @no:    lda #1
@@ -971,11 +1579,10 @@ pw_enter:
         lda #0
         sta pw_len
         sta pw_sel
-        lda #PLAYER_LEN2
+        sta pw_win
         ldx pw_kind
-        beq :+
-        lda #GARAGE_MAX
-:       sta pw_max
+        lda pw_maxes,x
+        sta pw_max
 @loop:  jsr wait_frame
         jsr read_pad
         lda pw_sel
@@ -1048,10 +1655,10 @@ pw_enter:
         bcs @err
         lda pw_sel
         sta PW_TEXT,x
+        inc pw_len
         tay
         lda pw_alpha,y
-        jsr pw_show_char
-        inc pw_len
+        jsr pw_type_char
         lda #SFX_SELECT
         jsr sfx_play
         jsr pw_clear_msg
@@ -1061,7 +1668,7 @@ pw_enter:
         dex
         stx pw_len
         lda #' '
-        jsr pw_show_char
+        jsr pw_type_char
         lda #SFX_BACK
         jsr sfx_play
         jsr pw_clear_msg
@@ -1069,9 +1676,13 @@ pw_enter:
 @done:  lda pw_kind
         bne :+
         jsr pw_dec_player
-        jmp :++
-:       jsr pw_dec_garage
-:       bcs @err
+        jmp @dec
+:       cmp #1
+        bne :+
+        jsr pw_dec_garage
+        jmp @dec
+:       jsr pw_dec_tune
+@dec:   bcs @err
         lda #SFX_BUY
         jsr sfx_play
         lda #20
@@ -1091,6 +1702,116 @@ pw_clear_msg:
         ldx #2
         ldy #24
         jmp vb_str
+
+pw_maxes: .byte PLAYER_LEN2, GARAGE_MAX, TUNE_MAX
+
+; pw_type_char: A = character typed (or ' ' deleted) at position X; pw_len
+; already updated.  Five rows of 16 show; a long password scrolls a row at a
+; time.  Also the letter count on row 5.
+pw_type_char:
+        pha
+        txa
+        pha
+        lda pw_len              ; window: the row being typed is the last shown
+        lsr a
+        lsr a
+        lsr a
+        lsr a
+        sec
+        sbc #4
+        bcs :+
+        lda #0
+:       cmp pw_win
+        beq @same
+        sta pw_win
+        pla
+        pla
+        jsr pw_redraw_typed
+        jmp pw_count
+@same:  lda pw_win
+        asl a
+        asl a
+        asl a
+        asl a
+        sta pw_v
+        pla
+        sec
+        sbc pw_v
+        tax
+        pla
+        jsr pw_show_char
+        ; fall through
+; pw_count: "12 LETTERS" on row 5
+pw_count:
+        lda pw_len
+        sta m_a
+        lda #0
+        sta m_a+1
+        jsr num_text
+        ldy #0
+        jsr cat_ptr0
+        sty pw_v
+        MOVI16 ptr0, str_pw_letters
+        ldy pw_v
+        jsr cat_ptr0
+        lda #0
+        sta linebuf,y
+        MOVI16 ptr0, linebuf
+        lda #14
+        jsr pad_ptr0
+        ldx #2
+        ldy #5
+        jmp vb_str
+
+; pw_redraw_typed: the five rows of typed letters from row pw_win
+pw_redraw_typed:
+        lda #0
+        sta pw_row
+@row:   lda pw_win
+        clc
+        adc pw_row
+        asl a
+        asl a
+        asl a
+        asl a
+        tax                     ; first position on this row
+        ldy #0
+@ch:    lda #' '
+        cpx pw_len
+        bcs :+
+        lda PW_TEXT,x
+        sty pw_v
+        tay
+        lda pw_alpha,y
+        ldy pw_v
+:       sta linebuf,y
+        iny
+        inx
+        txa
+        and #15
+        beq @end
+        and #3
+        bne @ch
+        lda #' '
+        sta linebuf,y
+        iny
+        bne @ch
+@end:   lda #0
+        sta linebuf,y
+        MOVI16 ptr0, linebuf
+        lda pw_row
+        asl a
+        clc
+        adc #6
+        tay
+        ldx #6
+        jsr vb_str
+        jsr wait_frame
+        inc pw_row
+        lda pw_row
+        cmp #5
+        bne @row
+        rts
 
 ; pw_show_char: A = character for typed position X (rows 6-14, 16 per row)
 pw_show_char:
@@ -1135,12 +1856,18 @@ pw_grid_xy:
         tay
         rts
 
-pw_titles_lo: .byte <str_pw_t1, <str_pw_t2
-pw_titles_hi: .byte >str_pw_t1, >str_pw_t2
-pw_hints_lo:  .byte <str_pw_h1, <str_pw_h2
-pw_hints_hi:  .byte >str_pw_h1, >str_pw_h2
+pw_titles_lo: .byte <str_pw_t1, <str_pw_t2, <str_pw_t3
+pw_titles_hi: .byte >str_pw_t1, >str_pw_t2, >str_pw_t3
+pw_hints_lo:  .byte <str_pw_h1, <str_pw_h2, <str_pw_h3
+pw_hints_hi:  .byte >str_pw_h1, >str_pw_h2, >str_pw_h3
 str_pw_t1:     .byte "PASSWORD 1: PLAYER", 0
 str_pw_t2:     .byte "PASSWORD 2: GARAGE", 0
+str_pw_t3:     .byte "PASSWORD 3: TUNES", 0
+str_pw_h3:     .byte "NO TUNES? JUST PRESS START", 0
+str_pw_letters: .byte " LETTERS", 0
+str_pw_tune_a: .byte "A: PASSWORD 3 (TUNES)", 0
+str_pw_notune: .byte "NO TUNED CARS: NO PASSWORD 3", 0
+str_pw_tnote:  .byte "TYPE IT AFTER PASSWORD 2", 0
 str_pw_h1:     .byte "32 LETTERS", 0
 str_pw_h2:     .byte "12 LETTERS, MORE WITH MORE CARS", 0
 str_pw_help1:  .byte "A:ADD  B:DELETE  START:DONE", 0
@@ -1150,6 +1877,6 @@ str_pw_clear:  .byte "                        ", 0
 str_pw_yours:  .byte "YOUR PASSWORDS", 0
 str_pw_player: .byte "1: PLAYER", 0
 str_pw_garage: .byte "2: GARAGE", 0
-str_pw_note1:  .byte "WRITE BOTH DOWN. TITLE >", 0
+str_pw_note1:  .byte "WRITE THEM DOWN. TITLE >", 0
 str_pw_note2:  .byte "PASSWORD BRINGS YOU BACK.", 0
 str_pw_back:   .byte "B:BACK", 0

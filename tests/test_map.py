@@ -123,6 +123,7 @@ class Map(unittest.TestCase):
         t = to_password_screen()
         type_password(t, pw.encode_player(**st))
         type_password(t, pw.encode_garage([(3, [2] * 14, 0x16)], 0))
+        type_password(t, '')
         t.step(60)
         self.assertEqual(t.mem('game_mode'), 1)
         self.assertEqual(t.mem('map_region'), SAPPORO)

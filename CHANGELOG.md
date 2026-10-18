@@ -3,6 +3,13 @@
 Every version of Pixel Racer NES, newest first. Downloads are on the
 [Releases page](https://github.com/Trevor792221/PCR-to-Nes-port/releases).
 
+## v4.3: Tunes in a password (2026-10-18)
+
+* Tuned cars now get a third password, **PASSWORD 3: TUNES**. It holds each tuned car's fuel map, ignition timing, boost, tire pressure, 2-step and gear ratios. OPTIONS → PASSWORD shows it: press A on the first page.
+* Cars left on the stock tune add nothing to it. If nothing is tuned there's no third password: just press START at PASSWORD 3.
+* Long tune passwords scroll while you type them, with a letter count.
+* Passwords from older versions still work: enter the first two and press START at PASSWORD 3.
+
 ## v4.2: Engine tuning (2026-10-18)
 
 * Two new parts: **wheelie bars** (more launch grip on RWD and AWD cars) and **injectors** (a little power, and the fuel to run lean or overboost).

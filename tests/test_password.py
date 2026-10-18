@@ -11,9 +11,11 @@ import password as pw          # noqa: E402
 from harness import *          # noqa: E402,F401,F403
 from test_game import new_game, SV_CASH, SV_CARS, G_OPTIONS   # noqa: E402
 from test_features import give_car, set_cash                 # noqa: E402
+SV_CARS_ = SV_CARS
 
 SV_GEMS, SV_XP, SV_LEVEL, SV_LADDER, SV_CURCAR = 0x6007, 0x6009, 0x600B, 0x600C, 0x600D
 SV_OPTIONS, SV_SECRET = 0x600E, 0x6018
+PW_TEXT = 0x6900
 SV_WINS, SV_LOSSES, SV_CRATES, SV_STREET = 0x600F, 0x6011, 0x6013, 0x6017
 SV_RACES, SV_PBEST, SV_PBCAR, SV_TOPSPD = 0x6019, 0x601B, 0x601D, 0x601E
 
@@ -59,6 +61,62 @@ def to_password_screen():
     s.press(A)
     s.step(40)
     return s
+
+
+def signed(v):
+    return v - 256 if v >= 128 else v
+
+
+def garage_tunes(s):
+    """(model, 12 tune bytes, final, gears) per car, in garage order"""
+    import gamedata as gd
+    out = []
+    for slot in range(8):
+        b = SV_CARS + slot * 48
+        m = s.wram(b)
+        if m == 0xFF:
+            continue
+        out.append((m, [signed(s.wram(b + 34 + i)) for i in range(12)], s.wram(b + 18, 2),
+                    [s.wram(b + 20 + 2 * i, 2) for i in range(gd.CARS[m][6])]))
+    return out
+
+
+def random_tune(rnd, model):
+    import gamedata as gd
+    tune = ([rnd.randint(-5, 5) for _ in range(8)] + [rnd.randint(-5, 5), rnd.randint(-14, 8),
+            rnd.randint(-13, 9), rnd.choice([0, 2 * rnd.randint(10, 45)])])
+    stock = pw._stock_ratios(model)
+    rat = []
+    for i, st in enumerate(stock):
+        lo, hi = (0x200, 0x5FF) if i == 0 else (0x80, 0x4FF)
+        rat.append(rnd.choice([st, st + 3 * rnd.randint((lo - st + 2) // 3, (hi - st) // 3)]))
+    return tune, rat[0], rat[1:]
+
+
+def tune_cars(s, rnd, slots, full=False):
+    for slot in slots:
+        b = SV_CARS + slot * 48
+        tune, final, gears = random_tune(rnd, s.wram(b))
+        if full:
+            tune = [rnd.choice([-5, 5]) for _ in range(8)] + [5, -14, 9, 90]
+            st = pw._stock_ratios(s.wram(b))         # as far as the limits go
+            final = st[0] + 3 * ((0x5FF - st[0]) // 3)
+            gears = [g + 3 * ((0x4FF - g) // 3) if i % 2 else g - 3 * ((g - 0x80) // 3)
+                     for i, g in enumerate(st[1:])]
+        for i, v in enumerate(tune):
+            s.nes[b + 34 + i] = v & 0xFF
+        s.nes[b + 18], s.nes[b + 19] = final & 0xFF, final >> 8
+        for i, g in enumerate(gears):
+            s.nes[b + 20 + 2 * i], s.nes[b + 21 + 2 * i] = g & 0xFF, g >> 8
+
+
+def show_passwords(s):
+    s.garage_goto(G_OPTIONS)
+    s.press(A)
+    s.step(30)
+    s.list_goto('ui_sel', 3)
+    s.press(A)
+    s.step(40)
 
 
 class Passwords(unittest.TestCase):
@@ -113,13 +171,14 @@ class Passwords(unittest.TestCase):
         s.press(A)
         s.step(40)
         g = pw.encode_garage(cars, cur)
-        rom = ''.join(pw.ALPHABET[s.nes[0x6840 + i]] for i in range(s.mem('pw_len')))
+        rom = ''.join(pw.ALPHABET[s.nes[PW_TEXT + i]] for i in range(s.mem('pw_len')))
         self.assertEqual(rom, g)
         p = pw.encode_player(**player)
         # a new console (no battery: nothing kept) takes both passwords
         t = to_password_screen()
         type_password(t, p)
         type_password(t, g)
+        type_password(t, '')                         # no tunes
         t.step(60)
         self.assertEqual(t.mem('game_mode'), 1, 'in the garage')
         self.assertEqual(game_state(t), (player, cars, cur))
@@ -140,6 +199,7 @@ class Passwords(unittest.TestCase):
         t = to_password_screen()
         type_password(t, p)
         type_password(t, g)
+        type_password(t, '')                         # no tunes
         t.step(60)
         self.assertEqual(t.mem('game_mode'), 1)
         player, cars, cur = game_state(t)
@@ -155,11 +215,84 @@ class Passwords(unittest.TestCase):
         t = to_password_screen()
         type_password(t, p)
         type_password(t, g)
+        type_password(t, '')                         # no tunes
         t.step(60)
         self.assertEqual(t.mem('game_mode'), 1)
         player, cars, cur = game_state(t)
         self.assertEqual(cars, [(8, [2] * 12 + [0, 0], 0x16), (2, [4] * 12 + [0, 0], 0x27)])
         self.assertEqual(cur, 1)
+
+    def test_tune_reference_round_trip(self):
+        rnd = random.Random(11)
+        for _ in range(300):
+            models = [rnd.randint(0, 12) for _ in range(rnd.randint(1, 8))]
+            cars = []
+            for m in models:
+                tune, final, gears = random_tune(rnd, m)
+                if rnd.random() < 0.3:
+                    tune = [0] * 12
+                cars.append((m, tune, final, gears))
+            t = pw.encode_tune(cars)
+            dec = pw.decode_tune(t, models)
+            for (m, tune, final, gears), (dt, dr) in zip(cars, dec):
+                self.assertEqual(dt or [0] * 12, tune)
+                self.assertEqual(dr or pw._stock_ratios(m), [final] + gears)
+            if t:
+                i = rnd.randrange(len(t))
+                bad = t[:i] + pw.ALPHABET[(pw.ALPHABET.index(t[i]) + rnd.randint(1, 31)) % 32] + t[i + 1:]
+                self.assertIsNone(pw.decode_tune(bad, models), 'typo %s -> %s' % (t, bad))
+        stock = [(2, [0] * 12, *(lambda r: (r[0], r[1:]))(pw._stock_ratios(2)))]
+        self.assertEqual(pw.encode_tune(stock), '', 'nothing tuned: no password')
+
+    def tune_round_trip(self, slots, models, full=False):
+        s = new_game()
+        for slot, m in zip(slots, models):
+            give_car(s, slot, m, 2)
+        s.nes[SV_CURCAR] = slots[-1]
+        tune_cars(s, random.Random(len(slots)), slots[:-1] if not full else slots, full)
+        player, cars, cur = game_state(s)
+        tunes = garage_tunes(s)
+        want = pw.encode_tune(tunes)
+        show_passwords(s)
+        g = ''.join(pw.ALPHABET[s.nes[PW_TEXT + i]] for i in range(s.mem('pw_len')))
+        s.press(A)                                   # page 2: the tune password
+        s.step(40)
+        rom = ''.join(pw.ALPHABET[s.nes[PW_TEXT + i]] for i in range(s.mem('pw_len')))
+        self.assertEqual(rom, want)
+        t = to_password_screen()
+        type_password(t, pw.encode_player(**player))
+        type_password(t, g)
+        type_password(t, want)
+        t.step(60)
+        self.assertEqual(t.mem('game_mode'), 1, 'in the garage')
+        self.assertEqual(garage_tunes(t), tunes)
+        self.assertEqual(t.mem('lag'), 0)
+        return want
+
+    def test_tunes_survive_a_fresh_console(self):
+        t = self.tune_round_trip([0, 3, 5], [9, 2, 7])
+        self.assertLess(len(t), 60)
+
+    def test_eight_tuned_cars_scroll(self):
+        t = self.tune_round_trip(list(range(8)), [11, 9, 8, 7, 10, 5, 2, 12], full=True)
+        self.assertGreater(len(t), 160, 'long enough to scroll the entry')
+
+    def test_wrong_tune_password_is_refused(self):
+        s = new_game()
+        give_car(s, 0, 9, 1)
+        tune_cars(s, random.Random(3), [0])
+        player, cars, cur = game_state(s)
+        t_ok = pw.encode_tune(garage_tunes(s))
+        other = pw.encode_tune([(9, [1] * 12, *(lambda r: (r[0], r[1:]))(pw._stock_ratios(9))),
+                                (2, [1] * 12, *(lambda r: (r[0], r[1:]))(pw._stock_ratios(2)))])
+        bad = t_ok[:-1] + pw.ALPHABET[(pw.ALPHABET.index(t_ok[-1]) + 1) % 32]
+        for wrong in (bad, other):                   # a typo; another garage's
+            t = to_password_screen()
+            type_password(t, pw.encode_player(**player))
+            type_password(t, pw.encode_garage(cars, cur))
+            type_password(t, wrong)
+            self.assertEqual(t.mem('pw_kind'), 2, 'still on password 3')
+            self.assertEqual(t.mem('game_mode'), 0)
 
     def test_new_game_passwords(self):
         p = pw.encode_player(3000, 5, 1, 0, 0, 0, 0, dict.fromkeys(dict(pw.STATS), 0))
@@ -167,6 +300,7 @@ class Passwords(unittest.TestCase):
         t = to_password_screen()
         type_password(t, p)
         type_password(t, g)
+        type_password(t, '')                         # no tunes
         t.step(60)
         self.assertEqual(t.mem('game_mode'), 1)
         self.assertEqual(t.wram(SV_CASH, 3), 3000)
