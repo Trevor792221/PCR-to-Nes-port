@@ -190,6 +190,30 @@ _NB2 = ('A2:4 C3:4 E3:4 G3:4 D3:4 F3:4 A3:4 C3:4 G2:4 B2:4 D3:4 F3:4 C3:4 E3:4 G
 NIGHT_BASS = 'I2 ' + _NB2 * 2
 NIGHT_DRUM = 'K:4 H:2 H:2 O:4 H:2 H:2 ' * 16
 
+# ---------------------------------------------------------------------------
+# "Road to Tokyo" -- the world map.  A minor with a miyako-bushi lean
+# (E F A B C), 128 bpm feel.  A: Am Am F E Am F Dm-E Am, B: F Dm Am E F Dm F-E Am
+# ---------------------------------------------------------------------------
+MAP_LEAD = '''
+I0 E5:2 F5:2 A5:4 B5:2 A5:2 F5:4 | E5:4 C5:2 B4:2 A4:8
+   A4:2 B4:2 C5:2 E5:2 F5:4 E5:2 C5:2 | B4:12 R:4
+   E5:2 F5:2 A5:4 C6:2 B5:2 A5:4 | B5:4 C6:2 B5:2 A5:8
+   F5:2 E5:2 C5:2 B4:2 C5:4 E5:4 | A4:12 R:4
+I3 C6:6 B5:2 A5:8 | F5:6 E5:2 C5:8 | E5:4 F5:4 A5:4 B5:4 | E5:12 R:4
+   A5:6 B5:2 C6:4 E6:4 | F6:4 E6:4 C6:4 B5:4 | A5:4 F5:4 E5:4 B4:4 | A4:12 R:4
+'''
+MAP_HARM = 'I1 ' + ''.join([
+    _stab('C5', 'E5'), _stab('C5', 'E5'), _stab('A4', 'C5'), _stab('G#4', 'B4'),
+    _stab('C5', 'E5'), _stab('A4', 'C5'), _stab('F4', 'A4', 'G#4', 'B4'), _stab('C5', 'E5'),
+    _stab('A4', 'C5'), _stab('F4', 'A4'), _stab('C5', 'E5'), _stab('G#4', 'B4'),
+    _stab('A4', 'C5'), _stab('F4', 'A4'), _stab('A4', 'C5', 'G#4', 'B4'), _stab('C5', 'E5')])
+MAP_BASS = 'I2 ' + ''.join([
+    _oct('A'), _oct('A'), _oct('F'), _oct('E'), _oct('A'), _oct('F'), _oct('D', 'E'), _oct('A'),
+    _oct('F'), _oct('D'), _oct('A'), _oct('E'), _oct('F'), _oct('D'), _oct('F', 'E'), _oct('A')])
+_MB = 'K:2 H:2 S:2 H:2 K:2 K:2 S:2 H:2 '
+_MF = 'K:2 K:2 S:2 K:2 S:1 S:1 S:2 O:2 S:2 '
+MAP_DRUM = (_MB * 7 + _MF) * 2
+
 # short jingles (do not loop)
 WIN_LEAD = 'I9 C5:1 E5:1 G5:1 C6:3 R:1 A5:1 C6:6'
 WIN_HARM = 'I1 E4:1 G4:1 C5:1 E5:3 R:1 F5:1 E5:6'
@@ -212,6 +236,8 @@ SONGS = [
                    (NEON_BASS, True, False), (NEON_DRUM, True, True)]),
     ('song_night', [(NIGHT_LEAD, True, False), (NIGHT_HARM, True, False),
                     (NIGHT_BASS, True, False), (NIGHT_DRUM, True, True)]),
+    ('song_map', [(MAP_LEAD, True, False), (MAP_HARM, True, False),
+                  (MAP_BASS, True, False), (MAP_DRUM, True, True)]),
 ]
 
 
@@ -255,6 +281,7 @@ def main():
     lines.append('SONG_BOSS = 3')
     lines.append('SONG_NEON = 4')
     lines.append('SONG_NIGHT = 5')
+    lines.append('SONG_MAP = 6')
     open(sys.argv[1], 'w').write('\n'.join(lines) + '\n')
 
 

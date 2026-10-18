@@ -161,7 +161,8 @@ def main():
              'song_win': ('02-win.wav', 0), 'song_lose': ('03-lose.wav', 0),
              'song_boss': ('04-showdown.wav', 2),
              'song_neon': ('05-neon-boulevard.wav', 1),
-             'song_night': ('06-after-hours.wav', 1)}
+             'song_night': ('06-after-hours.wav', 1),
+             'song_map': ('07-road-to-tokyo.wav', 1)}
     for name, chans in mm.SONGS:
         data = [mm.compile_channel(t, loop, drums) for t, loop, drums in chans]
         fname, loops = names[name]

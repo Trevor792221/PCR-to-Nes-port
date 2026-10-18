@@ -70,6 +70,8 @@ map_screen:
         bpl :-
         MOVI16 ptr0, pal_map
         jsr load_palette
+        lda #SONG_MAP           ; the map's own theme ("Road to Tokyo")
+        jsr music_play
         ; title, level, the list of regions
         lda #$20
         sta text_attr

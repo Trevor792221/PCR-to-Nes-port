@@ -49,9 +49,12 @@ class Map(unittest.TestCase):
             s.press(B)
             s.step(40)
         open_map(s, 9)
+        self.assertEqual(s.mem('mus_song'), 6, 'the map plays Road to Tokyo')
+        self.assertTrue(any(s.mem('mus_act', i) for i in range(4)))
         pick_region(s, GUNMA)
         self.assertEqual(s.mem('map_region'), GUNMA)
         self.assertEqual(s.mem('ui_count'), 8, 'race select')
+        self.assertIn(s.mem('mus_song'), (0, 4, 5), 'garage theme back in race select')
         s.press(B)                                   # back to the map
         s.step(40)
         self.assertEqual(s.mem('ui_count'), 7)

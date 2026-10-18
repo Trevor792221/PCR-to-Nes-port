@@ -98,7 +98,7 @@ res_mph:    .res 2          ; trap speed in mph (for the stats page)
 tmp_rec:    .res 32         ; scratch car record (dealer, crates)
 race_theme: .res 1          ; 0 day, 1 sunset, 2 night (picked per race)
 copy_bank:  .res 1          ; source bank for chr_copy / bank0_copy (0 = graphics)
-garage_song: .res 1         ; garage theme in use (SONG_GARAGE or SONG_NEON)
+garage_song: .res 1         ; garage theme in use (SONG_GARAGE, SONG_NEON or SONG_NIGHT)
 new_song:   .res 1          ; set by a race: the garage picks a theme again
 garage_night: .res 1        ; 1: the garage is shown at night
 map_region: .res 1          ; map region the races are in (0 FUKUOKA .. 6 TOKYO)

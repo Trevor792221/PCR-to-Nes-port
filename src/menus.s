@@ -2964,7 +2964,7 @@ st_sfx:     .res 1
 ; ---------------------------------------------------------------------------
 ; snd_test: play any song or sound effect (debug menu)
 ; ---------------------------------------------------------------------------
-NSONGS = 6
+NSONGS = 7
 NSFX   = 17
 snd_test:
         lda #0
@@ -3146,13 +3146,14 @@ str_st0:     .byte "MUSIC", 0
 str_st1:     .byte "SOUND", 0
 str_st2:     .byte "STOP", 0
 str_st_help: .byte "LEFT/RIGHT:PICK  A:PLAY", 0
-st_song_names: .word sn0, sn1, sn2, sn3, sn4, sn5
+st_song_names: .word sn0, sn1, sn2, sn3, sn4, sn5, sn6
 sn0:    .byte "MIDNIGHT GARAGE", 0
 sn1:    .byte "WIN", 0
 sn2:    .byte "LOSE", 0
 sn3:    .byte "SHOWDOWN", 0
 sn4:    .byte "NEON BOULEVARD", 0
 sn5:    .byte "AFTER HOURS", 0
+sn6:    .byte "ROAD TO TOKYO", 0
 st_sfx_names:
         .word sf1, sf2, sf3, sf4, sf5, sf6, sf7, sf8, sf9
         .word sf10, sf11, sf12, sf13, sf14, sf15, sf16, sf17

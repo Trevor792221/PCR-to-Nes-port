@@ -3,6 +3,11 @@
 Every version of Pixel Racer NES, newest first. Downloads are on the
 [Releases page](https://github.com/Trevor792221/PCR-to-Nes-port/releases).
 
+## v4.1: Road to Tokyo (2026-10-18)
+
+* The world map has its own song, "Road to Tokyo": an upbeat travel theme with a Japanese scale. The garage music comes back when you leave the map.
+* The debug menu's SOUND TEST can play it, and it's in the soundtrack download as `07-road-to-tokyo.wav`.
+
 ## v4.0: World map of Japan (2026-10-18)
 
 * RACE now opens a map of Japan. Pick the region you race in: Fukuoka, Hiroshima, Osaka, Nagoya, Gunma, Sapporo and Tokyo open at levels 1, 2, 4, 6, 8, 11 and 14.
