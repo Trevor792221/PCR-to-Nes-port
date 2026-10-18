@@ -12,6 +12,9 @@
 ;                    body colour 5 | checksum 8
 ;                    (versions 1-2, 11-66 chars, have 6 pairs: no wheelie
 ;                    bars or injectors; they still work)
+;                    Version 4 (0 in the field), 14-85 chars, only when a
+;                    car is swapped: after each colour, engine 5 | drive 2
+;                    (the record's CR_ENGINE and CR_DRIVE bytes)
 ; Bits go MSB first; each 5 bits is one character XORed with a mask that
 ; steps by 13 per position.  The checksum (rotate left, add) runs over every
 ; field and is seeded differently per password.  tools/password.py is the
@@ -55,9 +58,11 @@ PW_TEXT   = DYNO_BMP + $100     ; up to 255 symbols (0-31)
 PW_PL     = DYNO_BMP + $200     ; decoded player fields (25 bytes, see pw_apply)
 PW_N      = DYNO_BMP + $220     ; decoded garage: cars
 PW_CUR    = DYNO_BMP + $221     ;   car in use
-PW_CARS   = DYNO_BMP + $240     ;   8 x 16: model, 14 parts, colour index
-PWC_SIZE  = 16
+PW_CARS   = DYNO_BMP + $240     ;   8 x 18: model, 14 parts, colour index,
+PWC_SIZE  = 18                  ;   engine and drivetrain swap bytes
 PWC_PAINT = 1 + NPARTS
+PWC_ENGINE = PWC_PAINT + 1
+PWC_DRIVE  = PWC_PAINT + 2
 PW_TUNE   = DYNO_BMP + $300     ; decoded tunes: 8 x 32
 PWT_SIZE  = 32                  ;   12 tune bytes (as in the record),
 PWT_GEARS = 12                  ;   gears tuned (0/1),
@@ -70,12 +75,14 @@ SEED_TUNE    = $A5
 TUNE_MAX     = 230              ; letters (8 fully tuned cars need up to 230)
 PLAYER_LEN   = 15               ; version 1 (v3.0): no stats
 PLAYER_LEN2  = 32               ; version 2: with stats
-GARAGE_MAX   = 74
+GARAGE_MAX   = 85
 
 pw_alpha:   .byte "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 garage_len: .byte 12, 21, 30, 39, 48, 56, 65, 74    ; version 3: (16 + 44*cars + 4) / 5
 garage_len2: .byte 11, 19, 27, 35, 43, 50, 58, 66   ; versions 1-2: 12 parts, 39 bits a car
 garage_pad: .byte 0, 1, 2, 3, 4, 0, 1, 2            ; 5*len - bits (the same for both)
+garage_len4: .byte 14, 24, 34, 44, 55, 65, 75, 85   ; version 4: + swaps, 51 bits a car
+garage_pad4: .byte 3, 2, 1, 0, 4, 3, 2, 1
 
 ; ---------------------------------------------------------------------------
 ; Bit buffer
@@ -535,7 +542,29 @@ pw_enc_garage:
         sta pw_mode
         lda #SEED_GARAGE
         sta pw_chk
-        lda #3                  ; version 3: CRC, 14 parts
+        lda #3                  ; version 3: CRC, 14 parts; 4 (written as
+        sta pw_ver              ; 0) when a car is swapped
+        lda #0
+        sta pw_s
+@sw:    lda pw_s
+        jsr slot_ptr
+        ldy #CR_MODEL
+        lda (ptr1),y
+        cmp #$FF
+        beq :+
+        ldy #CR_ENGINE
+        lda (ptr1),y
+        iny
+        ora (ptr1),y
+        beq :+
+        lda #4
+        sta pw_ver
+:       inc pw_s
+        lda pw_s
+        cmp #NSLOTS
+        bne @sw
+        lda pw_ver
+        and #3
         ldx #2
         jsr pw_put
         ; count the cars and find the one in use
@@ -606,6 +635,17 @@ pw_enc_garage:
 :       txa
         ldx #5
         jsr pw_put
+        lda pw_ver
+        cmp #4
+        bne @next
+        ldy #CR_ENGINE          ; version 4: the swaps
+        lda (ptr1),y
+        ldx #5
+        jsr pw_put
+        ldy #CR_DRIVE
+        lda (ptr1),y
+        ldx #2
+        jsr pw_put
 @next:  inc pw_s
         lda pw_s
         cmp #NSLOTS
@@ -615,7 +655,11 @@ pw_enc_garage:
         jsr pw_putb
         ldx pw_i
         lda garage_len-1,x
-        sta pw_len
+        ldy pw_ver
+        cpy #4
+        bne :+
+        lda garage_len4-1,x
+:       sta pw_len
         jmp pw_to_text
 
 ; pw_dec_garage: PW_TEXT -> PW_N, PW_CUR, PW_CARS.  Carry set if wrong.
@@ -625,9 +669,10 @@ pw_dec_garage:
         jcc pw_bad
         jsr pw_from_text
         ldx #2                  ; version 1 (v3.0) field sum, 2 CRC,
-        jsr pw_getb             ; 3 (v4.2) CRC and 14 parts
-        sta pw_ver
-        beq @bad
+        jsr pw_getb             ; 3 (v4.2) CRC and 14 parts, 0: version 4
+        bne :+                  ; (v5.0) with swaps
+        lda #4
+:       sta pw_ver
         cmp #1
         beq :+
         lda #2                  ; (versions 2 and 3: CRC)
@@ -639,9 +684,12 @@ pw_dec_garage:
         sta pw_chk
         ldx #2
         jsr pw_get
-        cmp pw_ver
+        sta pw_lo
+        lda pw_ver
+        and #3
+        cmp pw_lo
         beq :+
-@bad:   jmp pw_bad
+        jmp pw_bad
 :
         ldx #3
         jsr pw_get
@@ -651,8 +699,11 @@ pw_dec_garage:
         lda garage_len-1,x
         ldy pw_ver
         cpy #3
-        beq :+
-        lda garage_len2-1,x
+        beq :++
+        bcc :+
+        lda garage_len4-1,x
+        bcs :++
+:       lda garage_len2-1,x
 :       cmp pw_len
         jne pw_bad
         ldx #3
@@ -708,6 +759,34 @@ pw_dec_garage:
         sta (ptr2),y
         cmp #24
         jcs pw_bad
+        lda #0                  ; swaps: none before version 4
+        sta pw_lo
+        sta pw_hb
+        lda pw_ver
+        cmp #4
+        bne @swp
+        ldx #5
+        jsr pw_get
+        sta pw_lo
+        cmp #NENGINES+1
+        jcs pw_bad
+        cmp #CRATE_CAR+1        ; the crate car's engine isn't for sale
+        jeq pw_bad
+        ldx #2
+        jsr pw_get
+        sta pw_hb
+        ora pw_lo               ; and the crate car can't be swapped
+        beq @swp
+        ldy #0
+        lda (ptr2),y
+        cmp #CRATE_CAR
+        jeq pw_bad
+@swp:   ldy #PWC_ENGINE
+        lda pw_lo
+        sta (ptr2),y
+        iny
+        lda pw_hb
+        sta (ptr2),y
         clc
         lda ptr2
         adc #PWC_SIZE
@@ -717,7 +796,7 @@ pw_dec_garage:
 :       inc pw_s
         lda pw_s
         cmp PW_N
-        bne @car
+        jne @car
         lda pw_chk
         sta pw_want
         ldx #8
@@ -726,6 +805,11 @@ pw_dec_garage:
         jne pw_bad
         ldx PW_N                ; the spare bits in the last letter must be 0
         lda garage_pad-1,x
+        ldy pw_ver
+        cpy #4
+        bne :+
+        lda garage_pad4-1,x
+:       cmp #0
         beq :+
         tax
         jsr pw_getb
@@ -1112,11 +1196,13 @@ pw_dec_tune:
 @gears: ldy #PWT_GEARS
         lda (ptr2),y
         jeq @next
-        lda pw_s                ; model: PW_CARS + car*16
+        lda pw_s                ; model: PW_CARS + car*18
+        asl a
+        sta pw_lo
         asl a
         asl a
         asl a
-        asl a
+        adc pw_lo
         tax
         lda PW_CARS,x
         tax
@@ -1363,6 +1449,14 @@ pw_apply:
         lda paint_list,x
         ldy #CR_PAINT
         sta (ptr1),y
+        ldy #PWC_ENGINE         ; swaps
+        lda (ptr2),y
+        ldy #CR_ENGINE
+        sta (ptr1),y
+        ldy #PWC_DRIVE
+        lda (ptr2),y
+        ldy #CR_DRIVE
+        sta (ptr1),y
         clc
         lda ptr2
         adc #PWC_SIZE
@@ -1403,7 +1497,11 @@ pw_show:
         lda #7
         jsr pw_print_rows
         jsr pw_enc_garage
-        lda #14
+        lda pw_len              ; over 80 letters (swaps): rows together
+        cmp #81
+        bcc :+
+        dec pw_rstep
+:       lda #14
         jsr pw_print_rows
         PRINT str_pw_note1, 2, 23
         PRINT str_pw_note2, 2, 24

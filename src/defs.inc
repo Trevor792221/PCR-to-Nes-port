@@ -114,6 +114,8 @@ CR_TIMING = 42                  ;   ignition advance (-5 .. +5),
 CR_TIREP  = 43                  ;   tire psi from 32 (-14 .. +8),
 CR_BOOST  = 44                  ;   boost psi from the turbo's own,
 CR_LAUNCH = 45                  ;   2-step launch rpm/100 (0 off)
+CR_ENGINE = 46                  ; swapped engine id + 1 (0 = its own)
+CR_DRIVE  = 47                  ; swapped drivetrain + 1 (0 = its own)
 CR_SIZE   = 48
 NCELLS    = 8                   ; fuel map cells
 

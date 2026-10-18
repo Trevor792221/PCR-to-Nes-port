@@ -8,8 +8,10 @@ ui_count:   .res 1
 ui_x:       .res 1          ; cursor column
 ui_y0:      .res 1          ; first item row
 ui_dy:      .res 1          ; rows per item
-ui_cols:    .res 1          ; 1 or 2 columns
-ui_x2:      .res 1          ; second column x
+ui_cols:    .res 1          ; columns (items go across, then down)
+ui_x2:      .res 1          ; second column x (the rest the same distance apart)
+ui_c:       .res 1          ; column of ui_sel
+ui_rs:      .res 1          ; first item of its row
 ui_anim:    .res 1
 
 .segment "FIXED"
@@ -361,41 +363,70 @@ list_select:
         lda pad_rpt
         and #BTN_UP
         beq @nu
-        lda ui_cols
-        cmp #2
-        bne :+
-        lda ui_sel
-        sec
-        sbc #2
-        jcs @set
-        adc ui_count
-        jcs @set                ; (always)
-:       ldx ui_sel
-        bne :+
-        ldx ui_count
-:       dex
+        lda ui_sel              ; a row up, or round to the bottom of the column
+        cmp ui_cols
+        bcc @bot
+        sbc ui_cols
+        jmp @set
+@bot:   tax
+        clc
+        adc ui_cols
+        cmp ui_count
+        bcc @bot
         txa
         jmp @set
 @nu:    lda pad_rpt
         and #BTN_DOWN
         beq @nd
-        lda ui_sel
+        lda ui_sel              ; a row down, or round to the top
         clc
         adc ui_cols
         cmp ui_count
-        bcc @set
-        sbc ui_count
+        jcc @set
+        jsr ui_col
         jmp @set
 @nd:    lda ui_cols
         cmp #2
-        bne @lr1
+        bcc @lr1
         lda pad_rpt
         and #BTN_LEFT|BTN_RIGHT
         beq @btn
-        lda ui_sel
-        eor #1
+        jsr ui_col              ; along the row, round at its ends
+        sta ui_c
+        eor #$FF
+        sec
+        adc ui_sel
+        sta ui_rs
+        lda pad_rpt
+        and #BTN_RIGHT
+        beq @left
+        ldx ui_sel
+        inx
+        ldy ui_c
+        iny
+        cpy ui_cols
+        bcs @rs
+        cpx ui_count
+        bcs @rs
+        txa
+        jmp @chk
+@rs:    lda ui_rs
+        jmp @chk
+@left:  ldx ui_sel
+        dex
+        txa
+        ldy ui_c
+        bne @chk
+        clc                     ; row's last item
+        lda ui_rs
+        adc ui_cols
         cmp ui_count
-        bcs @btn
+        bcc :+
+        lda ui_count
+:       sec
+        sbc #1
+@chk:   cmp ui_sel
+        beq @btn                ; alone on its row
         jmp @set
 @lr1:   lda pad_rpt
         and #BTN_LEFT
@@ -442,20 +473,32 @@ list_select:
 ; list_cursor: place the cursor sprite for ui_sel
 list_cursor:
         lda ui_sel
-        ldx ui_cols
-        cpx #2
-        bne @one
-        lsr a
-        pha
-        lda ui_sel
-        and #1
-        beq :+
-        ldx ui_x2
-        bne @gotx
-:       ldx ui_x
-@gotx:  pla
-        jmp @row
-@one:   ldx ui_x
+        ldx ui_x
+        ldy ui_cols
+        cpy #2
+        bcc @row
+        jsr ui_col
+        sta ui_c
+        eor #$FF                ; row = (sel - col) / cols
+        sec
+        adc ui_sel
+        ldy #0
+:       cmp ui_cols
+        bcc :+
+        sbc ui_cols
+        iny
+        bne :-
+:       lda ui_x                ; x = ui_x + col * (ui_x2 - ui_x)
+        ldx ui_c
+        beq :++
+:       clc
+        adc ui_x2
+        sec
+        sbc ui_x
+        dex
+        bne :-
+:       tax
+        tya
 @row:   sta m_a
         lda ui_dy
         sta m_b
@@ -467,6 +510,14 @@ list_cursor:
         tay
         ldx tmp7
         jmp ui_cursor
+
+; ui_col: A = ui_sel's column (ui_sel mod ui_cols)
+ui_col: lda ui_sel
+:       cmp ui_cols
+        bcc :+
+        sbc ui_cols
+        bcs :-
+:       rts
 
 ; ---------------------------------------------------------------------------
 ; Message line (row Y, 30 chars from column 1) through the VRAM queue
@@ -665,8 +716,7 @@ stats_line:
         sta linebuf,y
         iny
         sty tmp6
-        ldx ph_model+1
-        lda car_drive,x
+        lda ph_drv+1            ; after any swap
         jsr drive_name_ptr
         ldy tmp6
         jsr cat_ptr0

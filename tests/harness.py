@@ -60,13 +60,13 @@ class Sim:
         return v
 
     def garage_goto(self, item):
-        """Move the garage cursor (2 columns) to item."""
+        """Move the garage cursor (3 columns) to item."""
         for _ in range(20):
             cur = self.mem('g_sel')
             if cur == item:
                 return
-            cr, cc = divmod(cur, 2)
-            tr, tc = divmod(item, 2)
+            cr, cc = divmod(cur, 3)
+            tr, tc = divmod(item, 3)
             if cr < tr:
                 self.press(DOWN)
             elif cr > tr:

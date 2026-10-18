@@ -97,7 +97,7 @@ phys_setup:
         tay
         lda car_ngears,y
         sta ph_ngears,x
-        lda car_curve,y
+        lda ph_ecv,x
         sta ph_shape            ; curve index for now
 
         ; hpm = 256 + sum(hp_bonus[p] * level[p])
@@ -141,11 +141,10 @@ phys_setup:
         lda tmp3
         sta ph_hpm_h,x
 
-        ; teff = torque * hpm >> 8
-        ldy ph_model,x
-        lda car_torque_l,y
+        ; teff = torque * hpm >> 8  (the engine in use: tune_calc)
+        lda tn_torque
         sta m_a
-        lda car_torque_h,y
+        lda tn_torque+1
         sta m_a+1
         lda tmp2
         sta m_b
@@ -166,12 +165,11 @@ phys_setup:
         sta m_b
         jsr mul8
         ldx cx
-        ldy ph_model,x
         clc
-        lda car_redline_l,y
+        lda tn_redl
         adc m_r
         sta ph_redl_l,x
-        lda car_redline_h,y
+        lda tn_redl+1
         adc m_r+1
         sta ph_redl_h,x
         clc
@@ -197,10 +195,9 @@ phys_setup:
         sbc m_r+1
         sta m_b+1
         ldx cx
-        ldy ph_model,x
-        lda car_mass_l,y
+        lda tn_mass             ; with any swaps (tune_calc)
         sta m_a
-        lda car_mass_h,y
+        lda tn_mass+1
         sta m_a+1
         jsr mul16
         ldx cx
@@ -502,9 +499,7 @@ phys_setup:
         lda #0
         sta m_a+1
         ldx cx
-        ldy ph_model,x
-        lda car_drive,y
-        tay
+        ldy ph_drv,x
         lda drive_k_l,y
         sta m_b
         lda drive_k_h,y

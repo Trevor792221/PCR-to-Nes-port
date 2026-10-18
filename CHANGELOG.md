@@ -3,6 +3,15 @@
 Every version of Pixel Racer NES, newest first. Downloads are on the
 [Releases page](https://github.com/Trevor792221/PCR-to-Nes-port/releases).
 
+## v5.0: Engine and drivetrain swaps (2026-10-18)
+
+* **Engine swaps** (garage → SWAP, paid in gems). Choose any dealer car's engine or one of four swap-only crate engines: a twin-rotor rotary, a high-rev I4, a flat six and a big-block V8. Each engine brings its own power, redline, torque curve and weight. Prices run from 5 to 30 gems, and the bigger engines unlock at higher levels. The old engine's parts go back to stock and you get 3/4 of what they cost back in cash. The engine tune is reset.
+* **Drivetrain swaps** for 10 gems: FWD, RWD or AWD. AWD launches hardest but is heavier and loses a little power through the driveline. FWD is the lightest but has the least launch grip.
+* Going back to a car's own engine or drivetrain is free. The Zenith X400 can't be swapped.
+* A rotary engine has its own sound in races.
+* The garage menu is now laid out in three columns, with SWAP as the 11th item.
+* Swaps are saved in the garage password, which becomes 14-85 letters when a car is swapped. Garages with no swaps keep the same passwords as before, and all older passwords still work.
+
 ## v4.9: ECU tuning (2026-10-18)
 
 * The fuel map and ignition timing now need an ECU upgrade, like the 2-step. On a stock ECU the TUNE screen shows NEEDS ECU for both. Fuel and timing values a car already has (from a save or a TUNE password) are kept, but they only take effect once the car has an ECU upgrade.

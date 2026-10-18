@@ -12,11 +12,11 @@ import gamedata as gd
 from cpu import CPU
 
 CR_PARTS, CR_PAINT, CR_FINAL, CR_GEARS = 1, 15, 18, 20
-CR_FUEL, CR_TIMING, CR_TIREP, CR_BOOST, CR_LAUNCH = 34, 42, 43, 44, 45
+CR_FUEL, CR_TIMING, CR_TIREP, CR_BOOST, CR_LAUNCH, CR_ENGINE, CR_DRIVE = 34, 42, 43, 44, 45, 46, 47
 CR_SIZE = 48
 
 
-def record(model, parts, final=None, gears=None, tune=None):
+def record(model, parts, final=None, gears=None, tune=None, engine=0, drive=0):
     c = gd.CARS[model]
     rec = [0] * CR_SIZE
     rec[0] = model
@@ -36,17 +36,18 @@ def record(model, parts, final=None, gears=None, tune=None):
         rec[CR_TIREP] = tune.tirep & 0xFF
         rec[CR_BOOST] = tune.boost & 0xFF
         rec[CR_LAUNCH] = tune.launch
+    rec[CR_ENGINE], rec[CR_DRIVE] = engine, drive
     return rec
 
 
 class Physics(unittest.TestCase):
-    def setup_car(self, cpu, slot, model, parts, tune=None):
-        rec = record(model, parts, tune=tune)
+    def setup_car(self, cpu, slot, model, parts, tune=None, engine=0, drive=0):
+        rec = record(model, parts, tune=tune, engine=engine, drive=drive)
         base = cpu.sym['tmp_rec']
         cpu.mem[base:base + CR_SIZE] = bytes(rec)
         cpu.put('ptr0', base, size=2)
         cpu.call('phys_setup', x=slot)
-        return gd.Car(model, parts, tune=tune)
+        return gd.Car(model, parts, tune=tune, engine=engine, drive=drive)
 
     def state(self, cpu, x):
         g = lambda n: cpu.get(n, x)
@@ -62,6 +63,9 @@ class Physics(unittest.TestCase):
                     spool=car.spool, spin=int(car.spin), slip=int(car.slip))
 
     def check_setup(self, cpu, x, car):
+        self.assertEqual(cpu.get('ph_mass_l', x) | cpu.get('ph_mass_h', x) << 8, car.mass)
+        self.assertEqual(cpu.get('ph_redl_l', x) | cpu.get('ph_redl_h', x) << 8, car.redline)
+        self.assertEqual(cpu.get('ph_hpm_l', x) | cpu.get('ph_hpm_h', x) << 8, car.hpmult & 0xFFFF)
         self.assertEqual(cpu.get('ph_k0h_l', x) | cpu.get('ph_k0h_h', x) << 8, car.k0h)
         self.assertEqual(cpu.get('ph_trac_l', x) | cpu.get('ph_trac_h', x) << 8, car.trac)
         self.assertEqual(cpu.get('ph_dk_l', x) | cpu.get('ph_dk_h', x) << 8, car.dk)
@@ -73,9 +77,9 @@ class Physics(unittest.TestCase):
             self.assertEqual(cpu.get('ph_curve', x * 48 + b), car.curve[b], 'curve %d' % b)
             self.assertEqual(cpu.get('ph_bcurve', x * 48 + b), car.bcurve[b], 'bcurve %d' % b)
 
-    def run_race(self, model, parts, launch, x=0, frames=900, tune=None):
+    def run_race(self, model, parts, launch, x=0, frames=900, tune=None, engine=0, drive=0):
         cpu = CPU()
-        car = self.setup_car(cpu, x, model, parts, tune)
+        car = self.setup_car(cpu, x, model, parts, tune, engine, drive)
         self.check_setup(cpu, x, car)
         car.reset()
         # rev up, launch, shift near the redline, nitrous from 2nd gear
@@ -125,7 +129,11 @@ class Physics(unittest.TestCase):
             tune = gd.Tune([rnd.randint(-5, 5) for _ in range(8)], rnd.randint(-5, 5),
                            rnd.randint(gd.TIREP_MIN, gd.TIREP_MAX), rnd.randint(-12, 12),
                            rnd.choice([0, 0, rnd.randint(20, 90)]))
-            car = self.setup_car(cpu, n & 1, model, parts, tune)
+            engine = drive = 0
+            if model != gd.CRATE_CAR and n % 2:
+                engine = rnd.choice([0] + [e + 1 for e in gd.SWAP_ENGINES])
+                drive = rnd.randint(0, 3)
+            car = self.setup_car(cpu, n & 1, model, parts, tune, engine, drive)
             tn, x = car.tune, n & 1
             got = dict(hpm=cpu.get('tn_hpm', size=2), bmul=cpu.get('tn_bmul'),
                        grip=cpu.get('tn_grip'), roll=cpu.get('ph_roll', x),
@@ -133,7 +141,10 @@ class Physics(unittest.TestCase):
                        psi=cpu.get('tn_psi'), knock=cpu.get('tn_knock'), lean=cpu.get('tn_lean'),
                        band=[cpu.get('tn_band', k) or 256 for k in range(8)])
             want = dict(tn, hpm=tn['hpm'] & 0xFFFF, grip=tn['grip'] & 0xFF)
-            self.assertEqual(got, want, 'model %d parts %r tune %r' % (model, parts, vars(tune)))
+            self.assertEqual(got, want, 'model %d parts %r tune %r swap %d %d'
+                             % (model, parts, vars(tune), engine, drive))
+            self.assertEqual((cpu.get('ph_eng', x), cpu.get('ph_drv', x), cpu.get('ph_ecv', x)),
+                             (car.engine, car.drive, gd.ENGINES[car.engine][4]))
             self.check_setup(cpu, x, car)
 
     def test_tuned_races(self):
@@ -147,6 +158,23 @@ class Physics(unittest.TestCase):
         # 2-step launch control, wheelie bars, soft tires on a RWD car
         self.run_race(8, [1, 1, 2, 0, 1, 1, 1, 2, 1, 1, 0, 0, 4, 0], launch=9000,
                       tune=T([-2] * 8, -1, -14, 0, 38), x=1)
+        # swaps: a rotary in the Pukku turned RWD, a big block in an AWD Komet
+        self.run_race(0, [2] * 14, launch=7000, engine=14, drive=2)
+        self.run_race(1, [1, 1, 1, 2, 1, 0, 1, 2, 1, 0, 0, 0, 0, 0], launch=5000, engine=17, drive=3, x=1)
+
+    def test_swaps(self):
+        stock = gd.Car(4, [0] * 14)                  # Hollis SS: RWD, 5.7 V8
+        awd = gd.Car(4, [0] * 14, drive=3)
+        self.assertEqual(awd.mass - stock.mass, gd.DRIVE_KG[2] - gd.DRIVE_KG[1])
+        self.assertGreater(awd.trac, stock.trac, 'AWD launches harder')
+        self.assertLess(awd.hpmult, stock.hpmult, 'but loses more through the driveline')
+        fwd = gd.Car(4, [0] * 14, drive=1)
+        self.assertLess(fwd.mass, stock.mass)
+        self.assertLess(fwd.trac, stock.trac)
+        rot = gd.Car(4, [0] * 14, engine=14)         # twin rotor
+        self.assertEqual(rot.redline, 9000)
+        self.assertEqual(rot.mass, stock.mass - 220 + 106)
+        self.assertEqual(gd.Car(4, [0] * 14, engine=5).k0h, stock.k0h, 'its own engine = stock')
 
     def test_tuning_does_what_it_says(self):
         base = [2, 2, 2, 3, 2, 2, 2, 2, 2, 2, 2, 2, 0, 0]

@@ -18,6 +18,8 @@
 ;   tires   psi from 32: -2 grip and -1 rolling drag per psi
 ;   wheelie bars: launch grip per level (RWD 5, FWD and AWD 3)
 ;   2-step  launch rpm (needs an ECU upgrade)
+;   swaps   the engine in use brings its torque, redline, curve and weight;
+;           the drivetrain its traction, weight and driveline loss
 ; ===========================================================================
 
 .segment "BSS"
@@ -42,6 +44,13 @@ tn_ecu:     .res 1          ; ECU level (0: fuel map and timing stay stock)
 tn_t:       .res 1          ; timing in use
 tn_acc:     .res 2
 tn_d:       .res NCELLS
+tn_torque:  .res 2          ; engine in use: peak torque,
+tn_redl:    .res 2          ;   base redline,
+tn_mass:    .res 2          ; and the car's weight with both swaps
+tn_od:      .res 1          ; the car's own drivetrain
+ph_eng:     .res 2          ; per car: engine id in use,
+ph_drv:     .res 2          ;   drivetrain in use,
+ph_ecv:     .res 2          ;   its torque curve shape
 .segment "BANK6"
 
 .include "build/tunedata.inc"
@@ -70,8 +79,80 @@ tn_le_lim:
         cmp tn_tmp
         rts
 
-; tune_calc: ptr0 = car record, cx = car.  Sets tn_*, ph_roll and ph_ls.
+; tn_madd / tn_msub: tn_mass +/-= A
+tn_madd:
+        clc
+        adc tn_mass
+        sta tn_mass
+        bcc :+
+        inc tn_mass+1
+:       rts
+tn_msub:
+        sta tn_tmp
+        sec
+        lda tn_mass
+        sbc tn_tmp
+        sta tn_mass
+        bcs :+
+        dec tn_mass+1
+:       rts
+
+; tune_calc: ptr0 = car record, cx = car.  Sets tn_*, ph_eng, ph_drv,
+; ph_curve, ph_roll and ph_ls.
 tune_calc:
+        ; --- swaps: the engine and drivetrain in use -----------------------------
+        ldx cx
+        ldy #CR_MODEL
+        lda (ptr0),y            ; model (its own engine id too)
+        tay
+        lda car_drive,y
+        sta tn_od
+        lda car_mass_l,y
+        sta tn_mass
+        lda car_mass_h,y
+        sta tn_mass+1
+        lda eng_kg2,y           ; - own engine
+        jsr tn_msub
+        lda eng_kg2,y
+        jsr tn_msub
+        ldy tn_od               ; - own driveline
+        lda drv_kg,y
+        jsr tn_msub
+        ldy #CR_DRIVE
+        lda (ptr0),y
+        beq :+
+        sec
+        sbc #1
+        bcs :++
+:       lda tn_od
+:       sta ph_drv,x
+        tay                     ; + this driveline
+        lda drv_kg,y
+        jsr tn_madd
+        ldy #CR_ENGINE
+        lda (ptr0),y
+        beq :+
+        sec
+        sbc #1
+        bcs :++
+:       ldy #CR_MODEL
+        lda (ptr0),y
+:       sta ph_eng,x
+        tay
+        lda eng_kg2,y           ; + this engine
+        jsr tn_madd
+        lda eng_kg2,y
+        jsr tn_madd
+        lda eng_curve,y
+        sta ph_ecv,x
+        lda eng_torque_l,y
+        sta tn_torque
+        lda eng_torque_h,y
+        sta tn_torque+1
+        lda eng_redline_l,y
+        sta tn_redl
+        lda eng_redline_h,y
+        sta tn_redl+1
         ; --- boost ----------------------------------------------------------
         lda #0
         sta tn_psi
@@ -277,14 +358,23 @@ tune_calc:
         sta tn_acc+1
         lda tn_top
         jsr tn_adds
+        ldx cx                  ; + driveline loss, against the car's own
+        ldy ph_drv,x
+        lda drv_hpm,y
+        jsr tn_adds
+        ldy tn_od
+        lda drv_hpm,y
+        eor #$FF
+        clc
+        adc #1
+        jsr tn_adds
         lda tn_acc
         sta tn_hpm
         lda tn_acc+1
         sta tn_hpm+1
         ; --- grip: wheelie bars, and -2 per tire psi --------------------------
         ldx cx
-        ldy ph_model,x
-        lda car_drive,y
+        lda ph_drv,x
         tax
         ldy #CR_PARTS+P_WHEELIE
         lda (ptr0),y

@@ -132,7 +132,7 @@ class Features(unittest.TestCase):
         self.assertEqual(s.mem('cur_bank'), 1)       # stats page is up, no crash
         s.press(B)
         s.step(40)
-        self.assertEqual(s.mem('ui_count'), 10, 'back in the garage')
+        self.assertEqual(s.mem('ui_count'), 11, 'back in the garage')
 
     def test_race_backgrounds_vary(self):
         s = new_game()

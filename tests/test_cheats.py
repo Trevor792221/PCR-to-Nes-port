@@ -68,7 +68,7 @@ class Cheats(unittest.TestCase):
         s.press(SELECT)
         s.step(30)
         self.assertEqual(s.wram(SV_CASH, 3), 3000)
-        self.assertEqual(s.mem('ui_count'), 10, 'still the garage menu')
+        self.assertEqual(s.mem('ui_count'), 11, 'still the garage menu')
 
     def test_sound_test(self):
         s = sim_with(DEBUG)

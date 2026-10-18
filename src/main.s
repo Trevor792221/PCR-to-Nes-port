@@ -151,6 +151,7 @@ cheat_debug:     .byte 0        ; $FFC2  non-zero: SELECT in the garage = debug 
 .segment "BANK6"
 .include "map.s"
 .include "tune.s"
+.include "swap.s"
 
 ; ---------------------------------------------------------------------------
 ; Reset stubs: identical in every bank so the console boots no matter which

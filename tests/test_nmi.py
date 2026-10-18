@@ -73,6 +73,12 @@ class NMIBudget(unittest.TestCase):
         s.press(A)
         self.check('dyno', self.watch(s, 3, 150))
         self.leave(s)
+        s.nes[0x6007] = 99                           # gems for a swap
+        s.garage_goto(10)
+        s.press(A)
+        self.check('swap', self.watch(s, 3, 200, lambda i: A if i == 150 else
+                                      (RIGHT if i % 20 < 2 else 0)))
+        self.leave(s)
 
     def test_two_player_race(self):
         # two tachs, gears, speeds and nitrous bars must still fit in vblank

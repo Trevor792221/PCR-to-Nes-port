@@ -116,6 +116,24 @@ def main():
          'tn_turbo_psi:', bytes_line(gd.TURBO_PSI),
          'tn_turbo_max:', bytes_line(gd.TURBO_PSI_MAX),
          'tn_wheelie:', bytes_line(gd.WHEELIE_GRIP)]
+    # engine and drivetrain swaps (tune_calc and the SWAP screen)
+    E = gd.ENGINES
+    tq = [gd.eng_torque(e) for e in range(gd.NENGINES)]
+    t += ['NENGINES = %d' % gd.NENGINES, 'NSWAP_ENG = %d' % len(gd.SWAP_ENGINES),
+          'DRIVE_GEMS = %d' % gd.DRIVE_GEMS, 'SWAP_REFUND = %d' % gd.SWAP_REFUND]
+    t += words('eng_torque', tq) + words('eng_redline', [e[3] for e in E])
+    t += words('eng_hp', [e[1] for e in E])
+    for name, vals in (('eng_curve', [e[4] for e in E]),
+                       ('eng_kg2', [e[2] // 2 for e in E]),       # kg / 2
+                       ('eng_gems', [e[5] for e in E]),
+                       ('eng_level', [e[6] for e in E]),
+                       ('swap_eng', gd.SWAP_ENGINES),
+                       ('drv_kg', gd.DRIVE_KG),
+                       ('drv_hpm', [v & 0xFF for v in gd.DRIVE_HPM]),
+                       ('eng_parts', gd.ENGINE_PARTS)):
+        t += [name + ':', bytes_line(vals)]
+    t += ['NENG_PARTS = %d' % len(gd.ENGINE_PARTS), 'eng_names:']
+    t += ['        .byte "%s", 0' % e[0].ljust(12) for e in E]
     open(os.path.join(os.path.dirname(sys.argv[1]), 'tunedata.inc'), 'w').write('\n'.join(t) + '\n')
 
 

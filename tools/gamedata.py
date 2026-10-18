@@ -41,6 +41,8 @@ CURVES = [
     _shape([(0, 195), (.25, 238), (.45, 255), (.7, 244), (.9, 214), (1.0, 196), (1.3, 160)]),
     # 2: modern performance engine, flat curve
     _shape([(0, 172), (.3, 226), (.5, 250), (.65, 255), (.85, 250), (1.0, 236), (1.3, 200)]),
+    # 3: twin-rotor rotary: smooth and flat, keeps pulling to the redline
+    _shape([(0, 160), (.3, 212), (.55, 242), (.8, 255), (.95, 252), (1.0, 245), (1.3, 222)]),
 ]
 
 # ---------------------------------------------------------------------------
@@ -133,6 +135,59 @@ WEIGHT_CUT = 10
 ECU_RPM = 200
 
 # ---------------------------------------------------------------------------
+# Swaps (garage -> SWAP), paid in gems.  Engine ids 0..NCARS-1 are each car's
+# own engine (its hp, redline and curve from CARS); the ones after are
+# swap-only crate engines.  kg is the engine's own weight: a swap changes the
+# car's weight by the difference.  Going back to the car's own engine or
+# drivetrain is free.  The crate car (Zenith X400) can't be swapped, and its
+# engine isn't for sale.
+# Record bytes: CR_ENGINE = engine id + 1, CR_DRIVE = drive + 1 (0 = stock).
+# ---------------------------------------------------------------------------
+# name, kg, gems, level -- one per car, in CARS order
+OWN_ENGINES = [
+    ('1.0 I3',        70,  5,  1),
+    ('1.6 I4',       100,  5,  1),
+    ('2.0 I4',       120,  8,  2),
+    ('2.0 RALLY I4', 136, 10,  3),
+    ('5.7 V8',       220, 12,  4),
+    ('3.0 I6',       200, 12,  5),
+    ('4.7 TRUCK V8', 246, 14,  5),
+    ('2.6 I6',       210, 14,  7),
+    ('7.0 V8',       260, 18,  8),
+    ('3.8 V6',       190, 18, 10),
+    ('6.5 V12',      280, 24, 12),
+    ('HYBRID V8',    300, 30, 15),
+    ('X400 PROTO',   240,  0, 99),
+]
+# name, hp, kg, redline, curve, gems, level
+CRATE_ENGINES = [
+    ('TWIN ROTOR',   255, 106, 9000, 3, 10,  4),
+    ('HIGH-REV I4',  240, 116, 9400, 0,  9,  3),
+    ('FLAT SIX',     400, 190, 8600, 2, 18,  8),
+    ('BIG BLOCK V8', 560, 300, 6400, 1, 22, 10),
+]
+ENGINES = [(n, c[2], kg, c[4], c[5], gems, lv) for c, (n, kg, gems, lv) in zip(CARS, OWN_ENGINES)] \
+    + CRATE_ENGINES
+NENGINES = len(ENGINES)
+SWAP_ENGINES = [e for e in range(NENGINES) if e != CRATE_CAR]   # the SWAP list
+DRIVE_GEMS = 10
+DRIVE_KG = [0, 25, 75, 75]       # FWD, RWD, AWD: weight of the driveline
+DRIVE_HPM = [0, -6, -16, -16]    # *256ths: power lost through it
+SWAP_REFUND = 3                  # engine parts come back as 3/4 of their cost
+ENGINE_PARTS = [P_INTAKE, P_EXHAUST, P_ECU, P_TURBO, P_INTERNALS, P_NITROUS,
+                P_ICOOL, P_INJECT]
+
+
+def eng_torque(e):
+    n, hp, kg, redline, curve, gems, lv = ENGINES[e]
+    return peak_torque(hp, redline, curve)
+
+
+def swapped(model, engine=0, drive=0):
+    """(engine id, drive) in use from the record bytes (0 = stock)."""
+    return (engine - 1 if engine else model, drive - 1 if drive else CARS[model][8])
+
+# ---------------------------------------------------------------------------
 # Engine tune (TUNE screen).  Stored per car as signed bytes, 0 = stock:
 #   fuel[8]  fuel map, one cell per eighth of the redline: -5 rich .. +5 lean
 #   timing   ignition advance, -5 .. +5 degrees
@@ -158,7 +213,7 @@ class Tune:
         self.timing, self.tirep, self.boost, self.launch = timing, tirep, boost, launch
 
 
-def tune_calc(model, parts, tune):
+def tune_calc(model, parts, tune, drive=None):
     """What the tune does (mirrors tune_calc in src/tune.s).  Returns a dict:
     hpm (added to the power multiplier, /256), band (power factor per fuel
     cell, /256), bmul (boost scale /256 below stock boost, 0 = none), grip,
@@ -192,10 +247,12 @@ def tune_calc(model, parts, tune):
     band = [256 + d - top for d in ds]
     band = [max(64, b) for b in band]
     c = CARS[model]
-    grip = WHEELIE_GRIP[c[8]] * parts[P_WHEELIE] - 2 * tune.tirep
+    drive = c[8] if drive is None else drive        # after a drivetrain swap
+    grip = WHEELIE_GRIP[drive] * parts[P_WHEELIE] - 2 * tune.tirep
     roll = max(3, ROLL - tune.tirep)
     launch = tune.launch * 100 if parts[P_ECU] and tune.launch else 0
-    return dict(hpm=top + OVERBOOST_HP * ob, band=band, bmul=bmul, grip=grip,
+    hpm = top + OVERBOOST_HP * ob + DRIVE_HPM[drive] - DRIVE_HPM[c[8]]
+    return dict(hpm=hpm, band=band, bmul=bmul, grip=grip,
                 roll=roll, launch=launch, psi=psi, knock=knock, lean=lean)
 
 
@@ -237,26 +294,30 @@ def u16(x):
 class Car:
     """Integer model of one car.  Mirrors src/physics.s."""
 
-    def __init__(self, model, parts=None, final=None, gears=None, tune=None):
+    def __init__(self, model, parts=None, final=None, gears=None, tune=None, engine=0, drive=0):
         c = CARS[model]
         parts = list(parts or [])
         parts += [0] * (NPARTS - len(parts))
         self.model = model
-        tn = self.tune = tune_calc(model, parts, tune or Tune())
+        self.engine, self.drive = e, d = swapped(model, engine, drive)
+        eng = ENGINES[e]
+        tn = self.tune = tune_calc(model, parts, tune or Tune(), d)
         self.ngears = c[6]
         final = final if final is not None else gear_raw(c[7])
         gears = gears or [gear_raw(g) for g in car_gears(model)]
         # --- engine ---------------------------------------------------------
         hpm = 256 + sum(HP_BONUS.get(p, 0) * parts[p] for p in range(NPARTS)) + tn['hpm']
         self.hpmult = hpm
-        teff = car_torque(model) * hpm >> 8
-        self.redline = c[4] + ECU_RPM * parts[P_ECU]
+        teff = eng_torque(e) * hpm >> 8
+        self.redline = eng[3] + ECU_RPM * parts[P_ECU]
         self.limiter = self.redline + REDLINE_PAD
-        m = c[3] * (256 - WEIGHT_CUT * parts[P_WEIGHT]) >> 8
+        m = c[3] + eng[2] - OWN_ENGINES[model][1] + DRIVE_KG[d] - DRIVE_KG[c[8]]
+        self.base_mass = m
+        m = m * (256 - WEIGHT_CUT * parts[P_WEIGHT]) >> 8
         self.mass = m
         self.k0h = min(65535, teff * KC_HALF // m)
         # curve stretched over this redline: idx = rpm*32/redline
-        shape = CURVES[c[5]]
+        shape = CURVES[eng[4]]
         tl = parts[P_TURBO]
         boost, start = TURBO_BOOST[tl], TURBO_START[tl]
         if boost:                        # intercooler: +1/16 boost per level
@@ -295,7 +356,7 @@ class Car:
                 + AERO_GRIP * parts[P_AERO] + tn['grip'])
         self.roll = tn['roll']
         self.launch = tn['launch']
-        self.trac = u16(grip * DRIVE_K[c[8]] >> 8)
+        self.trac = u16(grip * DRIVE_K[d] >> 8)
         self.trac_k = self.trac - (self.trac >> 2) - (self.trac >> 4)
         cda = int(round(c[9] * 256)) * (256 - AERO_CUT * parts[P_AERO]) >> 8
         self.dk = u16(DKC * cda // m)

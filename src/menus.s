@@ -248,6 +248,7 @@ garage_main:
 garage_jump:
         .word g_race-1, g_parts-1, g_mycars-1, g_tune-1, g_dealer-1
         .word g_paint-1, g_crates-1, g_dyno-1, g_options-1, g_stats-1
+        .word g_swap-1
 
 g_race: FARCALL BANK_MAP, map_screen    ; pick a region first
         cmp #0
@@ -286,6 +287,8 @@ g_options:
 :       rts
 g_stats:
         jsr stats_screen
+        jmp garage_main
+g_swap: FARCALL BANK_MAP, swap_screen
         jmp garage_main
 
 ; garage_draw: whole garage screen (PPU off -> on)
@@ -339,7 +342,10 @@ garage_draw:
         jsr print
         ; menu
         BOX 1, 17, 30, 12
-        ldx #0
+        ldx #0                  ; three columns, across then down
+        stx tmp4
+        lda #G_Y0
+        sta tmp5
 @items: txa
         pha
         asl a
@@ -348,25 +354,27 @@ garage_draw:
         sta ptr0
         lda garage_items+1,y
         sta ptr0+1
-        txa
-        and #1
-        beq :+
-        lda #18
-        bne :++
-:       lda #5
-:       sta tmp4
-        txa
-        lsr a
+        lda tmp4
         asl a
-        clc
-        adc #18
-        tay
-        ldx tmp4
+        asl a
+        asl a
+        adc tmp4
+        adc #G_X0+2             ; column * 9
+        tax
+        ldy tmp5
         jsr print
-        pla
+        inc tmp4
+        lda tmp4
+        cmp #3
+        bne :+
+        lda #0
+        sta tmp4
+        inc tmp5
+        inc tmp5
+:       pla
         tax
         inx
-        cpx #10
+        cpx #G_N
         bne @items
         jsr attr_upload
         ; big car
@@ -380,17 +388,17 @@ garage_draw:
         jsr ppu_on
         lda garage_song         ; the garage theme: carries on if playing,
         jsr music_play          ; else (after a race or the boss intro) starts
-        lda #10
+        lda #G_N
         sta ui_count
-        lda #3
+        lda #G_X0
         sta ui_x
-        lda #16
+        lda #G_X0+9
         sta ui_x2
-        lda #18
+        lda #G_Y0
         sta ui_y0
         lda #1
         sta ui_dy
-        lda #2
+        lda #3
         sta ui_cols
         lda #2
         sta ui_dy
@@ -483,8 +491,12 @@ garage_sprites:
         jsr oam_clear
         jmp list_cursor
 
+G_N  = 11                       ; items, in three columns
+G_X0 = 2                        ; cursor column of the first
+G_Y0 = 19                       ; first row (two apart)
 garage_items:
         .word str_g0, str_g1, str_g2, str_g3, str_g4, str_g5, str_g6, str_g7, str_g8, str_g9
+        .word str_g10
 str_g0: .byte "RACE", 0
 str_g1: .byte "PARTS", 0
 str_g2: .byte "MY CARS", 0
@@ -495,6 +507,7 @@ str_g6: .byte "CRATES", 0
 str_g7: .byte "DYNO", 0
 str_g8: .byte "OPTIONS", 0
 str_g9: .byte "STATS", 0
+str_g10: .byte "SWAP", 0
 str_garage: .byte "GARAGE", 0
 str_notime: .byte "BEST 1/4: NO TIME YET", 0
 str_best:   .byte "BEST 1/4: ", 0

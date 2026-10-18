@@ -390,11 +390,14 @@ race_setup:
         sta oam+3
         ; engine sound
         jsr engine_start
-        ldx ph_model
-        lda car_curve,x
+        lda ph_ecv              ; the engine in use: V8s burble, rotaries buzz
         cmp #1
         bne :+
         lda #$40
+        bne :+++
+:       cmp #3
+        bne :+
+        lda #$80
         bne :++
 :       lda #$00
 :       sta eng_duty

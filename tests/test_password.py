@@ -29,6 +29,10 @@ def game_state(s):
         if slot == s.wram(SV_CURCAR):
             cur = len(cars)
         cars.append((s.wram(b), [s.wram(b + 1 + i) for i in range(14)], s.wram(b + 15)))
+    if any(s.wram(SV_CARS + slot * 48 + 46, 2) for slot in range(8)
+           if s.wram(SV_CARS + slot * 48) != 0xFF):        # swapped: version 4
+        cars = [c + (s.wram(SV_CARS + slot * 48 + 46), s.wram(SV_CARS + slot * 48 + 47))
+                for c, slot in zip(cars, [k for k in range(8) if s.wram(SV_CARS + k * 48) != 0xFF])]
     player = dict(cash=s.wram(SV_CASH, 3), gems=s.wram(SV_GEMS, 2), level=s.wram(SV_LEVEL),
                   xp=s.wram(SV_XP, 2), ladder=s.wram(SV_LADDER), secret=s.wram(SV_SECRET),
                   options=s.wram(SV_OPTIONS))
@@ -135,9 +139,18 @@ class Passwords(unittest.TestCase):
             n = rnd.randint(1, 8)
             cars = [(rnd.randint(0, 12), [rnd.randint(0, 4) for _ in range(14)],
                      rnd.choice(pw.PAINT_LIST)) for _ in range(n)]
+            ver = 3
+            if rnd.random() < .5:                    # swaps: version 4
+                ver = 4
+                cars = [c + ((0, 0) if c[0] == 12 or rnd.random() < .3 else
+                             (rnd.choice([0] + [e for e in range(1, 18) if e != 13]),
+                              rnd.randint(0, 3))) for c in cars]
+                if not any(any(c[3:]) for c in cars):
+                    ver = 3
+                    cars = [c[:3] for c in cars]
             cur = rnd.randrange(n)
             g = pw.encode_garage(cars, cur)
-            self.assertEqual(len(g), pw.garage_len(n))
+            self.assertEqual(len(g), pw.garage_len(n, ver))
             self.assertEqual(pw.decode_garage(g), dict(cars=cars, cur=cur))
             # a single wrong letter is caught (checksum / range checks)
             i = rnd.randrange(len(p))
@@ -182,6 +195,41 @@ class Passwords(unittest.TestCase):
         t.step(60)
         self.assertEqual(t.mem('game_mode'), 1, 'in the garage')
         self.assertEqual(game_state(t), (player, cars, cur))
+
+    def test_swaps_survive_a_fresh_console(self):
+        s = new_game()
+        for slot, model in enumerate([4, 1, 12, 9, 0, 5, 7, 2]):   # 8 cars: 85 letters
+            give_car(s, slot, model, slot % 5)
+        for slot, engine, drive in ((0, 14, 3), (1, 17, 0), (3, 0, 1), (7, 5, 2)):
+            s.nes[SV_CARS + slot * 48 + 46] = engine
+            s.nes[SV_CARS + slot * 48 + 47] = drive
+        s.nes[SV_CURCAR] = 3
+        player, cars, cur = game_state(s)
+        s.garage_goto(G_OPTIONS)
+        s.press(A)
+        s.step(30)
+        s.list_goto('ui_sel', 3)
+        s.press(A)
+        s.step(40)
+        g = pw.encode_garage(cars, cur)
+        self.assertEqual(len(g), 85)
+        rom = ''.join(pw.ALPHABET[s.nes[PW_TEXT + i]] for i in range(s.mem('pw_len')))
+        self.assertEqual(rom, g)
+        self.assertEqual(pw.decode_garage(g)['cars'][0][3:], (14, 3))
+        t = to_password_screen()
+        type_password(t, pw.encode_player(**player))
+        type_password(t, g)
+        type_password(t, '')
+        t.step(60)
+        self.assertEqual(t.mem('game_mode'), 1, 'in the garage')
+        self.assertEqual(game_state(t), (player, cars, cur))
+        # the crate car can't come back swapped
+        bad = pw.encode_garage([(12, [0] * 14, 0x16, 2, 0)], 0)
+        self.assertIsNone(pw.decode_garage(bad))
+        t = to_password_screen()
+        type_password(t, pw.encode_player(**player))
+        type_password(t, bad)
+        self.assertEqual(t.mem('pw_kind'), 1, 'refused: still on password 2')
 
     def test_wrong_password_is_refused(self):
         t = to_password_screen()
