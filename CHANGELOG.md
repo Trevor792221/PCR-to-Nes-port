@@ -3,6 +3,12 @@
 Every version of Pixel Racer NES, newest first. Downloads are on the
 [Releases page](https://github.com/Trevor792221/PCR-to-Nes-port/releases).
 
+## v4.7: New highway traffic (2026-10-18)
+
+* All five traffic vehicles are redrawn: a company van, a work pickup with a ladder rack, a camper van with a pop-top roof, a removal truck with a square cab, and a yellow taxi with a roof sign.
+* All traffic now has light blue windows.
+* Taxis only drive in cruise mode, where they are always yellow; street races keep the other four. Cruise traffic's second colour is yellow too.
+
 ## v4.6: Every car redesigned (2026-10-18)
 
 * All 13 cars have a new, original sprite of their own (they used to share 7 body shapes):

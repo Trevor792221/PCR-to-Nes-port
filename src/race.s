@@ -252,14 +252,13 @@ race_setup:
         jsr set_car_palette
         lda opp_rec+CR_PAINT
         sta palette+$1A
-        lda race_kind           ; cruise: no rival, so palette 2 is a
-        cmp #RK_CRUISE          ; second traffic colour
+        lda race_kind           ; cruise: no rival, so palette 2 is the
+        cmp #RK_CRUISE          ; taxis' yellow (a second traffic colour)
         bne :+
-        lda #NTRCOL
-        jsr rand_below
-        tax
-        lda tr_colours,x
+        lda #$28
         sta palette+$1A
+        lda #$21                ; light blue windows
+        sta palette+$1B
 :       lda #NTRGREY            ; traffic grey/silver/white for this race
         jsr rand_below
         tax
@@ -646,12 +645,10 @@ speed_unit_r:
 
 ; traffic vehicle types: body shape, sprite tile, speed range (px/frame*64)
 NTRTYPE = 5
-tr_shape:   .byte 13, 14, 15, 16, 17    ; sedan, hatch, pickup, van, box truck (art.py)
+tr_shape:   .byte 13, 14, 15, 16, 17    ; taxi, company van, pickup, camper, removal truck (art.py)
 tr_tile:    .byte $40, $4C, $58, $64, $70
 tr_smin:    .byte 56, 60, 48, 48, 36    ; box trucks crawl, hatches nip along
 tr_srng:    .byte 44, 48, 40, 32, 28
-NTRCOL = 8
-tr_colours: .byte $16, $12, $1A, $28, $14, $27, $21, $06
 NTRGREY = 4
 tr_greys:   .byte $10, $10, $3D, $30
 
@@ -1510,7 +1507,7 @@ traffic_update:
         lda cruise_empty
         jne @move
 :       dec tr_spawn
-        bpl @move
+        jpl @move
         lda #40
         jsr rand_below
         clc
@@ -1542,9 +1539,17 @@ traffic_update:
         jsr rand_below
         ldx tmp7
         sta tr_lane,x
-        lda #NTRTYPE            ; vehicle type sets the speed range
+        lda race_kind           ; vehicle type sets the speed range.  Taxis
+        cmp #RK_CRUISE          ; (type 0) only when cruising: their yellow
+        beq :+                  ; needs palette 2, the rival's in races
+        lda #NTRTYPE-1
         jsr rand_below
-        ldx tmp7
+        clc
+        adc #1
+        bne :++
+:       lda #NTRTYPE
+        jsr rand_below
+:       ldx tmp7
         sta tr_type,x
         tay
         lda tr_srng,y           ; px/frame (*64)
@@ -1559,11 +1564,15 @@ traffic_update:
         lda race_kind
         cmp #RK_CRUISE
         bne @move
+        ldx tmp7
+        lda #2                  ; cruising: taxis in palette 2 (yellow),
+        ldy tr_type,x           ; the rest in either
+        beq :+
         jsr rand
         and #1
         ldx tmp7
         ora #2
-        sta tr_pal,x
+:       sta tr_pal,x
 @move:  ldx #NTRAFFIC-1
 @m:     lda tr_on,x
         beq @mn

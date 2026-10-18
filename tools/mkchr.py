@@ -582,6 +582,11 @@ def build_sprites():
 def car_tiles(name):
     a = art.car_pixels(name, 0)
     b = art.car_pixels(name, 1)
+    if not isinstance(name, int):
+        # traffic: colour 3 is light blue, for the windows only; hubs and
+        # lights in the lower half take the body colour (pal_race, race.s)
+        a = a[:8] + [r.replace('w', 'p') for r in a[8:]]
+        b = b[:8] + [r.replace('w', 'p') for r in b[8:]]
     tiles = grid_tiles(a, 4, 2)                         # 0-3 top, 4-7 bottom (wheels A)
     tiles += grid_tiles(b[8:], 4, 1)                    # 8-11 bottom (wheels B)
     return tiles

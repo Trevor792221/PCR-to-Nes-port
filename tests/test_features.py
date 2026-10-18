@@ -240,6 +240,37 @@ class Features(unittest.TestCase):
             shots += not was and s.mem('ph_nos_on')
         self.assertGreaterEqual(shots, 3, 'bottle refills while cruising')
 
+    def test_taxis_only_cruise_and_always_yellow(self):
+        for kind, want_taxi in ((3, False), (5, True)):           # street race, cruise
+            s = new_game()
+            s.garage_goto(G_RACE)
+            s.press(A)
+            s.step(30)
+            s.press(A)
+            s.step(30)
+            s.list_goto('rs_sel', kind)
+            s.press(A)
+            s.step(40)
+            taxis = pals = 0
+            for f in range(6000 if want_taxi else 2500):     # 1 in 5 vehicles is a taxi
+                b = A
+                if s.mem('ph_gear') == 0:
+                    b |= RIGHT if f % 4 < 2 else 0
+                elif rpm(s) >= redline(s) - 300 and s.mem('ph_shift_t') == 0 and f % 4 < 2:
+                    b |= RIGHT
+                s.step(1, b)
+                for i in range(6):
+                    if s.mem('tr_on', i) and s.mem('tr_type', i) == 0:
+                        taxis += 1
+                        pals |= 1 << s.mem('tr_pal', i)
+                if s.mem('game_mode') != 2:
+                    break
+            if want_taxi:
+                self.assertGreater(taxis, 0, 'taxis when cruising')
+                self.assertEqual(pals, 1 << 2, 'taxis use the yellow palette')
+            else:
+                self.assertEqual(taxis, 0, 'no taxis in street races')
+
     def test_cruise_without_traffic(self):
         s = new_game()
         s.garage_goto(G_RACE)
