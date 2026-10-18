@@ -29,10 +29,10 @@ def game_state(s):
         if slot == s.wram(SV_CURCAR):
             cur = len(cars)
         cars.append((s.wram(b), [s.wram(b + 1 + i) for i in range(14)], s.wram(b + 15)))
-    if any(s.wram(SV_CARS + slot * 48 + 46, 2) for slot in range(8)
-           if s.wram(SV_CARS + slot * 48) != 0xFF):        # swapped: version 4
-        cars = [c + (s.wram(SV_CARS + slot * 48 + 46), s.wram(SV_CARS + slot * 48 + 47))
-                for c, slot in zip(cars, [k for k in range(8) if s.wram(SV_CARS + k * 48) != 0xFF])]
+    swap = lambda slot: s.wram(SV_CARS + slot * 48 + 47)   # engine | drive << 5
+    slots = [k for k in range(8) if s.wram(SV_CARS + k * 48) != 0xFF]
+    if any(swap(slot) for slot in slots):                   # swapped: version 4
+        cars = [c + (swap(slot) & 0x1F, swap(slot) >> 5) for c, slot in zip(cars, slots)]
     player = dict(cash=s.wram(SV_CASH, 3), gems=s.wram(SV_GEMS, 2), level=s.wram(SV_LEVEL),
                   xp=s.wram(SV_XP, 2), ladder=s.wram(SV_LADDER), secret=s.wram(SV_SECRET),
                   options=s.wram(SV_OPTIONS))
@@ -72,7 +72,7 @@ def signed(v):
 
 
 def garage_tunes(s):
-    """(model, 12 tune bytes, final, gears) per car, in garage order"""
+    """(model, 13 tune bytes, final, gears) per car, in garage order"""
     import gamedata as gd
     out = []
     for slot in range(8):
@@ -80,7 +80,7 @@ def garage_tunes(s):
         m = s.wram(b)
         if m == 0xFF:
             continue
-        out.append((m, [signed(s.wram(b + 34 + i)) for i in range(12)], s.wram(b + 18, 2),
+        out.append((m, [signed(s.wram(b + 34 + i)) for i in range(13)], s.wram(b + 18, 2),
                     [s.wram(b + 20 + 2 * i, 2) for i in range(gd.CARS[m][6])]))
     return out
 
@@ -88,7 +88,8 @@ def garage_tunes(s):
 def random_tune(rnd, model):
     import gamedata as gd
     tune = ([rnd.randint(-5, 5) for _ in range(8)] + [rnd.randint(-5, 5), rnd.randint(-14, 8),
-            rnd.randint(-13, 9), rnd.choice([0, 2 * rnd.randint(10, 45)])])
+            rnd.randint(-13, 9), rnd.choice([0, 2 * rnd.randint(10, 45)]),
+            rnd.choice([0, 0, rnd.randint(-4, 4)])])
     stock = pw._stock_ratios(model)
     rat = []
     for i, st in enumerate(stock):
@@ -102,7 +103,7 @@ def tune_cars(s, rnd, slots, full=False):
         b = SV_CARS + slot * 48
         tune, final, gears = random_tune(rnd, s.wram(b))
         if full:
-            tune = [rnd.choice([-5, 5]) for _ in range(8)] + [5, -14, 9, 90]
+            tune = [rnd.choice([-5, 5]) for _ in range(8)] + [5, -14, 9, 90, -4]
             st = pw._stock_ratios(s.wram(b))         # as far as the limits go
             final = st[0] + 3 * ((0x5FF - st[0]) // 3)
             gears = [g + 3 * ((0x4FF - g) // 3) if i % 2 else g - 3 * ((g - 0x80) // 3)
@@ -201,8 +202,7 @@ class Passwords(unittest.TestCase):
         for slot, model in enumerate([4, 1, 12, 9, 0, 5, 7, 2]):   # 8 cars: 85 letters
             give_car(s, slot, model, slot % 5)
         for slot, engine, drive in ((0, 14, 3), (1, 17, 0), (3, 0, 1), (7, 5, 2)):
-            s.nes[SV_CARS + slot * 48 + 46] = engine
-            s.nes[SV_CARS + slot * 48 + 47] = drive
+            s.nes[SV_CARS + slot * 48 + 47] = engine | drive << 5
         s.nes[SV_CURCAR] = 3
         player, cars, cur = game_state(s)
         s.garage_goto(G_OPTIONS)
@@ -278,14 +278,18 @@ class Passwords(unittest.TestCase):
             for m in models:
                 tune, final, gears = random_tune(rnd, m)
                 if rnd.random() < 0.3:
-                    tune = [0] * 12
+                    tune = [0] * 13
+                elif rnd.random() < 0.3:
+                    tune = tune[:12]                 # no nitrous: version 1
                 cars.append((m, tune, final, gears))
             t = pw.encode_tune(cars)
             dec = pw.decode_tune(t, models)
             for (m, tune, final, gears), (dt, dr) in zip(cars, dec):
-                self.assertEqual(dt or [0] * 12, tune)
+                self.assertEqual(dt or [0] * 13, tune + [0] * (13 - len(tune)))
                 self.assertEqual(dr or pw._stock_ratios(m), [final] + gears)
             if t:
+                v = 2 if any(c[1][12:13] != [0] and c[1][12:] for c in cars) else 1
+                self.assertEqual(pw.Bits.from_text(t, pw.SEED_TUNE).get(2), v)
                 i = rnd.randrange(len(t))
                 bad = t[:i] + pw.ALPHABET[(pw.ALPHABET.index(t[i]) + rnd.randint(1, 31)) % 32] + t[i + 1:]
                 self.assertIsNone(pw.decode_tune(bad, models), 'typo %s -> %s' % (t, bad))

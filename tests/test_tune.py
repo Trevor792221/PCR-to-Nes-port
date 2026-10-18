@@ -9,9 +9,9 @@ from harness import *          # noqa: E402,F401,F403
 from test_game import new_game, start_race, SV_CARS, G_TUNE, G_PARTS  # noqa: E402
 from test_features import give_car, set_cash                        # noqa: E402
 
-CR_PARTS, CR_FUEL, CR_TIMING, CR_TIREP, CR_BOOST, CR_LAUNCH = 1, 34, 42, 43, 44, 45
-P_ECU, P_TURBO, P_ICOOL, P_WHEELIE, P_INJECT = 2, 3, 10, 12, 13
-IGN, BOOST, TIRE, LAUNCH, RESET = 2, 3, 4, 5, 6
+CR_PARTS, CR_FUEL, CR_TIMING, CR_TIREP, CR_BOOST, CR_LAUNCH, CR_NOS = 1, 34, 42, 43, 44, 45, 46
+P_ECU, P_TURBO, P_NITROUS, P_ICOOL, P_WHEELIE, P_INJECT = 2, 3, 5, 10, 12, 13
+IGN, BOOST, TIRE, LAUNCH, NOS, RESET = 2, 3, 4, 5, 6, 7
 
 
 def signed(v):
@@ -30,7 +30,7 @@ def open_tune(s):
     s.garage_goto(G_TUNE)
     s.press(A)
     s.step(80)
-    assert s.mem('ui_count') == 8
+    assert s.mem('ui_count') == 9
 
 
 def nudge(s, row, n):
@@ -115,7 +115,7 @@ class Tune(unittest.TestCase):
         self.assertEqual(s.mem('lag'), 0)
         s.press(B)
         s.step(60)
-        self.assertEqual(s.mem('ui_count'), 8, 'back on the tune screen')
+        self.assertEqual(s.mem('ui_count'), 9, 'back on the tune screen')
 
     def test_timing_and_fuel_map_need_the_ecu(self):
         s = car_with(9, inject=1)
@@ -125,7 +125,7 @@ class Tune(unittest.TestCase):
         s.list_goto('ui_sel', 1)
         s.press(A)
         s.step(60)
-        self.assertEqual(s.mem('ui_count'), 8, 'no ECU: the fuel map stays shut')
+        self.assertEqual(s.mem('ui_count'), 9, 'no ECU: the fuel map stays shut')
         s.nes[SV_CARS + CR_TIMING] = 5               # e.g. from a TUNE password
         for k in range(8):
             s.nes[SV_CARS + CR_FUEL + k] = 5
@@ -134,6 +134,25 @@ class Tune(unittest.TestCase):
         s.step(45)
         self.assertEqual((s.mem('tn_knock'), s.mem('tn_lean')), (0, 0), 'ignored without one')
         self.assertEqual(s.mem16('tn_hpm'), 0)
+
+    def test_nitrous_slider(self):
+        s = car_with(9)
+        open_tune(s)
+        nudge(s, NOS, -2)
+        self.assertEqual(self.rec(s, CR_NOS), 0, 'no kit: nothing to tune')
+        s = car_with(9, nitrous=2)                   # 96 boost for 180 frames
+        open_tune(s)
+        nudge(s, NOS, -6)
+        self.assertEqual(self.rec(s, CR_NOS), -4, 'all the way to power')
+        self.assertEqual((s.mem('ph_nos_add', 1), s.mem('ph_nos_fr', 1)), (144, 120))
+        nudge(s, NOS, 9)
+        self.assertEqual(self.rec(s, CR_NOS), 4, 'all the way to duration')
+        self.assertEqual((s.mem('ph_nos_add', 1), s.mem('ph_nos_fr', 1)), (48, 255))
+        s.list_goto('ui_sel', RESET)
+        s.press(A)
+        s.step(60)
+        self.assertEqual(self.rec(s, CR_NOS), 0, 'reset: even again')
+        self.assertEqual(s.mem('lag'), 0)
 
     def test_two_step_holds_the_revs_on_the_line(self):
         s = car_with(8, ecu=1)

@@ -5,7 +5,7 @@
 ;   engine      any dealer car's engine or a crate engine (eng_* tables,
 ;               from tools/gamedata.py).  The old engine's parts go back to
 ;               stock and are bought back at 3/4 of what they cost, and the
-;               engine tune (fuel map, timing, boost, 2-step) is reset.
+;               engine tune (fuel map, timing, boost, 2-step, nitrous) is reset.
 ;   drivetrain  FWD, RWD or AWD for DRIVE_GEMS.
 ;   Going back to the car's own engine or drivetrain is free.  The crate
 ;   car can't be swapped.
@@ -176,8 +176,9 @@ sw_locked:
 sw_engine:
         jsr cur_car_ptr         ; A = model
         tax
-        ldy #CR_ENGINE
+        ldy #CR_SWAP
         lda (ptr1),y
+        and #SWAP_ENG
         beq :+
         tax
         dex
@@ -186,9 +187,15 @@ sw_engine:
 sw_drive:
         jsr cur_car_ptr
         tax
-        ldy #CR_DRIVE
+        ldy #CR_SWAP
         lda (ptr1),y
+        and #SWAP_DRV
         beq :+
+        lsr a
+        lsr a
+        lsr a
+        lsr a
+        lsr a
         sec
         sbc #1
         rts
@@ -510,7 +517,9 @@ sw_buy_engine:
         iny
         cpy #CR_TIMING+1
         bne :-
-        ldy #CR_BOOST           ; boost and 2-step
+        ldy #CR_BOOST           ; boost, 2-step and nitrous
+        sta (ptr1),y
+        iny
         sta (ptr1),y
         iny
         sta (ptr1),y
@@ -523,7 +532,11 @@ sw_buy_engine:
         adc #1
         .byte $2C               ; (skip the lda #0)
 :       lda #0
-        ldy #CR_ENGINE
+        sta sw_cost
+        ldy #CR_SWAP            ; keep the drivetrain bits
+        lda (ptr1),y
+        and #SWAP_DRV
+        ora sw_cost
         sta (ptr1),y
         ldx #2
 :       lda sw_acc,x
@@ -574,9 +587,18 @@ sw_buy_drive:
         ldx sw_d
         inx
         txa
+        asl a                   ; into bits 5-6
+        asl a
+        asl a
+        asl a
+        asl a
         .byte $2C
 :       lda #0
-        ldy #CR_DRIVE
+        sta sw_cost
+        ldy #CR_SWAP            ; keep the engine bits
+        lda (ptr1),y
+        and #SWAP_ENG
+        ora sw_cost
         sta (ptr1),y
         jsr save_write
         MOVI16 ptr0, str_sw_swapped

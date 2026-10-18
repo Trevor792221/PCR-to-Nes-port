@@ -14,7 +14,7 @@ from test_features import give_car                             # noqa: E402
 
 G_SWAP = 10
 SV_GEMS, SV_LEVEL = 0x6007, 0x600B
-CR_PARTS, CR_FUEL, CR_TIMING, CR_TIREP, CR_BOOST, CR_LAUNCH, CR_ENGINE, CR_DRIVE = \
+CR_PARTS, CR_FUEL, CR_TIMING, CR_TIREP, CR_BOOST, CR_LAUNCH, CR_NOS, CR_SWAP = \
     1, 34, 42, 43, 44, 45, 46, 47
 ROTOR = gd.NCARS + 1                         # engine ids after the cars' own
 BIG_BLOCK = gd.NCARS + 3
@@ -58,6 +58,12 @@ class Swap(unittest.TestCase):
     def rec(self, s, off):
         return s.wram(SV_CARS + off)
 
+    def engine(self, s):                         # swap byte: engine + 1 in bits 0-4,
+        return self.rec(s, CR_SWAP) & 0x1F       # drivetrain + 1 in bits 5-6
+
+    def drive(self, s):
+        return self.rec(s, CR_SWAP) >> 5
+
     def test_engine_swap(self):
         parts = [3, 2, 1, 2, 1, 1, 2, 3, 0, 0, 1, 0, 0, 2]   # engine and chassis parts
         s = garage(4, parts=parts)                            # Hollis SS: 5.7 V8
@@ -68,7 +74,7 @@ class Swap(unittest.TestCase):
         pick_engine(s, ROTOR)
         s.press(A)
         s.step(60)
-        self.assertEqual(self.rec(s, CR_ENGINE), ROTOR + 1)
+        self.assertEqual(self.engine(s), ROTOR + 1)
         self.assertEqual(s.wram(SV_GEMS), 50 - gd.ENGINES[ROTOR][5])
         got = [self.rec(s, CR_PARTS + i) for i in range(14)]
         want = [0 if p in gd.ENGINE_PARTS else lv for p, lv in enumerate(parts)]
@@ -87,7 +93,7 @@ class Swap(unittest.TestCase):
         pick_engine(s, 4)
         s.press(A)
         s.step(60)
-        self.assertEqual(self.rec(s, CR_ENGINE), 0)
+        self.assertEqual(self.engine(s), 0)
         self.assertEqual(s.wram(SV_GEMS), 50 - gd.ENGINES[ROTOR][5])
 
     def test_level_and_gems(self):
@@ -96,13 +102,13 @@ class Swap(unittest.TestCase):
         pick_engine(s, BIG_BLOCK)                    # level 10
         s.press(A)
         s.step(30)
-        self.assertEqual(self.rec(s, CR_ENGINE), 0, 'too low a level')
+        self.assertEqual(self.engine(s), 0, 'too low a level')
         s = garage(0, gems=4, level=20)
         open_swap(s)
         pick_engine(s, 1)                            # 5 gems
         s.press(A)
         s.step(30)
-        self.assertEqual(self.rec(s, CR_ENGINE), 0, 'not enough gems')
+        self.assertEqual(self.engine(s), 0, 'not enough gems')
         self.assertEqual(s.wram(SV_GEMS), 4)
 
     def test_drivetrain_swap(self):
@@ -111,12 +117,12 @@ class Swap(unittest.TestCase):
         pick_drive(s, gd.AWD)
         s.press(A)
         s.step(60)
-        self.assertEqual(self.rec(s, CR_DRIVE), gd.AWD + 1)
+        self.assertEqual(self.drive(s), gd.AWD + 1)
         self.assertEqual(s.wram(SV_GEMS), 50 - gd.DRIVE_GEMS)
         pick_drive(s, gd.FWD)                        # back: free
         s.press(A)
         s.step(60)
-        self.assertEqual(self.rec(s, CR_DRIVE), 0)
+        self.assertEqual(self.drive(s), 0)
         self.assertEqual(s.wram(SV_GEMS), 50 - gd.DRIVE_GEMS)
 
     def test_the_crate_car_cant_be_swapped(self):
@@ -131,13 +137,12 @@ class Swap(unittest.TestCase):
         s.step(20)
         s.press(A)
         s.step(30)
-        self.assertEqual((self.rec(s, CR_ENGINE), self.rec(s, CR_DRIVE)), (0, 0))
+        self.assertEqual(self.rec(s, CR_SWAP), 0)
         self.assertEqual(s.wram(SV_GEMS), 50)
 
     def test_swapped_car_races_with_its_new_engine(self):
         s = garage(0)
-        s.nes[SV_CARS + CR_ENGINE] = BIG_BLOCK + 1
-        s.nes[SV_CARS + CR_DRIVE] = gd.RWD + 1
+        s.nes[SV_CARS + CR_SWAP] = BIG_BLOCK + 1 | (gd.RWD + 1) << 5
         start_race(s, 4)                             # test run
         s.step(20)
         self.assertEqual((s.mem('ph_eng'), s.mem('ph_drv')), (BIG_BLOCK, gd.RWD))

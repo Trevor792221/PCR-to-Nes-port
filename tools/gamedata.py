@@ -194,6 +194,7 @@ def swapped(model, engine=0, drive=0):
 #   tirep    tire pressure, psi above/below 32 (-14 .. +8)
 #   boost    psi above/below the turbo's own boost
 #   launch   2-step launch rpm / 100 (0 = off; needs an ECU upgrade)
+#   nos      nitrous: -4 (more power, a shorter shot) .. +4 (longer, softer)
 # ---------------------------------------------------------------------------
 NCELLS = 8
 TURBO_PSI = [0, 6, 9, 12, 16]          # each turbo's stock boost
@@ -220,10 +221,20 @@ WEATHER_ODDS = [_W_WARM, _W_WARM, _W_WARM, _W_WARM,
                 _W_WARM]                                                 # Tokyo
 
 
+NOS_MIN, NOS_MAX = -4, 4
+
+
+def nos_tuned(level, n):
+    """(boost, frames) of a nitrous kit set n steps from power to duration."""
+    return (min(255, NOS_ADD[level] * (8 - n) >> 3),
+            min(255, NOS_FRAMES[level] * 8 // (8 - n)))
+
+
 class Tune:
-    def __init__(self, fuel=None, timing=0, tirep=0, boost=0, launch=0):
+    def __init__(self, fuel=None, timing=0, tirep=0, boost=0, launch=0, nos=0):
         self.fuel = list(fuel or [0] * NCELLS)
         self.timing, self.tirep, self.boost, self.launch = timing, tirep, boost, launch
+        self.nos = nos
 
 
 def tune_calc(model, parts, tune, drive=None, weather=CLEAR):
@@ -356,8 +367,7 @@ class Car:
             self.bcurve.append(bc)
         self.spool_rate = TURBO_RATE[tl]
         self.spool_start = 0
-        self.nos_add = NOS_ADD[parts[P_NITROUS]]
-        self.nos_frames = NOS_FRAMES[parts[P_NITROUS]]
+        self.nos_add, self.nos_frames = nos_tuned(parts[P_NITROUS], (tune or Tune()).nos)
         self.shift_frames = SHIFT_FRAMES[parts[P_GEARBOX]]
         # --- gearing --------------------------------------------------------
         self.rs, self.kg = [0], [0]

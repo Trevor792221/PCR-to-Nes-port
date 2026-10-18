@@ -115,8 +115,10 @@ CR_TIREP  = 43                  ;   tire psi from 32 (-14 .. +8),
 CR_BOOST  = 44                  ;   boost psi from the turbo's own,
 CR_LAUNCH = 45                  ;   2-step launch rpm/100 (0 off)
 MAX_LEVEL = 99
-CR_ENGINE = 46                  ; swapped engine id + 1 (0 = its own)
-CR_DRIVE  = 47                  ; swapped drivetrain + 1 (0 = its own)
+CR_NOS    = 46                  ;   nitrous: -4 more power .. +4 longer
+CR_SWAP   = 47                  ; swaps: engine id + 1 in bits 0-4, drivetrain
+SWAP_ENG  = $1F                 ;   + 1 in bits 5-6 (0 = the car's own)
+SWAP_DRV  = $60
 CR_SIZE   = 48
 NCELLS    = 8                   ; fuel map cells
 

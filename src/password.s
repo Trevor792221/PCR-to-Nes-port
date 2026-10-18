@@ -14,7 +14,7 @@
 ;                    bars or injectors; they still work)
 ;                    Version 4 (0 in the field), 14-85 chars, only when a
 ;                    car is swapped: after each colour, engine 5 | drive 2
-;                    (the record's CR_ENGINE and CR_DRIVE bytes)
+;                    (from the record's CR_SWAP byte)
 ; Bits go MSB first; each 5 bits is one character XORed with a mask that
 ; steps by 13 per position.  The checksum (rotate left, add) runs over every
 ; field and is seeded differently per password.  tools/password.py is the
@@ -64,15 +64,16 @@ PWC_PAINT = 1 + NPARTS
 PWC_ENGINE = PWC_PAINT + 1
 PWC_DRIVE  = PWC_PAINT + 2
 PW_TUNE   = DYNO_BMP + $300     ; decoded tunes: 8 x 32
-PWT_SIZE  = 32                  ;   12 tune bytes (as in the record),
-PWT_GEARS = 12                  ;   gears tuned (0/1),
-PWT_RATIO = 13                  ;   final + 7 gears (8.8)
+PWT_SIZE  = 32                  ;   13 tune bytes (as in the record),
+PWT_TUNE  = CR_NOS - CR_FUEL + 1
+PWT_GEARS = PWT_TUNE            ;   gears tuned (0/1),
+PWT_RATIO = PWT_TUNE + 1        ;   final + 7 gears (8.8)
 
 PW_PL_SIZE   = 25
 SEED_PLAYER  = $5A
 SEED_GARAGE  = $C3
 SEED_TUNE    = $A5
-TUNE_MAX     = 230              ; letters (8 fully tuned cars need up to 230)
+TUNE_MAX     = 237              ; letters (8 fully tuned cars, nitrous too, need up to 237)
 PLAYER_LEN   = 15               ; version 1 (v3.0): no stats
 PLAYER_LEN2  = 32               ; version 2: with stats
 GARAGE_MAX   = 85
@@ -552,10 +553,8 @@ pw_enc_garage:
         lda (ptr1),y
         cmp #$FF
         beq :+
-        ldy #CR_ENGINE
+        ldy #CR_SWAP
         lda (ptr1),y
-        iny
-        ora (ptr1),y
         beq :+
         lda #4
         sta pw_ver
@@ -638,12 +637,18 @@ pw_enc_garage:
         lda pw_ver
         cmp #4
         bne @next
-        ldy #CR_ENGINE          ; version 4: the swaps
+        ldy #CR_SWAP            ; version 4: the swaps
         lda (ptr1),y
+        and #SWAP_ENG
         ldx #5
         jsr pw_put
-        ldy #CR_DRIVE
+        ldy #CR_SWAP
         lda (ptr1),y
+        lsr a
+        lsr a
+        lsr a
+        lsr a
+        lsr a
         ldx #2
         jsr pw_put
 @next:  inc pw_s
@@ -819,6 +824,7 @@ pw_dec_garage:
 
 ; ---------------------------------------------------------------------------
 ; TUNE password (optional): engine tunes and gear ratios of tuned cars
+; (format in tools/password.py; version 2 adds the nitrous setting)
 ; ---------------------------------------------------------------------------
 ; pw_stock: A = model -> ptr3 = its stock gear set (7 words), pw_d = stock
 ; final drive
@@ -908,7 +914,26 @@ pw_enc_tune:
         sta pw_chk
         lda #0
         sta pw_any
-        lda #1                  ; version 1
+        lda #1                  ; version 1, or 2 (+ nitrous) when a car's
+        sta pw_ver              ; nitrous is tuned
+        lda #0
+        sta pw_s
+@nv:    lda pw_s
+        jsr slot_ptr
+        ldy #CR_MODEL
+        lda (ptr1),y
+        cmp #$FF
+        beq :+
+        ldy #CR_NOS
+        lda (ptr1),y
+        beq :+
+        lda #2
+        sta pw_ver
+:       inc pw_s
+        lda pw_s
+        cmp #NSLOTS
+        bne @nv
+        lda pw_ver
         ldx #2
         jsr pw_put
         jsr count_cars
@@ -929,7 +954,7 @@ pw_enc_tune:
         lda #0
 :       ora (ptr1),y
         iny
-        cpy #CR_LAUNCH+1
+        cpy #CR_NOS+1
         bne :-
         cmp #0
         beq :+
@@ -1015,6 +1040,17 @@ pw_enc_tune:
         lda (ptr1),y
         lsr a
         ldx #6
+        jsr pw_put
+        lda pw_ver              ; version 2: nitrous (+4, 4 bits)
+        cmp #2
+        bne @noeng
+        lda pw_s
+        jsr slot_ptr
+        ldy #CR_NOS
+        lda (ptr1),y
+        clc
+        adc #4
+        ldx #4
         jsr pw_put
 @noeng: pla
         jeq @next
@@ -1127,10 +1163,13 @@ pw_dec_tune:
         lda #SEED_TUNE
         sta pw_chk
         ldx #2
-        jsr pw_get
+        jsr pw_get              ; version 1, or 2 with nitrous
+        sta pw_ver
         cmp #1
+        beq :+
+        cmp #2
         jne pw_bad
-        ldx #3
+:       ldx #3
         jsr pw_get
         clc
         adc #1
@@ -1192,6 +1231,17 @@ pw_dec_tune:
         cmp #LAUNCH_MIN_PW
         jcc pw_bad
 :       ldy #CR_LAUNCH-CR_FUEL
+        sta (ptr2),y
+        lda pw_ver
+        cmp #2
+        bne @gears
+        ldx #4
+        jsr pw_get              ; nitrous: 0-8
+        cmp #9
+        jcs pw_bad
+        sec
+        sbc #4
+        ldy #CR_NOS-CR_FUEL
         sta (ptr2),y
 @gears: ldy #PWT_GEARS
         lda (ptr2),y
@@ -1325,7 +1375,7 @@ pw_apply_tune:
         sta ptr2
         lda #>PW_TUNE
         sta ptr2+1
-        ldx #0                  ; 12 tune bytes
+        ldx #0                  ; the tune bytes
 :       txa
         tay
         lda (ptr2),y
@@ -1337,7 +1387,7 @@ pw_apply_tune:
         pla
         sta (ptr1),y
         inx
-        cpx #12
+        cpx #PWT_TUNE
         bne :-
         ldy #PWT_GEARS
         lda (ptr2),y
@@ -1449,13 +1499,16 @@ pw_apply:
         lda paint_list,x
         ldy #CR_PAINT
         sta (ptr1),y
-        ldy #PWC_ENGINE         ; swaps
+        ldy #PWC_DRIVE          ; swaps: drivetrain in bits 5-6
         lda (ptr2),y
-        ldy #CR_ENGINE
-        sta (ptr1),y
-        ldy #PWC_DRIVE
-        lda (ptr2),y
-        ldy #CR_DRIVE
+        asl a
+        asl a
+        asl a
+        asl a
+        asl a
+        ldy #PWC_ENGINE
+        ora (ptr2),y
+        ldy #CR_SWAP
         sta (ptr1),y
         clc
         lda ptr2

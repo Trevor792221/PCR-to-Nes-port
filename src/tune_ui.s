@@ -13,8 +13,8 @@ fm_k:       .res 1
 fm_r:       .res 1
 .segment "BANK3"
 
-ET_Y0 = 7                       ; first row (two apart)
-ET_N  = 8
+ET_Y0 = 5                       ; first row (two apart)
+ET_N  = 9
 ET_VX = 17                      ; value column
 ET_GEARS  = 0
 ET_FUEL   = 1
@@ -22,14 +22,15 @@ ET_IGN    = 2
 ET_BOOST  = 3
 ET_TIRE   = 4
 ET_LAUNCH = 5
-ET_RESET  = 6
-ET_BACK   = 7
+ET_NOS    = 6
+ET_RESET  = 7
+ET_BACK   = 8
 LAUNCH_MIN = 20                 ; 2-step: 2000 rpm ..
 
 ; ---------------------------------------------------------------------------
 ; tune_screen: the hub.  Gear ratios and the fuel map open their own
-; screens; timing, boost, tire pressure and the 2-step change with
-; Left/Right.  The box shows peak power and whether the engine knocks or
+; screens; timing, boost, tire pressure, the 2-step and the nitrous
+; (power or duration) change with Left/Right.  The box shows peak power and whether the engine knocks or
 ; runs lean.
 ; ---------------------------------------------------------------------------
 tune_screen:
@@ -144,7 +145,7 @@ tune_screen:
         lda #0
 :       sta (ptr1),y
         iny
-        cpy #CR_LAUNCH+1
+        cpy #CR_NOS+1
         bne :-
         jsr save_write
         lda #SFX_SELECT
@@ -211,7 +212,17 @@ et_adjust:
 @yes:   sec
         rts
 @launch:
-        cmp #ET_LAUNCH
+        cmp #ET_NOS
+        bne :++
+        jsr et_nos              ; nitrous: needs a kit
+        bne :+
+        MOVI16 ptr0, str_et_nonos
+        jmp et_refuse
+:       ldy #CR_NOS             ; -4 power .. +4 duration
+        lda #<-4
+        ldx #4
+        jmp et_step
+:       cmp #ET_LAUNCH
         bne @no
         jsr et_ecu
         bne :+
@@ -327,7 +338,7 @@ et_all:
         jsr wait_frame
         inc tmp7
         lda tmp7
-        cmp #ET_LAUNCH+1
+        cmp #ET_NOS+1
         bne @v
         jmp et_status
 
@@ -403,7 +414,10 @@ et_value:
         MOVI16 ptr0, str_et_psi
         jmp et_close
 @launch:
-        jsr et_ecu
+        cmp #ET_NOS
+        bne :+
+        jmp et_nos_value
+:       jsr et_ecu
         beq et_needecu
         ldy #CR_LAUNCH
         lda (ptr1),y
@@ -427,6 +441,42 @@ et_value:
         sty tmp6
         MOVI16 ptr0, str_et_rpm
         jmp et_close
+
+; et_nos_value: "P---#----D", the nitrous between power and duration, or
+; NO NITROUS without a kit
+et_nos_value:
+        jsr et_nos
+        bne :+
+        MOVI16 ptr0, str_et_nokit
+        rts
+:       lda #'P'
+        sta linebuf
+        ldx #1
+        lda #'-'
+:       sta linebuf,x
+        inx
+        cpx #10
+        bne :-
+        lda #'D'
+        sta linebuf+10
+        lda #0
+        sta linebuf+11
+        ldy #CR_NOS             ; the knob: column 5 + n
+        lda (ptr1),y
+        clc
+        adc #5
+        tax
+        lda #'#'
+        sta linebuf,x
+        MOVI16 ptr0, linebuf
+        rts
+
+; et_nos: A = nitrous kit level of the car in use (Z set: none).  ptr1 = record.
+et_nos:
+        jsr cur_car_ptr
+        ldy #CR_PARTS+P_NITROUS
+        lda (ptr1),y
+        rts
 
 ; et_ecu: A = ECU level of the car in use (Z set: stock ECU).  ptr1 = record.
 et_ecu:
@@ -525,7 +575,7 @@ et_help:
         jmp et_msg
 
 et_labels:
-        .word str_et0, str_et1, str_et2, str_et3, str_et4, str_et5, str_et6, str_et7
+        .word str_et0, str_et1, str_et2, str_et3, str_et4, str_et5, str_et8, str_et6, str_et7
 str_et0:  .byte "GEAR RATIOS", 0
 str_et1:  .byte "FUEL MAP", 0
 str_et2:  .byte "IGNITION", 0
@@ -534,6 +584,7 @@ str_et4:  .byte "TIRE PRESSURE", 0
 str_et5:  .byte "LAUNCH 2-STEP", 0
 str_et6:  .byte "RESET ENGINE TUNE", 0
 str_et7:  .byte "BACK", 0
+str_et8:  .byte "NITROUS", 0
 str_et_open:     .byte "A: OPEN", 0
 str_et_deg:      .byte " DEG", 0
 str_et_psi:      .byte " PSI", 0
@@ -543,6 +594,8 @@ str_et_none:     .byte "NO TURBO", 0
 str_et_needecu:  .byte "NEEDS ECU", 0
 str_et_noturbo:  .byte "BUY A TURBO TO SET BOOST", 0
 str_et_noecu:    .byte "UPGRADE THE ECU FOR 2-STEP", 0
+str_et_nonos:    .byte "BUY NITROUS TO TUNE IT", 0
+str_et_nokit:    .byte "NO NITROUS", 0
 str_et_ecuign:   .byte "UPGRADE THE ECU FOR TIMING", 0
 str_et_ecufuel:  .byte "UPGRADE THE ECU TO MAP FUEL", 0
 str_et_peak:     .byte "PEAK ", 0
@@ -554,7 +607,7 @@ str_et_both:     .byte "KNOCKING AND LEAN!", 0
 et_helps:
         .word str_eh0a, str_eh0b, str_eh1a, str_eh1b, str_eh2a, str_eh2b
         .word str_eh3a, str_eh3b, str_eh4a, str_eh4b, str_eh5a, str_eh5b
-        .word str_eh6a, str_eh6b, str_eh7a, str_eh7b
+        .word str_eh8a, str_eh8b, str_eh6a, str_eh6b, str_eh7a, str_eh7b
 str_eh0a: .byte "FINAL DRIVE AND EACH GEAR", 0
 str_eh0b: .byte 0
 str_eh1a: .byte "RICH OR LEAN AT EACH RPM", 0
@@ -567,8 +620,10 @@ str_eh4a: .byte "LOW PSI GRIPS AT LAUNCH", 0
 str_eh4b: .byte "BUT DRAGS AT SPEED", 0
 str_eh5a: .byte "HOLD A ON THE LINE: THE", 0
 str_eh5b: .byte "REVS WAIT HERE FOR GREEN", 0
-str_eh6a: .byte "FUEL, TIMING, BOOST, TIRES", 0
-str_eh6b: .byte "AND 2-STEP BACK TO STOCK", 0
+str_eh6a: .byte "FUEL, TIMING, BOOST, TIRES,", 0
+str_eh6b: .byte "2-STEP AND NITROUS TO STOCK", 0
+str_eh8a: .byte "LEFT: A BIGGER, SHORTER HIT", 0
+str_eh8b: .byte "RIGHT: LESS, FOR LONGER", 0
 str_eh7a: .byte 0
 str_eh7b: .byte 0
 

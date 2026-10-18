@@ -19,6 +19,8 @@
 ;   wheelie bars: launch grip per level (RWD 5, FWD and AWD 3)
 ;   weather rain and snow take grip away (race_weather, races only)
 ;   2-step  launch rpm (needs an ECU upgrade)
+;   nitrous n = -4 (power) .. +4 (duration): the kit's boost x (8-n)/8 for
+;           its shot length x 8/(8-n), each at most 255
 ;   swaps   the engine in use brings its torque, redline, curve and weight;
 ;           the drivetrain its traction, weight and driveline loss
 ; ===========================================================================
@@ -119,9 +121,15 @@ tune_calc:
         ldy tn_od               ; - own driveline
         lda drv_kg,y
         jsr tn_msub
-        ldy #CR_DRIVE
+        ldy #CR_SWAP
         lda (ptr0),y
+        and #SWAP_DRV
         beq :+
+        lsr a
+        lsr a
+        lsr a
+        lsr a
+        lsr a
         sec
         sbc #1
         bcs :++
@@ -130,8 +138,9 @@ tune_calc:
         tay                     ; + this driveline
         lda drv_kg,y
         jsr tn_madd
-        ldy #CR_ENGINE
+        ldy #CR_SWAP
         lda (ptr0),y
+        and #SWAP_ENG
         beq :+
         sec
         sbc #1
@@ -403,6 +412,54 @@ tune_calc:
         bcs :++
 :       lda #3
 :       sta ph_roll,x
+        ; --- nitrous: power for duration ----------------------------------------
+        ldy #CR_PARTS+P_NITROUS
+        lda (ptr0),y
+        sta tn_f                ; kit level
+        ldy #CR_NOS
+        sec
+        lda #8
+        sbc (ptr0),y
+        sta tn_tmp              ; 8 - n: 4 .. 12
+        ldy tn_f
+        lda nos_add_tab,y       ; boost * (8 - n) / 8
+        sta m_a
+        lda tn_tmp
+        sta m_b
+        jsr mul8
+        lsr m_r+1
+        ror m_r
+        lsr m_r+1
+        ror m_r
+        lsr m_r+1
+        ror m_r
+        lda m_r+1
+        beq :+
+        lda #$FF
+        sta m_r
+:       ldx cx
+        lda m_r
+        sta ph_nos_add,x
+        ldy tn_f                ; frames * 8 / (8 - n)
+        lda nos_frames_tab,y
+        sta m_r
+        lda #0
+        sta m_r+1
+        asl m_r
+        rol m_r+1
+        asl m_r
+        rol m_r+1
+        asl m_r
+        rol m_r+1
+        lda tn_tmp
+        jsr div16_8
+        lda m_r+1
+        beq :+
+        lda #$FF
+        sta m_r
+:       ldx cx
+        lda m_r
+        sta ph_nos_fr,x
         ; --- 2-step: launch rpm / 100, only with an ECU upgrade ----------------
         lda #0
         sta ph_ls_l,x

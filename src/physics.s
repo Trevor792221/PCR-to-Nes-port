@@ -278,14 +278,7 @@ phys_setup:
         sta ph_tstart
         lda turbo_rate,y
         sta ph_srate,x
-        ldy #CR_PARTS+P_NITROUS
-        lda (ptr0),y
-        tay
-        lda nos_add_tab,y
-        sta ph_nos_add,x
-        lda nos_frames_tab,y
-        sta ph_nos_fr,x
-        ldy #CR_PARTS+P_GEARBOX
+        ldy #CR_PARTS+P_GEARBOX         ; (nitrous: tune_calc)
         lda (ptr0),y
         tay
         lda shift_frames_tab,y

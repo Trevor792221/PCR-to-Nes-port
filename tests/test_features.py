@@ -437,10 +437,11 @@ class Features(unittest.TestCase):
 
     def test_boss_cars_stand_out(self):
         """Every boss car, black ones too, is drawn on a lit stage."""
+        home = [0, 0, 1, 1, 2, 2, 3, 4, 5, 6, 6]     # bosses race in their home region
         for ladder in range(11):
             s = new_game()
             s.nes[0x600B], s.nes[0x600C] = 30, ladder
-            s.nes[s.sym['map_region']] = 6
+            s.nes[s.sym['map_region']] = home[ladder]
             s.garage_goto(G_RACE)
             s.press(A)
             s.step(30)

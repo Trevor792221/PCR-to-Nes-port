@@ -12,7 +12,7 @@ import gamedata as gd
 from cpu import CPU
 
 CR_PARTS, CR_PAINT, CR_FINAL, CR_GEARS = 1, 15, 18, 20
-CR_FUEL, CR_TIMING, CR_TIREP, CR_BOOST, CR_LAUNCH, CR_ENGINE, CR_DRIVE = 34, 42, 43, 44, 45, 46, 47
+CR_FUEL, CR_TIMING, CR_TIREP, CR_BOOST, CR_LAUNCH, CR_NOS, CR_SWAP = 34, 42, 43, 44, 45, 46, 47
 CR_SIZE = 48
 
 
@@ -36,7 +36,8 @@ def record(model, parts, final=None, gears=None, tune=None, engine=0, drive=0):
         rec[CR_TIREP] = tune.tirep & 0xFF
         rec[CR_BOOST] = tune.boost & 0xFF
         rec[CR_LAUNCH] = tune.launch
-    rec[CR_ENGINE], rec[CR_DRIVE] = engine, drive
+        rec[CR_NOS] = tune.nos & 0xFF
+    rec[CR_SWAP] = engine | drive << 5            # engine + 1, drivetrain + 1
     return rec
 
 
@@ -67,6 +68,8 @@ class Physics(unittest.TestCase):
         self.assertEqual(cpu.get('ph_mass_l', x) | cpu.get('ph_mass_h', x) << 8, car.mass)
         self.assertEqual(cpu.get('ph_redl_l', x) | cpu.get('ph_redl_h', x) << 8, car.redline)
         self.assertEqual(cpu.get('ph_hpm_l', x) | cpu.get('ph_hpm_h', x) << 8, car.hpmult & 0xFFFF)
+        self.assertEqual((cpu.get('ph_nos_add', x), cpu.get('ph_nos_fr', x)),
+                         (car.nos_add, car.nos_frames))
         self.assertEqual(cpu.get('ph_k0h_l', x) | cpu.get('ph_k0h_h', x) << 8, car.k0h)
         self.assertEqual(cpu.get('ph_trac_l', x) | cpu.get('ph_trac_h', x) << 8, car.trac)
         self.assertEqual(cpu.get('ph_dk_l', x) | cpu.get('ph_dk_h', x) << 8, car.dk)
@@ -129,7 +132,7 @@ class Physics(unittest.TestCase):
                 parts[gd.P_TURBO] = 0
             tune = gd.Tune([rnd.randint(-5, 5) for _ in range(8)], rnd.randint(-5, 5),
                            rnd.randint(gd.TIREP_MIN, gd.TIREP_MAX), rnd.randint(-12, 12),
-                           rnd.choice([0, 0, rnd.randint(20, 90)]))
+                           rnd.choice([0, 0, rnd.randint(20, 90)]), rnd.randint(-4, 4))
             engine = drive = 0
             if model != gd.CRATE_CAR and n % 2:
                 engine = rnd.choice([0] + [e + 1 for e in gd.SWAP_ENGINES])
@@ -163,6 +166,23 @@ class Physics(unittest.TestCase):
         # swaps: a rotary in the Pukku turned RWD, a big block in an AWD Komet
         self.run_race(0, [2] * 14, launch=7000, engine=14, drive=2)
         self.run_race(1, [1, 1, 1, 2, 1, 0, 1, 2, 1, 0, 0, 0, 0, 0], launch=5000, engine=17, drive=3, x=1)
+
+    def test_nitrous_power_for_duration(self):
+        parts = [0] * 5 + [3] + [0] * 8              # race nitrous: 136 boost, 210 frames
+        even = gd.Car(9, parts)
+        hit = gd.Car(9, parts, tune=gd.Tune(nos=-4))
+        long_ = gd.Car(9, parts, tune=gd.Tune(nos=4))
+        self.assertEqual((even.nos_add, even.nos_frames), (136, 210))
+        self.assertEqual((hit.nos_add, hit.nos_frames), (204, 140), 'x1.5 for x2/3')
+        self.assertEqual((long_.nos_add, long_.nos_frames), (68, 255), 'x1/2, capped at 255 frames')
+        self.assertEqual(gd.Car(9, [0] * 14, tune=gd.Tune(nos=-4)).nos_add, 0, 'no kit, no nitrous')
+        for n in range(-4, 3):                       # about the same nitrous in total
+            a, f = gd.nos_tuned(2, n)                # (until the shot hits 255 frames)
+            self.assertAlmostEqual(a * f / (96 * 180), 1, delta=.07)
+        cpu = CPU()
+        for n in (-4, 0, 4):
+            car = self.setup_car(cpu, 1, 9, [0] * 5 + [4] + [0] * 8, tune=gd.Tune(nos=n))
+            self.check_setup(cpu, 1, car)
 
     def test_weather_grip(self):
         parts = [2] * 14
