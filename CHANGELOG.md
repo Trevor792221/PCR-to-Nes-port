@@ -3,9 +3,13 @@
 Every version of Pixel Racer NES, newest first. Downloads are on the
 [Releases page](https://github.com/Trevor792221/PCR-to-Nes-port/releases).
 
-## v5.2: Nitrous tuning, bosses race at home (2026-10-18)
+## v5.2: Balance, nitrous tuning, bosses race at home (2026-10-18)
 
 * Each ladder boss can now only be raced in its home region. Bosses 1-2 are in Fukuoka, 3-4 in Hiroshima, 5-6 in Osaka, 7 in Nagoya, 8 in Gunma, 9 in Sapporo, and 10-11 in Tokyo. Elsewhere, race select tells you where the next boss is, e.g. "BOSS IS IN OSAKA". Before, any region worked once your level was high enough.
+* **Balance.**
+  * Regions open later, at about the level you'll have reached when your car can beat the previous region's bosses: Fukuoka 1, Hiroshima 7, Osaka 12, Nagoya 17, Gunma 21, Sapporo 23, Tokyo 31. Before, they opened at 1, 2, 4, 6, 8, 11 and 14.
+  * Each region's bosses are now a clear step faster than the last. Rosa (Osaka) has level-2 parts instead of level 3, and Iron Jo (Sapporo) now drives a Nova Hyper with level-3 parts instead of a fully upgraded Brennan 427.
+  * Easy quick races are easier to win. Easy rivals drive sloppily (slow off the line, poor shifts) and are 12.5% down on power, so a clean race beats them even in the starter car.
 * **Nitrous tuning.** The TUNE screen has a NITROUS slider from POWER to DURATION; it needs a nitrous kit. Each step toward power gives a bigger hit for a shorter shot, up to 1.5x the boost for 2/3 of the time. Each step toward duration gives a gentler shot that lasts longer, down to half the boost for twice as long. RESET ENGINE TUNE and engine swaps put it back in the middle. It is saved in the TUNE password, and tune passwords without nitrous tuning are unchanged.
 
 ## v5.1: Weather (2026-10-18)

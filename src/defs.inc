@@ -115,6 +115,7 @@ CR_TIREP  = 43                  ;   tire psi from 32 (-14 .. +8),
 CR_BOOST  = 44                  ;   boost psi from the turbo's own,
 CR_LAUNCH = 45                  ;   2-step launch rpm/100 (0 off)
 MAX_LEVEL = 99
+EASY_CAP  = 32                  ; easy quick-race rivals: -32/256 power (12.5%)
 CR_NOS    = 46                  ;   nitrous: -4 more power .. +4 longer
 CR_SWAP   = 47                  ; swaps: engine id + 1 in bits 0-4, drivetrain
 SWAP_ENG  = $1F                 ;   + 1 in bits 5-6 (0 = the car's own)

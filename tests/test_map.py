@@ -13,7 +13,7 @@ from test_game import new_game, G_RACE                       # noqa: E402
 from test_password import to_password_screen, type_password  # noqa: E402
 
 SV_XP, SV_LEVEL, SV_LADDER = 0x6009, 0x600B, 0x600C
-REGION_LV = [1, 2, 4, 6, 8, 11, 14]
+REGION_LV = [1, 7, 12, 17, 21, 23, 31]
 FUKUOKA, HIROSHIMA, OSAKA, NAGOYA, GUNMA, SAPPORO, TOKYO = range(7)
 
 
@@ -36,19 +36,19 @@ class Map(unittest.TestCase):
         s = new_game()
         open_map(s, 1)
         self.assertEqual(s.mem('map_max'), FUKUOKA)
-        pick_region(s, HIROSHIMA)                    # needs level 2
+        pick_region(s, HIROSHIMA)                    # needs level 7
         self.assertEqual(s.mem('ui_count'), 7, 'still on the map')
         self.assertEqual(s.mem('map_region'), FUKUOKA)
         self.assertEqual(s.mem('lag'), 0)
         s.press(B)
         s.step(40)
-        for lv in range(1, 20):
+        for lv in range(1, 35):
             open_map(s, lv)
             want = max(i for i, need in enumerate(REGION_LV) if lv >= need)
             self.assertEqual(s.mem('map_max'), want, 'level %d' % lv)
             s.press(B)
             s.step(40)
-        open_map(s, 9)
+        open_map(s, 21)
         self.assertEqual(s.mem('mus_song'), 6, 'the map plays Road to Tokyo')
         self.assertTrue(any(s.mem('mus_act', i) for i in range(4)))
         pick_region(s, GUNMA)
@@ -72,14 +72,14 @@ class Map(unittest.TestCase):
 
     def test_rivals_get_tougher(self):
         skill0, parts0 = self.street_rival(FUKUOKA, 1)
-        skill6, parts6 = self.street_rival(TOKYO, 14)
+        skill6, parts6 = self.street_rival(TOKYO, 31)
         self.assertEqual(skill0, 140)
         self.assertEqual(skill6, 140 + 6 * 8)
         self.assertEqual(set(parts0), {0}, 'stock car: stock rivals at home')
         self.assertEqual(set(parts6), {3}, 'tuned rivals in Tokyo')
 
     def test_bets_scale_with_the_region(self):
-        for region, level, bet in ((FUKUOKA, 1, 300), (OSAKA, 4, 600), (TOKYO, 14, 1200)):
+        for region, level, bet in ((FUKUOKA, 1, 300), (OSAKA, 12, 600), (TOKYO, 31, 1200)):
             s = new_game()
             open_map(s, level)
             pick_region(s, region)
@@ -91,8 +91,8 @@ class Map(unittest.TestCase):
 
     def test_bosses_need_their_home_region(self):
         s = new_game()
-        s.nes[SV_LADDER] = 4                         # boss 5 lives in Osaka (level 4)
-        open_map(s, 3)
+        s.nes[SV_LADDER] = 4                         # boss 5 lives in Osaka (level 12)
+        open_map(s, 11)
         pick_region(s, FUKUOKA)
         s.list_goto('rs_sel', 0)
         s.nes[s.sym['bi_boss']] = 0xFF
@@ -100,10 +100,10 @@ class Map(unittest.TestCase):
         s.step(40)
         self.assertEqual(s.mem('ui_count'), 8, 'locked: still on race select')
         self.assertEqual(s.mem('game_mode'), 1)
-        s.nes[SV_LEVEL] = 4
+        s.nes[SV_LEVEL] = 12
         s.press(A)
         s.step(45)
-        self.assertNotEqual(s.mem('bi_boss'), 4, 'level 4, but in Fukuoka: still locked')
+        self.assertNotEqual(s.mem('bi_boss'), 4, 'level 12, but in Fukuoka: still locked')
         s.press(B)                                   # to the map, then Osaka
         s.step(40)
         pick_region(s, OSAKA)
@@ -119,7 +119,7 @@ class Map(unittest.TestCase):
             for here in (region, (region + 3) % 7):
                 s = new_game()
                 s.nes[SV_LADDER] = boss
-                open_map(s, 30)                      # every region open
+                open_map(s, 40)                      # every region open
                 pick_region(s, here)
                 s.list_goto('rs_sel', 0)
                 s.nes[s.sym['bi_boss']] = 0xFF
@@ -131,19 +131,19 @@ class Map(unittest.TestCase):
 
     def test_new_region_on_level_up(self):
         s = new_game()
-        s.nes[SV_XP] = 139                           # 1 short of level 2
-        open_map(s, 1)
+        s.nes[SV_XP], s.nes[SV_XP + 1] = 339 & 0xFF, 339 >> 8   # 1 short of level 7
+        open_map(s, 6)
         pick_region(s, FUKUOKA)
         s.list_goto('rs_sel', 4)                     # test run: 5 XP
         s.press(A)
         s.step(40)
         drive_race(s)
         s.step(60)
-        self.assertEqual(s.wram(SV_LEVEL), 2)
+        self.assertEqual(s.wram(SV_LEVEL), 7)
         self.assertEqual(s.mem('rw_newreg'), HIROSHIMA + 1)
 
     def test_password_puts_you_at_your_furthest_region(self):
-        st = dict(cash=50000, gems=10, level=12, xp=0, ladder=8, secret=0, options=0,
+        st = dict(cash=50000, gems=10, level=23, xp=0, ladder=8, secret=0, options=0,
                   stats=dict.fromkeys(dict(pw.STATS), 0))
         t = to_password_screen()
         type_password(t, pw.encode_player(**st))

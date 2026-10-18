@@ -118,6 +118,8 @@ race_main:
         jsr race_results
         lda #W_CLEAR            ; the weather only counts in races
         sta race_weather
+        lda #0                  ; and the easy rival's handicap in its race
+        sta opp_cap
         lda quit
         beq :+
         lda #MODE_GARAGE

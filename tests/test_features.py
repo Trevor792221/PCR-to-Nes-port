@@ -75,6 +75,21 @@ class Features(unittest.TestCase):
         s.step(30)
         return s.mem('ui_count')
 
+    def test_easy_races_are_easy(self):
+        """An easy rival drives sloppily and is down on power: a clean race
+        in the starter car beats it."""
+        wins = 0
+        for i in range(6):
+            s = new_game()
+            s.step(i * 7)
+            start_race(s, 1)                         # quick race, easy
+            self.assertEqual((s.mem('race_diff'), s.mem('opp_cap')), (0, 32))
+            drive_race(s)
+            wins += s.mem('res_flags') & 1
+            s.step(120)
+            self.assertEqual(s.mem('opp_cap'), 0, 'no handicap outside the race')
+        self.assertGreaterEqual(wins, 5)
+
     def test_secret_boss_hidden_without_zenith(self):
         s = new_game()
         self.assertEqual(self.race_select_count(s), 8)
@@ -82,7 +97,7 @@ class Features(unittest.TestCase):
     def test_secret_boss_only_in_tokyo(self):
         s = new_game()
         give_car(s, 0, 12, 4)
-        s.nes[0x600B] = 14
+        s.nes[0x600B] = 31
         for region, rows in ((2, 8), (5, 8), (6, 9)):
             self.assertEqual(self.race_select_count(s, region), rows, 'region %d' % region)
             s.press(B)                               # race select -> map
@@ -93,7 +108,7 @@ class Features(unittest.TestCase):
     def test_secret_boss_race_and_reward(self):
         s = new_game()
         give_car(s, 0, 12, 4)
-        s.nes[0x600B] = 14                           # level for Tokyo, the boss's home
+        s.nes[0x600B] = 31                           # level for Tokyo, the boss's home
         self.assertEqual(self.race_select_count(s, 6), 9)
         s.list_goto('rs_sel', 8)
         s.press(A)
@@ -350,7 +365,7 @@ class Features(unittest.TestCase):
         s.garage_goto(G_TUNE)
         s.press(A)
         s.step(80)
-        self.assertEqual(s.mem('ui_count'), 8, 'the engine tune hub')
+        self.assertEqual(s.mem('ui_count'), 9, 'the engine tune hub')
         s.press(A)                                   # GEAR RATIOS
         s.step(60)
         self.assertEqual(s.mem('ui_count'), 10, 'final, 7 gears, reset, back')
@@ -440,7 +455,7 @@ class Features(unittest.TestCase):
         home = [0, 0, 1, 1, 2, 2, 3, 4, 5, 6, 6]     # bosses race in their home region
         for ladder in range(11):
             s = new_game()
-            s.nes[0x600B], s.nes[0x600C] = 30, ladder
+            s.nes[0x600B], s.nes[0x600C] = 40, ladder
             s.nes[s.sym['map_region']] = home[ladder]
             s.garage_goto(G_RACE)
             s.press(A)

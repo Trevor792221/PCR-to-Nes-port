@@ -1059,8 +1059,12 @@ bet_half_hi: .byte >150, >500, >1250
 ; ---------------------------------------------------------------------------
 NBOSS = 11                      ; ladder bosses
 BOSS_SECRET = 11                ; the hidden 12th boss (table index)
-boss_model: .byte 0, 1, 2, 4, 3, 5, 6, 7, 8, 9, 11, CRATE_CAR
-boss_level: .byte 0, 1, 1, 1, 2, 3, 3, 3, 4, 4, 4, 4
+; Each region's bosses are a clear step faster than the last (1/4 mile:
+; 13.6, 11.8, 10.4, 9.3, 8.4, 8.0, 7.3 s), and region_lv is about the level
+; a player reaches by the time their car can beat the region before
+; (tools/progress.py).
+boss_model: .byte 0, 1, 2, 4, 3, 5, 6, 7, 11, 9, 11, CRATE_CAR
+boss_level: .byte 0, 1, 1, 1, 2, 2, 3, 3, 3, 4, 4, 4
 boss_home:  .byte 0, 0, 1, 1, 2, 2, 3, 4, 5, 6, 6, 6       ; map region (sets the level needed)
 boss_paint: .byte $2A, $11, $30, $14, $12, $28, $07, $3C, $0F, $00, $25, $13
 boss_skill: .byte 40, 70, 90, 110, 130, 150, 170, 190, 210, 230, 250, 255
@@ -1737,6 +1741,8 @@ make_rival:
         asl a
         sta tmp5
         ldx race_diff
+        lda diff_cap,x          ; easy rivals are down on power
+        sta opp_cap
         lda diff_skill,x
         clc
         adc tmp5
@@ -1747,7 +1753,8 @@ make_rival:
 :       sta opp_skill
         rts
 
-diff_skill: .byte 60, 140, 215
+diff_skill: .byte 0, 140, 215
+diff_cap:   .byte EASY_CAP, 0, 0    ; power handicap /256 per difficulty
 rg_model:   .byte 0, 0, 1, 1, 1, 2, 2
 NRIVALS = 12
 rival_names:

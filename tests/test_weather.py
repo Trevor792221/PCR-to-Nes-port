@@ -16,7 +16,7 @@ FUKUOKA, SAPPORO = 0, 5
 
 def race_in(weather=None, region=FUKUOKA, wait=0):
     s = new_game()
-    s.nes[SV_LEVEL] = 20                         # every region open
+    s.nes[SV_LEVEL] = 40                         # every region open
     s.nes[s.sym['map_region']] = region
     if weather is not None:
         s.nes[s.sym['weather_force']] = weather + 1

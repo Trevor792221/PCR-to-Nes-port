@@ -281,7 +281,7 @@ paint_list:
 ; World map regions (see map.s).  Each one opens at a level; rivals there
 ; are tougher and pay more.
 ; ---------------------------------------------------------------------------
-region_lv:  .byte 1, 2, 4, 6, 8, 11, 14         ; level that opens each region
+region_lv:  .byte 1, 7, 12, 17, 21, 23, 31       ; level that opens each region
 
 ; has_wheelie: ptr1 = car record -> Z clear (A = 1) if it has wheelie bars
 T_WBAR  = $28                   ; sprite tile: wheelie bars (races)

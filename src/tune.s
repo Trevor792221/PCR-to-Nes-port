@@ -378,7 +378,14 @@ tune_calc:
         clc
         adc #1
         jsr tn_adds
-        lda tn_acc
+        lda cx                  ; the rival (car 1): an easy rival's handicap
+        beq :+
+        lda opp_cap
+        eor #$FF
+        clc
+        adc #1
+        jsr tn_adds
+:       lda tn_acc
         sta tn_hpm
         lda tn_acc+1
         sta tn_hpm+1
