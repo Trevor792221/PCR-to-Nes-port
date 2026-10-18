@@ -43,6 +43,7 @@ runs on real NES / Famicom hardware or any accurate emulator.
 | Launch / wheelspin | Clutch-dump launch model: too many revs spin the tires (with smoke), too few bog the engine |
 | Street racing | Half-mile street race on 3 lanes with traffic. Change lanes to dodge cars; crashing costs you your speed. Traffic is a mix of company vans, work pickups with ladder racks, camper vans and removal trucks, all with light blue windows, each with its own speed range (trucks crawl, the vans nip along). Traffic colours change from race to race. Cruising adds yellow taxis, and some of the other traffic is yellow too |
 | Race scenery | Every race picks one of three backgrounds at random: **day** (pale sky, clouds, grey city), **sunset** (purple-to-orange sky, low sun, black skyline) or **night** (navy sky, moon, lit windows) |
+| Weather | On top of the time of day, every race has weather, picked by region: **clear**, **cloudy** (a low cloud bank over the day, sunset or night sky), **rain** (falling rain over the road and sky, and a dark wet road) or **snow** (drifting snow and white pavements). Rain costs every car in the race some launch grip and snow costs more, so AWD, good tires and wheelie bars matter more. Clear skies are the most common; snow only falls in Gunma and Sapporo, and Sapporo snows more often than not |
 | World map | Garage → RACE opens a map of **Japan**: pick the region you race in. Seven regions open as you level up: Fukuoka (level 1), Hiroshima (2), Osaka (4), Nagoya (6), Gunma (8), Sapporo (11) and Tokyo (14). Quick and street rivals in later regions drive better-tuned, faster cars and react quicker, and they pay more: bets and street prizes go from x1 in Fukuoka up to x4 in Tokyo, and wins give +10 XP per region. The results screen says when a race opens a new region. The map plays its own theme, "Road to Tokyo". The coastline is drawn from [Natural Earth](https://www.naturalearthdata.com/) data (public domain) |
 | Story / ladder progression | Ladder of 10 street bosses, plus a final "Legend" boss. Every boss comes from a region on the map and needs the level that opens it (bosses 1-2 Fukuoka, 3-4 Hiroshima, 5-6 Osaka, 7 Nagoya, 8 Gunma, 9 Sapporo, 10-11 and Eclipse Tokyo). A hidden 12th boss, **Eclipse**, appears in race select only while you drive the Zenith X400 in Tokyo. Beating it pays $500,000 and, the first time, 25 gems. Before every boss race an intro screen shows the boss, their car in its colours with its HP, a short bio and the prize; B backs out. The intro plays its own theme, "Showdown" |
 | Quick races with bets | Random rival on Easy, Medium or Hard, betting $300, $1,000 or $2,500 (more in later map regions) |
@@ -145,7 +146,7 @@ physics runs at 50 Hz.
 | 2 | Race engine (drag, street, test), HUD, AI, traffic |
 | 3 | Parts, tune (gears, engine, fuel map), paint, crates, dyno, options |
 | 4 | Race scenery (day, sunset, night) and the boot splash screen |
-| 5 | Passwords (encode, decode, entry and display screens) |
+| 5 | Passwords (encode, decode, entry and display screens), the overcast race scenery |
 | 6 | World map (Japan tiles, nametable, region screen), engine tune maths, SWAP screen and engine tables |
 | 7 (fixed) | Reset/NMI, PPU helpers, math, physics, sound, game state, car data |
 

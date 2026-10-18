@@ -118,6 +118,8 @@ class TileSet:
 
 
 RACE_THEMES = ['DAY', 'SUNSET', 'NIGHT']
+# overcast versions (cloudy, rain and snow races): scenes 3-5
+CLOUDY_THEMES = ['DAY_CLOUDY', 'SUNSET_CLOUDY', 'NIGHT_CLOUDY']
 SKY_W, SKY_H = 256, 72          # skyline: nametable rows 6-14
 
 
@@ -160,7 +162,7 @@ def _disc(pix, cx, cy, r, c):
                 pix[y][x] = c
 
 
-def sky_night(rnd):
+def sky_night(rnd, overcast=False):
     """Palette: 0 black buildings, 1 navy sky, 2 blue glow, 3 lit windows."""
     pix = [['1'] * SKY_W for _ in range(SKY_H)]
     for y in range(40, SKY_H):
@@ -168,21 +170,25 @@ def sky_night(rnd):
             if y >= 52 or (y >= 44 and (x + y) % 2 == 0):
                 pix[y][x] = '2'
     for _ in range(10):
-        pix[rnd.randrange(30)][rnd.randrange(SKY_W)] = '3'
-    _disc(pix, 205, 11, 4.5, '3')                 # moon
+        y, x = rnd.randrange(30), rnd.randrange(SKY_W)
+        if not overcast:
+            pix[y][x] = '3'
+    if not overcast:
+        _disc(pix, 205, 11, 4.5, '3')             # moon
     _buildings(pix, rnd, '0', '3',
                lambda st, lx, ly: st == 2 or (st == 0 and (lx // 4 + ly // 6) % 3 != 2)
                or (st == 1 and (lx // 8 + ly // 8) % 2 == 0))
     return pix
 
 
-def sky_day(rnd):
+def sky_day(rnd, overcast=False):
     """Palette: 0 black windows, 1 pale sky, 2 grey buildings, 3 white
     clouds and sun."""
     pix = [['1'] * SKY_W for _ in range(SKY_H)]
-    _disc(pix, 44, 13, 7, '3')                    # sun
+    if not overcast:
+        _disc(pix, 44, 13, 7, '3')                # sun
     # clouds: overlapping discs, flat bottoms on 8-pixel rows
-    for cx, cy, n in ((112, 16, 4), (190, 10, 3), (240, 24, 3), (12, 30, 3)):
+    for cx, cy, n in () if overcast else ((112, 16, 4), (190, 10, 3), (240, 24, 3), (12, 30, 3)):
         for i in range(n):
             _disc(pix, cx + i * 7 - n * 3, cy - (2 if i % 2 else 0), 5 if i % 2 else 4, '3')
         for x in range(cx - n * 3 - 3, cx + n * 4 + 1):
@@ -199,7 +205,7 @@ def sky_day(rnd):
     return pix
 
 
-def sky_sunset(rnd):
+def sky_sunset(rnd, overcast=False):
     """Palette: 0 black silhouettes, 1 purple sky, 2 orange glow, 3 sun and
     a few lit windows."""
     pix = [['1'] * SKY_W for _ in range(SKY_H)]
@@ -221,7 +227,46 @@ def sky_sunset(rnd):
     return pix
 
 
-SKY_PAINTERS = {'DAY': sky_day, 'SUNSET': sky_sunset, 'NIGHT': sky_night}
+CLOUD_W, CLOUD_H = 128, 34     # the cloud bank repeats every 128 pixels
+
+
+def _cloud_mask(rnd):
+    m = [[0] * CLOUD_W for _ in range(CLOUD_H)]
+    for cy, r, n in ((-2, 12, 9), (9, 9, 9), (18, 7, 8), (25, 5, 5)):
+        for _ in range(n):
+            cx, rr, yy = rnd.randrange(CLOUD_W), r + rnd.randrange(-2, 3), cy + rnd.randrange(-2, 3)
+            for y in range(max(0, yy - rr - 1), min(CLOUD_H, yy + rr + 2)):
+                for dx in range(-rr - 1, rr + 2):
+                    if (dx + 0.5) ** 2 + (y + 0.5 - yy) ** 2 < rr * rr:
+                        m[y][(cx + dx) % CLOUD_W] = 1
+    return m
+
+
+def overcast(painter, body, sky):
+    """A low cloud bank in colour body over painter's sky, behind its
+    buildings (only the sky colours in sky are covered), with soft dithered
+    undersides.  painter(rnd, overcast=True) leaves out the sun, moon and
+    stars."""
+    def paint(rnd):
+        pix = painter(rnd, overcast=True)
+        m = _cloud_mask(random.Random(77))
+        for y in range(CLOUD_H):
+            for x in range(SKY_W):
+                if not m[y][x % CLOUD_W] or pix[y][x] not in sky:
+                    continue
+                below = [y + k < CLOUD_H and m[y + k][x % CLOUD_W] for k in (1, 2)]
+                if all(below) or (below[0] and (x + y) % 2 == 0):
+                    pix[y][x] = body
+        return pix
+    return paint
+
+
+SKY_PAINTERS = {'DAY': sky_day, 'SUNSET': sky_sunset, 'NIGHT': sky_night,
+                # light grey clouds on a grey day; orange-lit clouds against
+                # the purple of a sunset; city-lit grey clouds over the night
+                'DAY_CLOUDY': overcast(sky_day, '3', '13'),
+                'SUNSET_CLOUDY': overcast(sky_sunset, '2', '123'),
+                'NIGHT_CLOUDY': overcast(sky_night, '2', '12')}
 
 
 def build_race(theme):
@@ -606,18 +651,39 @@ def big_car_tiles(name):
     return grid_tiles(big, 8, 4)
 
 
+def weather_frames():
+    """Rain and snow over the road and the plain sky: 8 steps each of the
+    second bit plane of tile $80 (asphalt / plain sky, colour 1 everywhere),
+    so the drops show in colour 3.  Rain falls 2 pixels down and 1 left a
+    step, snow 1 down while it sways; after 8 steps both are back where they
+    started, so the loop is seamless."""
+    rain = [(5, 0), (5, 1), (4, 2), (1, 4), (1, 5), (0, 6)]
+    snow = [(2, 1), (6, 5)]
+    sway = [0, 0, 1, 1, 1, 1, 0, 0]
+    out = b''
+    for drops, move in ((rain, lambda f: (-f, 2 * f)), (snow, lambda f: (sway[f], f))):
+        for f in range(8):
+            dx, dy = move(f)
+            rows = [0] * 8
+            for x, y in drops:
+                rows[(y + dy) % 8] |= 0x80 >> ((x + dx) % 8)
+            out += bytes(rows)
+    return out
+
+
 def main():
     out = sys.argv[1]
     os.makedirs(out, exist_ok=True)
     w = lambda n, d: open(os.path.join(out, n), 'wb').write(d)
     w('common.chr', build_common())
+    w('weather.bin', weather_frames())
     counts = []
-    for i, theme in enumerate(RACE_THEMES):
+    for i, theme in enumerate(RACE_THEMES + CLOUDY_THEMES):
         race, race_nt, sp, n = build_race(theme)
         if i == 0:
             race_sp = sp
         assert sp == race_sp, 'road tiles must match across themes'
-        w('race%d.chr' % i, race)
+        w('race%d.chr' % i, race[:n * 16] if i >= len(RACE_THEMES) else race)  # overcast: bank 5
         w('race_map%d.bin' % i, race_nt)
         counts.append('%s %d' % (theme.lower(), n))
     nrace = ', '.join(counts)

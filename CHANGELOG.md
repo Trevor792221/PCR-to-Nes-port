@@ -3,6 +3,14 @@
 Every version of Pixel Racer NES, newest first. Downloads are on the
 [Releases page](https://github.com/Trevor792221/PCR-to-Nes-port/releases).
 
+## v5.1: Weather (2026-10-18)
+
+* **Weather.** Every race now has weather as well as a time of day:
+  * **Cloudy:** a low cloud bank over the day, sunset or night sky. Grey clouds by day, orange-lit clouds at sunset, and grey clouds over the city lights at night.
+  * **Rain:** rain falls over the road and the sky, and the road turns dark and wet. Every car in the race has less launch grip.
+  * **Snow:** snow drifts down and the pavements turn white. Grip drops even more than in the rain.
+* Weather depends on the region. Rain and clouds can come anywhere. Snow only falls in Gunma and Sapporo, and Sapporo snows more often than not. Elsewhere clear skies are the most common.
+
 ## v5.0: Engine and drivetrain swaps (2026-10-18)
 
 * **Engine swaps** (garage → SWAP, paid in gems). Choose any dealer car's engine or one of four swap-only crate engines: a twin-rotor rotary, a high-rev I4, a flat six and a big-block V8. Each engine brings its own power, redline, torque curve and weight. Prices run from 5 to 30 gems, and the bigger engines unlock at higher levels. The old engine's parts go back to stock and you get 3/4 of what they cost back in cash. The engine tune is reset.

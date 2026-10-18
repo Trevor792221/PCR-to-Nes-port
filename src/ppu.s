@@ -512,27 +512,34 @@ load_common_chr:
         CHR_LOAD gfx_sprites, $1000, $0400
         rts
 
-; load_race_chr: BG tiles $80-$FF for race_theme
+; load_race_chr: BG tiles $80-$FF for race_scene
 load_race_chr:
-        ldx race_theme
+        ldx race_scene
         lda scene_chr_lo,x
         sta ptr0
         lda scene_chr_hi,x
         sta ptr0+1
-        lda #0
+        lda scene_len_lo,x
         sta tmp0
-        lda #8
+        lda scene_len_hi,x
         sta tmp1
-        lda #BANK_SCENE
+        lda scene_bank,x
         sta copy_bank
         lda #$08
         ldx #$00
         jmp chr_copy
 
-scene_chr_lo: .byte <scene_chr0, <scene_chr1, <scene_chr2
-scene_chr_hi: .byte >scene_chr0, >scene_chr1, >scene_chr2
-scene_map_lo: .byte <scene_map0, <scene_map1, <scene_map2
-scene_map_hi: .byte >scene_map0, >scene_map1, >scene_map2
+; scenes 0-2: day, sunset, night (bank 4); 3-5: the same, overcast (bank 5)
+scene_chr_lo: .byte <scene_chr0, <scene_chr1, <scene_chr2, <scene_chr3, <scene_chr4, <scene_chr5
+scene_chr_hi: .byte >scene_chr0, >scene_chr1, >scene_chr2, >scene_chr3, >scene_chr4, >scene_chr5
+scene_map_lo: .byte <scene_map0, <scene_map1, <scene_map2, <scene_map3, <scene_map4, <scene_map5
+scene_map_hi: .byte >scene_map0, >scene_map1, >scene_map2, >scene_map3, >scene_map4, >scene_map5
+scene_bank:   .byte BANK_SCENE, BANK_SCENE, BANK_SCENE, BANK_PW, BANK_PW, BANK_PW
+SCENE_LEN3 = scene_chr4 - scene_chr3
+SCENE_LEN4 = scene_chr5 - scene_chr4
+SCENE_LEN5 = scene_chr_end - scene_chr5
+scene_len_lo: .byte 0, 0, 0, <SCENE_LEN3, <SCENE_LEN4, <SCENE_LEN5
+scene_len_hi: .byte 8, 8, 8, >SCENE_LEN3, >SCENE_LEN4, >SCENE_LEN5
 
 load_menu_chr:
         CHR_LOAD gfx_menu, $0800, $0800

@@ -118,6 +118,7 @@ class NMIBudget(unittest.TestCase):
 
     def test_street_race(self):
         s = Sim(boot=120)
+        s.nes[s.sym['weather_force']] = 3           # rain: the busiest VRAM queue
         s.press(A)
         s.step(40)
         s.garage_goto(0)

@@ -17,6 +17,7 @@
 ;           curve down from there.
 ;   tires   psi from 32: -2 grip and -1 rolling drag per psi
 ;   wheelie bars: launch grip per level (RWD 5, FWD and AWD 3)
+;   weather rain and snow take grip away (race_weather, races only)
 ;   2-step  launch rpm (needs an ECU upgrade)
 ;   swaps   the engine in use brings its torque, redline, curve and weight;
 ;           the drivetrain its traction, weight and driveline loss
@@ -388,6 +389,9 @@ tune_calc:
         sbc (ptr0),y
         sec
         sbc (ptr0),y
+        ldx race_weather        ; rain and snow: less grip for everyone
+        sec
+        sbc weather_grip,x
         sta tn_grip
         ; rolling drag = max(3, 9 - tire psi)
         ldx cx

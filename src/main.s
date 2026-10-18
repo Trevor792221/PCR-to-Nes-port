@@ -97,6 +97,9 @@ res_t60:    .res 2          ; 0-60 time ms
 res_mph:    .res 2          ; trap speed in mph (for the stats page)
 tmp_rec:    .res CR_SIZE    ; scratch car record (dealer, crates)
 race_theme: .res 1          ; 0 day, 1 sunset, 2 night (picked per race)
+race_scene: .res 1          ; background: race_theme, + 3 when overcast
+race_weather: .res 1        ; W_CLEAR, W_CLOUDY, W_RAIN, W_SNOW (0 outside races)
+weather_force: .res 1       ; tests: weather + 1 for the next races (0 = random)
 copy_bank:  .res 1          ; source bank for chr_copy / bank0_copy (0 = graphics)
 garage_song: .res 1         ; garage theme in use (SONG_GARAGE, SONG_NEON or SONG_NIGHT)
 new_song:   .res 1          ; set by a race: the garage picks a theme again
@@ -147,6 +150,7 @@ cheat_debug:     .byte 0        ; $FFC2  non-zero: SELECT in the garage = debug 
 
 .segment "BANK5"
 .include "password.s"
+.include "scenes2.s"
 
 .segment "BANK6"
 .include "map.s"

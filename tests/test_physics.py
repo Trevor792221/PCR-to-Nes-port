@@ -41,13 +41,14 @@ def record(model, parts, final=None, gears=None, tune=None, engine=0, drive=0):
 
 
 class Physics(unittest.TestCase):
-    def setup_car(self, cpu, slot, model, parts, tune=None, engine=0, drive=0):
+    def setup_car(self, cpu, slot, model, parts, tune=None, engine=0, drive=0, weather=0):
         rec = record(model, parts, tune=tune, engine=engine, drive=drive)
         base = cpu.sym['tmp_rec']
         cpu.mem[base:base + CR_SIZE] = bytes(rec)
         cpu.put('ptr0', base, size=2)
+        cpu.put('race_weather', weather)
         cpu.call('phys_setup', x=slot)
-        return gd.Car(model, parts, tune=tune, engine=engine, drive=drive)
+        return gd.Car(model, parts, tune=tune, engine=engine, drive=drive, weather=weather)
 
     def state(self, cpu, x):
         g = lambda n: cpu.get(n, x)
@@ -133,7 +134,8 @@ class Physics(unittest.TestCase):
             if model != gd.CRATE_CAR and n % 2:
                 engine = rnd.choice([0] + [e + 1 for e in gd.SWAP_ENGINES])
                 drive = rnd.randint(0, 3)
-            car = self.setup_car(cpu, n & 1, model, parts, tune, engine, drive)
+            weather = rnd.choice([0, 0, 1, 2, 3])
+            car = self.setup_car(cpu, n & 1, model, parts, tune, engine, drive, weather)
             tn, x = car.tune, n & 1
             got = dict(hpm=cpu.get('tn_hpm', size=2), bmul=cpu.get('tn_bmul'),
                        grip=cpu.get('tn_grip'), roll=cpu.get('ph_roll', x),
@@ -141,8 +143,8 @@ class Physics(unittest.TestCase):
                        psi=cpu.get('tn_psi'), knock=cpu.get('tn_knock'), lean=cpu.get('tn_lean'),
                        band=[cpu.get('tn_band', k) or 256 for k in range(8)])
             want = dict(tn, hpm=tn['hpm'] & 0xFFFF, grip=tn['grip'] & 0xFF)
-            self.assertEqual(got, want, 'model %d parts %r tune %r swap %d %d'
-                             % (model, parts, vars(tune), engine, drive))
+            self.assertEqual(got, want, 'model %d parts %r tune %r swap %d %d weather %d'
+                             % (model, parts, vars(tune), engine, drive, weather))
             self.assertEqual((cpu.get('ph_eng', x), cpu.get('ph_drv', x), cpu.get('ph_ecv', x)),
                              (car.engine, car.drive, gd.ENGINES[car.engine][4]))
             self.check_setup(cpu, x, car)
@@ -161,6 +163,18 @@ class Physics(unittest.TestCase):
         # swaps: a rotary in the Pukku turned RWD, a big block in an AWD Komet
         self.run_race(0, [2] * 14, launch=7000, engine=14, drive=2)
         self.run_race(1, [1, 1, 1, 2, 1, 0, 1, 2, 1, 0, 0, 0, 0, 0], launch=5000, engine=17, drive=3, x=1)
+
+    def test_weather_grip(self):
+        parts = [2] * 14
+        dry, wet, snow = (gd.Car(8, parts, weather=w) for w in (gd.CLEAR, gd.RAIN, gd.SNOW))
+        self.assertEqual(gd.Car(8, parts, weather=gd.CLOUDY).trac, dry.trac, 'clouds: no change')
+        self.assertLess(wet.trac, dry.trac)
+        self.assertLess(snow.trac, wet.trac)
+        self.assertEqual(dry.k0h, snow.k0h, 'grip only')
+        cpu = CPU()
+        for w in range(4):
+            car = self.setup_car(cpu, 0, 8, parts, weather=w)
+            self.check_setup(cpu, 0, car)
 
     def test_swaps(self):
         stock = gd.Car(4, [0] * 14)                  # Hollis SS: RWD, 5.7 V8

@@ -207,13 +207,26 @@ WHEELIE_GRIP = [3, 5, 3, 3]  # launch grip per level by drive: FWD (less squat k
                              # weight on the front), RWD, AWD
 
 
+# Weather (picked per race, by region: snow only in the cold north).  Rain
+# and snow take grip points away from every car in the race.
+CLEAR, CLOUDY, RAIN, SNOW = range(4)
+WEATHER_NAMES = ['CLEAR', 'CLOUDY', 'RAIN', 'SNOW']
+WEATHER_GRIP = [0, 0, 12, 30]
+# 16 equally likely draws per region (Fukuoka .. Tokyo, as on the map)
+_W_WARM = [CLEAR] * 9 + [CLOUDY] * 4 + [RAIN] * 3
+WEATHER_ODDS = [_W_WARM, _W_WARM, _W_WARM, _W_WARM,
+                [CLEAR] * 7 + [CLOUDY] * 3 + [RAIN] * 3 + [SNOW] * 3,     # Gunma
+                [CLEAR] * 5 + [CLOUDY] * 3 + [RAIN] * 1 + [SNOW] * 7,     # Sapporo
+                _W_WARM]                                                 # Tokyo
+
+
 class Tune:
     def __init__(self, fuel=None, timing=0, tirep=0, boost=0, launch=0):
         self.fuel = list(fuel or [0] * NCELLS)
         self.timing, self.tirep, self.boost, self.launch = timing, tirep, boost, launch
 
 
-def tune_calc(model, parts, tune, drive=None):
+def tune_calc(model, parts, tune, drive=None, weather=CLEAR):
     """What the tune does (mirrors tune_calc in src/tune.s).  Returns a dict:
     hpm (added to the power multiplier, /256), band (power factor per fuel
     cell, /256), bmul (boost scale /256 below stock boost, 0 = none), grip,
@@ -248,7 +261,7 @@ def tune_calc(model, parts, tune, drive=None):
     band = [max(64, b) for b in band]
     c = CARS[model]
     drive = c[8] if drive is None else drive        # after a drivetrain swap
-    grip = WHEELIE_GRIP[drive] * parts[P_WHEELIE] - 2 * tune.tirep
+    grip = WHEELIE_GRIP[drive] * parts[P_WHEELIE] - 2 * tune.tirep - WEATHER_GRIP[weather]
     roll = max(3, ROLL - tune.tirep)
     launch = tune.launch * 100 if parts[P_ECU] and tune.launch else 0
     hpm = top + OVERBOOST_HP * ob + DRIVE_HPM[drive] - DRIVE_HPM[c[8]]
@@ -294,14 +307,15 @@ def u16(x):
 class Car:
     """Integer model of one car.  Mirrors src/physics.s."""
 
-    def __init__(self, model, parts=None, final=None, gears=None, tune=None, engine=0, drive=0):
+    def __init__(self, model, parts=None, final=None, gears=None, tune=None, engine=0, drive=0,
+                 weather=0):
         c = CARS[model]
         parts = list(parts or [])
         parts += [0] * (NPARTS - len(parts))
         self.model = model
         self.engine, self.drive = e, d = swapped(model, engine, drive)
         eng = ENGINES[e]
-        tn = self.tune = tune_calc(model, parts, tune or Tune(), d)
+        tn = self.tune = tune_calc(model, parts, tune or Tune(), d, weather)
         self.ngears = c[6]
         final = final if final is not None else gear_raw(c[7])
         gears = gears or [gear_raw(g) for g in car_gears(model)]

@@ -92,6 +92,7 @@ race_main:
         beq :+
         jsr traffic_update
 :       jsr hud_update          ; shows last frame's state (1 frame late)
+        jsr weather_tick
 :       jsr race_split
         lda frame
         sec
@@ -115,6 +116,8 @@ race_main:
         ; done
         jsr engine_stop
         jsr race_results
+        lda #W_CLEAR            ; the weather only counts in races
+        sta race_weather
         lda quit
         beq :+
         lda #MODE_GARAGE
@@ -132,22 +135,39 @@ race_setup:
         lda #NTHEMES            ; random background: day, sunset or night
         jsr rand_below
         sta race_theme
+        jsr pick_weather        ; and the weather: race_weather, race_scene
         lda #1
-        jsr screen_begin        ; race tiles for that theme
+        jsr screen_begin        ; race tiles for that scene
         MOVI16 ptr0, pal_race
         jsr load_palette
-        lda race_theme          ; sky and road palettes (BG 2 and 3)
-        asl a
+        lda race_scene          ; sky palette (BG 2)
         asl a
         asl a
         tax
         ldy #0
-:       lda theme_pal,x
+:       lda sky_pal,x
         sta palette+8,y
         inx
         iny
-        cpy #8
+        cpy #4
         bne :-
+        ldx race_weather        ; road palette (BG 3): dry, wet or snowy
+        lda race_theme
+        asl a
+        adc race_theme
+        adc w_ground,x
+        asl a
+        asl a
+        tax
+        ldy #0
+:       lda road_pal,x
+        sta palette+12,y
+        inx
+        iny
+        cpy #4
+        bne :-
+        lda #0
+        sta w_step
         ; clear state
         lda #0
         ldx #(tr_x_h - rc_state)
@@ -192,18 +212,18 @@ race_setup:
         sta rc_street
 :
         ; copy the map to WRAM, then draw it in both nametables
-        ldx race_theme
+        ldx race_scene
         lda scene_map_lo,x
         sta ptr0
         lda scene_map_hi,x
         sta ptr0+1
+        lda scene_bank,x
+        sta copy_bank
         MOVI16 ptr1, MAP_COPY
         lda #<768
         sta tmp0
         lda #>768
         sta tmp1
-        lda #BANK_SCENE
-        sta copy_bank
         jsr bank0_copy
         lda #$20
         jsr draw_map
@@ -425,11 +445,101 @@ race_setup:
 
 split_tab: .byte 69, 64, 69     ; NTSC, PAL, Dendy
 
-; sky (BG palette 2) and road (BG palette 3) colours per theme
-theme_pal:
-        .byte $0F,$31,$00,$30,  $0F,$00,$10,$30     ; day: pale sky, grey city
-        .byte $0F,$04,$27,$38,  $0F,$2D,$10,$30     ; sunset: purple to orange
-        .byte $0F,$01,$12,$38,  $0F,$2D,$10,$30     ; night: navy, lit windows
+; sky colours (BG palette 2) per scene
+sky_pal:
+        .byte $0F,$31,$00,$30   ; day: pale sky, grey city
+        .byte $0F,$04,$27,$38   ; sunset: purple to orange
+        .byte $0F,$01,$12,$38   ; night: navy, lit windows
+        .byte $0F,$00,$2D,$10   ; overcast day: grey sky and clouds, dark city
+        .byte $0F,$04,$27,$37   ; overcast sunset: orange-lit clouds on purple
+        .byte $0F,$01,$00,$37   ; overcast night: grey clouds over the city
+; road colours (BG palette 3) per theme: dry, wet, snow on the pavements
+road_pal:
+        .byte $0F,$00,$10,$30,  $0F,$2D,$00,$30,  $0F,$00,$30,$30   ; day
+        .byte $0F,$2D,$10,$30,  $0F,$2D,$00,$30,  $0F,$2D,$30,$30   ; sunset
+        .byte $0F,$2D,$10,$30,  $0F,$2D,$00,$30,  $0F,$2D,$30,$30   ; night
+w_ground:   .byte 0, 0, 1, 2    ; clear, cloudy, rain, snow -> road_pal
+
+; ---------------------------------------------------------------------------
+; Weather
+; ---------------------------------------------------------------------------
+.include "build/racedata.inc"
+weather_frames: .incbin "build/weather.bin"     ; 8 rain steps, 8 snow steps
+
+.segment "BSS"
+w_step:     .res 1
+.segment "BANK2"
+
+; pick_weather: race_weather from the region's odds (weather_force for
+; tests), race_scene = race_theme, + 3 (overcast) unless the sky is clear
+pick_weather:
+        lda weather_force
+        beq :+
+        sec
+        sbc #1
+        jmp @set
+:       jsr rand
+        and #15
+        sta tmp7
+        lda map_region          ; 16 draws per region
+        asl a
+        asl a
+        asl a
+        asl a
+        ora tmp7
+        tax
+        lda weather_odds,x
+@set:   sta race_weather
+        ldx race_theme
+        cmp #W_CLOUDY
+        bcc :+
+        inx
+        inx
+        inx
+:       stx race_scene
+        rts
+
+; weather_tick: rain and snow fall over the road and the plain sky.  Tile
+; $80 (colour 1 everywhere) gets the next step of its second bit plane:
+; rain every 2 frames, snow every 4.
+weather_tick:
+        lda race_weather
+        cmp #W_RAIN
+        bcc @r
+        ldx #1
+        cmp #W_SNOW
+        bne :+
+        ldx #3
+:       txa
+        and frame
+        bne @r
+        inc w_step
+        lda w_step
+        and #7
+        asl a
+        asl a
+        asl a
+        ldx race_weather
+        cpx #W_SNOW
+        bne :+
+        ora #64                 ; snow steps come after the rain's
+:       sta tmp7
+        lda #<$0808             ; tile $80, plane 1
+        sta ptr3
+        lda #>$0808
+        sta ptr3+1
+        lda #8
+        jsr vb_open
+        ldy tmp7
+:       lda weather_frames,y
+        sta vbuf,x
+        inx
+        iny
+        tya
+        and #7
+        bne :-
+        jmp vb_close
+@r:     rts
 
 ppu_on_race:
         lda #0
