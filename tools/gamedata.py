@@ -92,14 +92,14 @@ def car_gears(model):
     return CUSTOM_GEARS.get(model, GEARSETS[c[6]])
 
 # ---------------------------------------------------------------------------
-# Parts: 12 categories x 5 levels (0 = stock)
+# Parts: 14 categories x 5 levels (0 = stock)
 # ---------------------------------------------------------------------------
 PARTS = ['INTAKE', 'EXHAUST', 'ECU TUNE', 'TURBO', 'INTERNALS',
          'NITROUS', 'GEARBOX', 'TIRES', 'SUSPENSION', 'WEIGHT RED.',
-         'INTERCOOLER', 'AERO KIT']
+         'INTERCOOLER', 'AERO KIT', 'WHEELIE BARS', 'INJECTORS']
 NPARTS = len(PARTS)
 P_INTAKE, P_EXHAUST, P_ECU, P_TURBO, P_INTERNALS, P_NITROUS, P_GEARBOX, \
-    P_TIRES, P_SUSP, P_WEIGHT, P_ICOOL, P_AERO = range(12)
+    P_TIRES, P_SUSP, P_WEIGHT, P_ICOOL, P_AERO, P_WHEELIE, P_INJECT = range(14)
 LEVEL_NAMES = ['STOCK', 'STREET', 'SPORT', 'RACE', 'PRO']
 PART_PRICE = [0, 600, 1800, 4500, 11000]           # times tier multiplier
 TIER_MULT = [2, 3, 4, 6, 9, 14]                    # /2
@@ -107,7 +107,7 @@ TIER_MULT = [2, 3, 4, 6, 9, 14]                    # /2
 # the average 1/4 + 1/2 mile time gain of one level, over 8 cars at every
 # level (tools/part_value.py).  The average weight is 16, so overall
 # upgrade spending stays where it was; turbo and tires cost the most.
-PART_WEIGHT = [9, 9, 15, 42, 12, 12, 11, 42, 12, 10, 8, 11]
+PART_WEIGHT = [9, 9, 15, 42, 12, 12, 11, 42, 12, 10, 8, 11, 12, 6]
 
 
 def part_cost(part, tier, level):
@@ -118,7 +118,7 @@ def part_cost(part, tier, level):
     return max(50, int(round(v / 50)) * 50)
 
 HP_BONUS = {P_INTAKE: 10, P_EXHAUST: 10, P_ECU: 8, P_INTERNALS: 13,
-            P_ICOOL: 5}                                       # *256ths per level
+            P_ICOOL: 5, P_INJECT: 3}                          # *256ths per level
 TURBO_BOOST = [0, 72, 128, 184, 240]
 TURBO_START = [0, 8, 12, 15, 18]       # curve index (of 32) where boost starts
 TURBO_RATE = [0, 9, 7, 5, 4]           # spool per frame
@@ -131,6 +131,71 @@ AERO_GRIP = 3                # downforce, per aero level
 AERO_CUT = 12                # drag: CdA * (256 - AERO_CUT*level) >> 8
 WEIGHT_CUT = 10
 ECU_RPM = 200
+
+# ---------------------------------------------------------------------------
+# Engine tune (TUNE screen).  Stored per car as signed bytes, 0 = stock:
+#   fuel[8]  fuel map, one cell per eighth of the redline: -5 rich .. +5 lean
+#   timing   ignition advance, -5 .. +5 degrees
+#   tirep    tire pressure, psi above/below 32 (-14 .. +8)
+#   boost    psi above/below the turbo's own boost
+#   launch   2-step launch rpm / 100 (0 = off; needs an ECU upgrade)
+# ---------------------------------------------------------------------------
+NCELLS = 8
+TURBO_PSI = [0, 6, 9, 12, 16]          # each turbo's stock boost
+TURBO_PSI_MAX = [0, 9, 14, 19, 25]
+PSI_MIN = 3
+TIRE_PSI = 32
+TIREP_MIN, TIREP_MAX = -14, 8
+OVERBOOST_HP = 6             # *256ths per psi over stock boost
+LEAN_STEP = 3                # lean / overboost headroom per injector level
+WHEELIE_GRIP = [0, 5, 3, 3]  # launch grip per level by drive (FWD gets none)
+
+
+class Tune:
+    def __init__(self, fuel=None, timing=0, tirep=0, boost=0, launch=0):
+        self.fuel = list(fuel or [0] * NCELLS)
+        self.timing, self.tirep, self.boost, self.launch = timing, tirep, boost, launch
+
+
+def tune_calc(model, parts, tune):
+    """What the tune does (mirrors tune_calc in src/tune.s).  Returns a dict:
+    hpm (added to the power multiplier, /256), band (power factor per fuel
+    cell, /256), bmul (boost scale /256 below stock boost, 0 = none), grip,
+    roll, launch rpm, psi, and knock / lean bit masks per cell."""
+    tl, ic, inj = parts[P_TURBO], parts[P_ICOOL], parts[P_INJECT]
+    psi = ob = bmul = 0
+    if tl:
+        d = TURBO_PSI[tl]
+        psi = max(PSI_MIN, min(TURBO_PSI_MAX[tl], d + tune.boost))
+        ob = max(0, psi - d)
+        if psi < d:
+            bmul = psi * 256 // d
+    start = TURBO_START[tl]
+    t = tune.timing
+    ds, knock, lean = [], 0, 0
+    for k in range(NCELLS):
+        f = tune.fuel[k]
+        obk = ob if tl and 4 * k + 3 >= start else 0
+        ln = max(0, f + obk - LEAN_STEP * inj)
+        lim = 3 + ic + ((-f) >> 1 if f < 0 else 0) - (obk >> 1) - ln
+        if t <= lim:
+            tim = 3 * t
+        else:
+            tim = 3 * lim - 12 * (t - lim)
+            knock |= 1 << k
+        if ln:
+            lean |= 1 << k
+        ds.append(max(-120, tim + 2 * f - 12 * ln))
+    top = max(ds)
+    band = [256 + d - top for d in ds]
+    band = [max(64, b) for b in band]
+    c = CARS[model]
+    grip = WHEELIE_GRIP[c[8]] * parts[P_WHEELIE] - 2 * tune.tirep
+    roll = max(3, ROLL - tune.tirep)
+    launch = tune.launch * 100 if parts[P_ECU] and tune.launch else 0
+    return dict(hpm=top + OVERBOOST_HP * ob, band=band, bmul=bmul, grip=grip,
+                roll=roll, launch=launch, psi=psi, knock=knock, lean=lean)
+
 
 IDLE = 900
 REDLINE_PAD = 200            # limiter = redline + this
@@ -170,16 +235,17 @@ def u16(x):
 class Car:
     """Integer model of one car.  Mirrors src/physics.s."""
 
-    def __init__(self, model, parts=None, final=None, gears=None):
+    def __init__(self, model, parts=None, final=None, gears=None, tune=None):
         c = CARS[model]
         parts = list(parts or [])
         parts += [0] * (NPARTS - len(parts))
         self.model = model
+        tn = self.tune = tune_calc(model, parts, tune or Tune())
         self.ngears = c[6]
         final = final if final is not None else gear_raw(c[7])
         gears = gears or [gear_raw(g) for g in car_gears(model)]
         # --- engine ---------------------------------------------------------
-        hpm = 256 + sum(HP_BONUS.get(p, 0) * parts[p] for p in range(NPARTS))
+        hpm = 256 + sum(HP_BONUS.get(p, 0) * parts[p] for p in range(NPARTS)) + tn['hpm']
         self.hpmult = hpm
         teff = car_torque(model) * hpm >> 8
         self.redline = c[4] + ECU_RPM * parts[P_ECU]
@@ -193,11 +259,16 @@ class Car:
         boost, start = TURBO_BOOST[tl], TURBO_START[tl]
         if boost:                        # intercooler: +1/16 boost per level
             boost = min(255, boost + (boost * parts[P_ICOOL] >> 4))
+            if tn['bmul']:               # turned down below the turbo's own boost
+                boost = boost * tn['bmul'] >> 8
         self.curve, self.bcurve = [], []
         for b in range(48):
             rpm = b * 256 + 128
             idx = min(40, rpm * 32 // self.redline)
             v = shape[idx]
+            fb = tn['band'][min(7, idx >> 2)]
+            if fb != 256:                # fuel map / timing for this cell
+                v = v * fb >> 8
             self.curve.append(v)
             # boost ramps in over 6 curve steps from 'start'
             if tl == 0 or idx < start:
@@ -219,7 +290,9 @@ class Car:
             self.kg.append(u16(self.k0h * r >> 15))
         # --- grip / aero ----------------------------------------------------
         grip = (TIRE_GRIP[parts[P_TIRES]] + SUSP_GRIP * parts[P_SUSP]
-                + AERO_GRIP * parts[P_AERO])
+                + AERO_GRIP * parts[P_AERO] + tn['grip'])
+        self.roll = tn['roll']
+        self.launch = tn['launch']
         self.trac = u16(grip * DRIVE_K[c[8]] >> 8)
         self.trac_k = self.trac - (self.trac >> 2) - (self.trac >> 4)
         cda = int(round(c[9] * 256)) * (256 - AERO_CUT * parts[P_AERO]) >> 8
@@ -290,6 +363,8 @@ class Car:
         if self.gear == 0:
             if self.throttle and self.rpm < self.limiter:
                 self.rpm += tq >> 1
+                if self.launch and self.rpm > self.launch:
+                    self.rpm = self.launch       # 2-step: held at the launch rpm
             elif self.rpm >= self.limiter:
                 self.rpm -= 400
             else:
@@ -312,7 +387,7 @@ class Car:
                     self.rpm -= 24 if self.throttle else 80
             if not self.slip:
                 drive = tq * kg >> 8
-        resist = ROLL + (min(255, self.v >> 12) ** 2 * self.dk >> 16)
+        resist = self.roll + (min(255, self.v >> 12) ** 2 * self.dk >> 16)
         if not self.throttle and self.gear:
             resist += 20
         # traction

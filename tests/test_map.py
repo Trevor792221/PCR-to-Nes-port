@@ -68,7 +68,7 @@ class Map(unittest.TestCase):
         s.press(A)
         s.step(5)
         self.assertEqual(s.mem('race_kind'), 2)
-        return s.mem('opp_skill'), [s.mem('opp_rec', 1 + i) for i in range(12)]
+        return s.mem('opp_skill'), [s.mem('opp_rec', 1 + i) for i in range(14)]
 
     def test_rivals_get_tougher(self):
         skill0, parts0 = self.street_rival(FUKUOKA, 1)
@@ -122,7 +122,7 @@ class Map(unittest.TestCase):
                   stats=dict.fromkeys(dict(pw.STATS), 0))
         t = to_password_screen()
         type_password(t, pw.encode_player(**st))
-        type_password(t, pw.encode_garage([(3, [2] * 12, 0x16)], 0))
+        type_password(t, pw.encode_garage([(3, [2] * 14, 0x16)], 0))
         t.step(60)
         self.assertEqual(t.mem('game_mode'), 1)
         self.assertEqual(t.mem('map_region'), SAPPORO)

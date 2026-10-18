@@ -2,15 +2,15 @@
 ; save.s -- battery-backed save in WRAM (fixed bank)
 ; ===========================================================================
 
-save_magic: .byte "PXR2"
-save_magic1: .byte "PXR1"          ; older layout, converted on load
+save_magic: .byte "PXR3"          ; WRAM layout (48-byte car records)
 
-; save_load: keep a valid save, otherwise start a new game
+; save_load: keep what's in WRAM across a reset if it's valid (there's no
+; battery: progress is kept as passwords), otherwise start a new game
 save_load:
         ldx #3
 @m:     lda SAVE_MAGIC,x
         cmp save_magic,x
-        bne save_old
+        jne new_game
         dex
         bpl @m
         jsr save_sum
@@ -21,72 +21,6 @@ save_load:
         cmp SV_SUM+1
         jne new_game
         jsr cash_clamp          ; saves from before the cash cap
-        jmp save_write
-
-; save_old: a valid "PXR1" save (before intercooler and aero) is converted:
-; record bytes 11-29 move up 2, the best time moves to SV_BESTS.
-save_old:
-        ldx #3
-@m:     lda SAVE_MAGIC,x
-        cmp save_magic1,x
-        bne new_game
-        dex
-        bpl @m
-        lda #<SV_END_V1
-        sta sum_end
-        lda #>SV_END_V1
-        sta sum_end+1
-        jsr save_sum_to
-        lda tmp0
-        cmp SV_END_V1
-        bne new_game
-        lda tmp1
-        cmp SV_END_V1+1
-        bne new_game
-        ldx #NSLOTS-1
-@slot:  stx tmp7
-        txa
-        jsr slot_ptr
-        ldy #CR_SIZE-1
-:       lda (ptr1),y
-        sta tmp_rec,y
-        dey
-        bpl :-
-        ldy #11
-:       lda tmp_rec,y
-        iny
-        iny
-        sta (ptr1),y
-        dey
-        cpy #30
-        bne :-
-        lda #0
-        ldy #CR_PARTS+P_ICOOL
-        sta (ptr1),y
-        iny
-        sta (ptr1),y
-        lda tmp7
-        asl a
-        tax
-        lda #0
-        sta SV_BESTS,x
-        sta SV_BESTS+1,x
-        lda tmp_rec+CR_MODEL
-        cmp #$FF
-        beq :+                  ; empty slot: no best time
-        lda tmp_rec+30
-        sta SV_BESTS,x
-        lda tmp_rec+31
-        sta SV_BESTS+1,x
-:       ldx tmp7
-        dex
-        bpl @slot
-        ldx #3
-:       lda save_magic,x
-        sta SAVE_MAGIC,x
-        dex
-        bpl :-
-        jsr cash_clamp
         jmp save_write
 
 ; new_game: wipe the save and give the player a starter car
@@ -187,20 +121,27 @@ save_sum_to:                    ; sum_end = end address
         bne @l
         rts
 
-; slot_ptr: A = slot -> ptr1 = SV_CARS + slot*32  (preserves X)
+; slot_ptr: A = slot -> ptr1 = SV_CARS + slot*48  (preserves X)
 slot_ptr:
         asl a
         asl a
         asl a
-        asl a
-        asl a
-        clc
-        adc #<SV_CARS
+        asl a                   ; slot*16 (< 128)
         sta ptr1
+        asl a                   ; slot*32
+        clc
+        adc ptr1
+        sta ptr1                ; slot*48 (< 384): carry is the high bit
         lda #>SV_CARS
         adc #0
         sta ptr1+1
-        rts
+        clc
+        lda ptr1
+        adc #<SV_CARS
+        sta ptr1
+        bcc :+
+        inc ptr1+1
+:       rts
 
 ; cur_car_ptr: ptr1 = record of the car in use, A = its model
 cur_car_ptr:

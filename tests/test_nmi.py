@@ -49,7 +49,20 @@ class NMIBudget(unittest.TestCase):
         self.leave(s)
         s.garage_goto(3)
         s.press(A)
-        self.check('tune', self.watch(s, 3, 120, lambda i: RIGHT if i % 6 < 2 else 0))
+        self.check('tune', self.watch(s, 3, 80))
+        s.list_goto('ui_sel', 2)                     # ignition
+        self.check('tune ignition', self.watch(s, 3, 200, lambda i: RIGHT if i % 40 < 2 else 0))
+        s.list_goto('ui_sel', 1)                     # fuel map
+        s.press(A)
+        self.check('fuel map', self.watch(s, 3, 300, lambda i: A if i == 200 else
+                                          (UP if i % 30 < 2 else (RIGHT if i % 60 == 10 else 0))))
+        s.press(B, hold=12)
+        s.step(80)
+        s.list_goto('ui_sel', 0)                     # gear ratios
+        s.press(A)
+        self.check('gears', self.watch(s, 3, 120, lambda i: RIGHT if i % 6 < 2 else 0))
+        s.press(B, hold=12)
+        s.step(80)
         self.leave(s)
         s.garage_goto(5)
         s.press(A)

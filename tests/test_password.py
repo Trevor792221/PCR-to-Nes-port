@@ -21,12 +21,12 @@ SV_RACES, SV_PBEST, SV_PBCAR, SV_TOPSPD = 0x6019, 0x601B, 0x601D, 0x601E
 def game_state(s):
     cars, cur = [], 0
     for slot in range(8):
-        b = SV_CARS + slot * 32
+        b = SV_CARS + slot * 48
         if s.wram(b) == 0xFF:
             continue
         if slot == s.wram(SV_CURCAR):
             cur = len(cars)
-        cars.append((s.wram(b), [s.wram(b + 1 + i) for i in range(12)], s.wram(b + 13)))
+        cars.append((s.wram(b), [s.wram(b + 1 + i) for i in range(14)], s.wram(b + 15)))
     player = dict(cash=s.wram(SV_CASH, 3), gems=s.wram(SV_GEMS, 2), level=s.wram(SV_LEVEL),
                   xp=s.wram(SV_XP, 2), ladder=s.wram(SV_LADDER), secret=s.wram(SV_SECRET),
                   options=s.wram(SV_OPTIONS))
@@ -75,7 +75,7 @@ class Passwords(unittest.TestCase):
             self.assertEqual(len(p), 32)
             self.assertEqual(pw.decode_player(p), st)
             n = rnd.randint(1, 8)
-            cars = [(rnd.randint(0, 12), [rnd.randint(0, 4) for _ in range(12)],
+            cars = [(rnd.randint(0, 12), [rnd.randint(0, 4) for _ in range(14)],
                      rnd.choice(pw.PAINT_LIST)) for _ in range(n)]
             cur = rnd.randrange(n)
             g = pw.encode_garage(cars, cur)
@@ -101,7 +101,7 @@ class Passwords(unittest.TestCase):
         s.nes[SV_STREET], s.nes[SV_PBCAR] = 17, 11
         give_car(s, 1, 11, 3)
         give_car(s, 4, 12, 4)
-        s.nes[SV_CARS + 4 * 32 + 2] = 2
+        s.nes[SV_CARS + 4 * 48 + 2] = 2
         s.nes[SV_CURCAR] = 4
         player, cars, cur = game_state(s)
         # OPTIONS > PASSWORD shows the passwords; the garage one is the last
@@ -147,9 +147,23 @@ class Passwords(unittest.TestCase):
         self.assertEqual(player['ladder'], 3)
         self.assertEqual(set(player['stats'].values()), {0}, 'fresh stats')
 
+    def test_v2_garage_passwords_from_v4_1_still_work(self):
+        p = pw.encode_player(250000, 40, 9, 10, 3, 0, 4, dict.fromkeys(dict(pw.STATS), 0))
+        g = pw.encode_garage([(8, [2] * 12, 0x16), (2, [4] * 12, 0x27)], 1, version=2)
+        self.assertEqual(len(g), 19)
+        self.assertEqual(pw.decode_garage(g)['cars'][0][1], [2] * 12 + [0, 0])
+        t = to_password_screen()
+        type_password(t, p)
+        type_password(t, g)
+        t.step(60)
+        self.assertEqual(t.mem('game_mode'), 1)
+        player, cars, cur = game_state(t)
+        self.assertEqual(cars, [(8, [2] * 12 + [0, 0], 0x16), (2, [4] * 12 + [0, 0], 0x27)])
+        self.assertEqual(cur, 1)
+
     def test_new_game_passwords(self):
         p = pw.encode_player(3000, 5, 1, 0, 0, 0, 0, dict.fromkeys(dict(pw.STATS), 0))
-        g = pw.encode_garage([(0, [0] * 12, 0x27)], 0)
+        g = pw.encode_garage([(0, [0] * 14, 0x27)], 0)
         t = to_password_screen()
         type_password(t, p)
         type_password(t, g)
@@ -157,7 +171,7 @@ class Passwords(unittest.TestCase):
         self.assertEqual(t.mem('game_mode'), 1)
         self.assertEqual(t.wram(SV_CASH, 3), 3000)
         self.assertEqual(t.wram(SV_CARS), 0)
-        self.assertEqual(t.wram(SV_CARS + 32), 0xFF)
+        self.assertEqual(t.wram(SV_CARS + 48), 0xFF)
 
 
 if __name__ == '__main__':

@@ -11,12 +11,14 @@ sys.path.insert(0, os.path.join(os.path.dirname(HERE), 'tools'))
 import gamedata as gd
 from cpu import CPU
 
-CR_PARTS, CR_FINAL, CR_GEARS = 1, 16, 18
+CR_PARTS, CR_PAINT, CR_FINAL, CR_GEARS = 1, 15, 18, 20
+CR_FUEL, CR_TIMING, CR_TIREP, CR_BOOST, CR_LAUNCH = 34, 42, 43, 44, 45
+CR_SIZE = 48
 
 
-def record(model, parts, final=None, gears=None):
+def record(model, parts, final=None, gears=None, tune=None):
     c = gd.CARS[model]
-    rec = [0] * 32
+    rec = [0] * CR_SIZE
     rec[0] = model
     parts = list(parts) + [0] * (gd.NPARTS - len(parts))
     rec[CR_PARTS:CR_PARTS + gd.NPARTS] = parts
@@ -27,17 +29,24 @@ def record(model, parts, final=None, gears=None):
     for i, g in enumerate(gears):
         rec[CR_GEARS + 2 * i] = g & 0xFF
         rec[CR_GEARS + 2 * i + 1] = g >> 8
+    if tune:
+        for k, f in enumerate(tune.fuel):
+            rec[CR_FUEL + k] = f & 0xFF
+        rec[CR_TIMING] = tune.timing & 0xFF
+        rec[CR_TIREP] = tune.tirep & 0xFF
+        rec[CR_BOOST] = tune.boost & 0xFF
+        rec[CR_LAUNCH] = tune.launch
     return rec
 
 
 class Physics(unittest.TestCase):
-    def setup_car(self, cpu, slot, model, parts):
-        rec = record(model, parts)
+    def setup_car(self, cpu, slot, model, parts, tune=None):
+        rec = record(model, parts, tune=tune)
         base = cpu.sym['tmp_rec']
-        cpu.mem[base:base + 32] = bytes(rec)
+        cpu.mem[base:base + CR_SIZE] = bytes(rec)
         cpu.put('ptr0', base, size=2)
         cpu.call('phys_setup', x=slot)
-        return gd.Car(model, parts)
+        return gd.Car(model, parts, tune=tune)
 
     def state(self, cpu, x):
         g = lambda n: cpu.get(n, x)
@@ -64,9 +73,9 @@ class Physics(unittest.TestCase):
             self.assertEqual(cpu.get('ph_curve', x * 48 + b), car.curve[b], 'curve %d' % b)
             self.assertEqual(cpu.get('ph_bcurve', x * 48 + b), car.bcurve[b], 'bcurve %d' % b)
 
-    def run_race(self, model, parts, launch, x=0, frames=900):
+    def run_race(self, model, parts, launch, x=0, frames=900, tune=None):
         cpu = CPU()
-        car = self.setup_car(cpu, x, model, parts)
+        car = self.setup_car(cpu, x, model, parts, tune)
         self.check_setup(cpu, x, car)
         car.reset()
         # rev up, launch, shift near the redline, nitrous from 2nd gear
@@ -103,6 +112,70 @@ class Physics(unittest.TestCase):
         self.run_race(11, [4, 4, 4, 4, 4, 4, 4, 0, 0, 4], launch=7000)   # wheelspin
         self.run_race(9, [3, 3, 3, 3, 3, 0, 3, 3, 3, 3, 4, 4], launch=6000)  # intercooler, aero
         self.run_race(4, [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 3], launch=4000)  # no turbo
+
+    def test_tune_maths_match_the_model(self):
+        import random
+        rnd = random.Random(5)
+        cpu = CPU()
+        for n in range(400):
+            model = rnd.randrange(gd.NCARS)
+            parts = [rnd.randint(0, 4) for _ in range(gd.NPARTS)]
+            if n % 3 == 0:
+                parts[gd.P_TURBO] = 0
+            tune = gd.Tune([rnd.randint(-5, 5) for _ in range(8)], rnd.randint(-5, 5),
+                           rnd.randint(gd.TIREP_MIN, gd.TIREP_MAX), rnd.randint(-12, 12),
+                           rnd.choice([0, 0, rnd.randint(20, 90)]))
+            car = self.setup_car(cpu, n & 1, model, parts, tune)
+            tn, x = car.tune, n & 1
+            got = dict(hpm=cpu.get('tn_hpm', size=2), bmul=cpu.get('tn_bmul'),
+                       grip=cpu.get('tn_grip'), roll=cpu.get('ph_roll', x),
+                       launch=cpu.get('ph_ls_l', x) | cpu.get('ph_ls_h', x) << 8,
+                       psi=cpu.get('tn_psi'), knock=cpu.get('tn_knock'), lean=cpu.get('tn_lean'),
+                       band=[cpu.get('tn_band', k) or 256 for k in range(8)])
+            want = dict(tn, hpm=tn['hpm'] & 0xFFFF, grip=tn['grip'] & 0xFF)
+            self.assertEqual(got, want, 'model %d parts %r tune %r' % (model, parts, vars(tune)))
+            self.check_setup(cpu, x, car)
+
+    def test_tuned_races(self):
+        T = gd.Tune
+        # overboost on big injectors, a lean top end, some advance
+        self.run_race(9, [2, 2, 2, 4, 2, 2, 2, 3, 2, 2, 4, 2, 2, 4], launch=6000,
+                      tune=T([0, 0, 1, 2, 3, 3, 3, 3], 3, -6, 6, 0))
+        # knock and lean everywhere, boost turned down, hard tires
+        self.run_race(7, [0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], launch=5000,
+                      tune=T([5] * 8, 5, 8, -5, 0))
+        # 2-step launch control, wheelie bars, soft tires on a RWD car
+        self.run_race(8, [1, 1, 2, 0, 1, 1, 1, 2, 1, 1, 0, 0, 4, 0], launch=9000,
+                      tune=T([-2] * 8, -1, -14, 0, 38), x=1)
+
+    def test_tuning_does_what_it_says(self):
+        base = [2, 2, 2, 3, 2, 2, 2, 2, 2, 2, 2, 2, 0, 0]
+        stock = gd.Car(9, base)
+        adv = gd.Car(9, base, tune=gd.Tune(timing=2))
+        self.assertGreater(adv.hpmult, stock.hpmult, 'a little advance: more power')
+        self.assertFalse(adv.tune['knock'])
+        knock = gd.Car(9, base, tune=gd.Tune(timing=5, boost=7))
+        self.assertTrue(knock.tune['knock'], 'too much advance on overboost knocks')
+        lean = gd.Car(9, base, tune=gd.Tune(fuel=[3] * 8))
+        self.assertEqual(lean.tune['lean'], 0xFF, 'stock injectors: no lean headroom')
+        inj = base[:13] + [1]
+        ok = gd.Car(9, inj, tune=gd.Tune(fuel=[3] * 8))
+        self.assertEqual(ok.tune['lean'], 0, 'injectors give headroom')
+        self.assertGreater(ok.hpmult, gd.Car(9, inj).hpmult)
+        more = gd.Car(9, base[:13] + [4], tune=gd.Tune(boost=6))
+        self.assertGreater(more.hpmult, gd.Car(9, base[:13] + [4]).hpmult, 'overboost')
+        soft = gd.Car(8, [0] * 14, tune=gd.Tune(tirep=-10))
+        self.assertGreater(soft.trac, gd.Car(8, [0] * 14).trac, 'soft tires grip')
+        self.assertGreater(soft.roll, gd.ROLL)
+        bars = gd.Car(8, [0] * 12 + [4, 0])
+        self.assertGreater(bars.trac, gd.Car(8, [0] * 14).trac, 'wheelie bars (RWD)')
+        self.assertEqual(gd.Car(1, [0] * 12 + [4, 0]).trac, gd.Car(1, [0] * 14).trac, 'FWD: none')
+        two = gd.Car(8, [0, 0, 1] + [0] * 11, tune=gd.Tune(launch=40))
+        two.throttle = True
+        for _ in range(200):
+            two.step()
+        self.assertEqual(two.rpm, 4000, '2-step holds the launch rpm')
+        self.assertEqual(gd.Car(8, [0] * 14, tune=gd.Tune(launch=40)).launch, 0, 'needs the ECU')
 
     def test_intercooler_and_aero_help(self):
         base = gd.Car(9, [0, 0, 0, 4] + [0] * 8)

@@ -27,12 +27,14 @@ class Economy(unittest.TestCase):
 
     def test_prices_follow_performance(self):
         # turbo and tires (the biggest gains) cost the most; the average
-        # weight keeps overall spending the same
+        # weight of the original 12 parts keeps overall spending the same.
+        # Wheelie bars and injectors (v4.2) are priced on the same scale.
         w = gd.PART_WEIGHT
-        self.assertEqual(sum(w) // len(w), 16)
+        self.assertEqual(sum(w[:12]) // 12, 16)
         self.assertEqual(max(w), w[gd.P_TURBO])
         self.assertEqual(max(w), w[gd.P_TIRES])
-        self.assertEqual(min(w), w[gd.P_ICOOL])
+        self.assertEqual(min(w[:12]), w[gd.P_ICOOL])
+        self.assertEqual(min(w), w[gd.P_INJECT], 'injectors: little power on their own')
 
     def test_rom_prices_match(self):
         from cpu import CPU

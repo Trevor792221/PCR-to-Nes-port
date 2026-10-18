@@ -3,6 +3,19 @@
 Every version of Pixel Racer NES, newest first. Downloads are on the
 [Releases page](https://github.com/Trevor792221/PCR-to-Nes-port/releases).
 
+## v4.2: Engine tuning (2026-10-18)
+
+* Two new parts: **wheelie bars** (more launch grip on RWD and AWD cars) and **injectors** (a little power, and the fuel to run lean or overboost).
+* The intercooler now needs a turbo. It also raises the knock limit.
+* TUNE is now an engine tune screen that shows peak power, and whether the engine knocks or runs lean, as you change:
+  * **Fuel map**: its own screen with 8 cells across the rev range, each from rich to lean. Lean makes power until the injectors run out; rich is safe but slower.
+  * **Ignition timing**: advance makes power until the engine knocks.
+  * **Boost**: set the psi once a turbo is fitted.
+  * **Tire pressure**: soft tires grip at launch but drag at speed.
+  * **2-step launch control**: after an ECU upgrade, hold A on the line and the revs wait at your launch rpm.
+  * **Gear ratios**: as before.
+* Garage passwords now hold the new parts (12 letters for one car, up to 74). Older garage passwords still work. Engine tunes start fresh after a password, like gear tunes.
+
 ## v4.1: Road to Tokyo (2026-10-18)
 
 * The world map has its own song, "Road to Tokyo": an upbeat travel theme with a Japanese scale. The garage music comes back when you leave the map.

@@ -11,7 +11,7 @@ import gamedata as gd          # noqa: E402
 
 SV_CASH, SV_GEMS, SV_LEVEL, SV_LADDER = 0x6004, 0x6007, 0x600B, 0x600C
 SV_CARS = 0x6020
-SV_BESTS = 0x6120
+SV_BESTS = 0x61A0
 G_RACE, G_PARTS, G_MYCARS, G_TUNE, G_DEALER, G_PAINT, G_CRATES, G_DYNO, G_OPTIONS = range(9)
 
 
@@ -63,7 +63,7 @@ class Game(unittest.TestCase):
         s = new_game()
         self.assertEqual(s.wram(SV_CASH, 3), 3000)
         self.assertEqual(s.wram(SV_CARS), 0)         # starter car
-        self.assertEqual(s.wram(SV_CARS + 32), 0xFF)  # rest empty
+        self.assertEqual(s.wram(SV_CARS + 48), 0xFF)  # rest empty
 
     def test_buy_part_and_save(self):
         s = new_game()
@@ -136,7 +136,7 @@ class Game(unittest.TestCase):
         s.step(5)
         s.press(A)                                   # confirm
         s.step(10)
-        self.assertEqual(s.wram(SV_CARS + 32), 1)
+        self.assertEqual(s.wram(SV_CARS + 48), 1)
         self.assertEqual(s.wram(0x600D), 1)          # now driving it
         s.press(B)
         s.step(40)
@@ -182,8 +182,8 @@ class Game(unittest.TestCase):
         s.nes[s.sym['rng'] + 1] = hi
         s.press(A)
         s.step(80)
-        self.assertEqual(s.wram(SV_CARS + 32), 12, 'crate car in slot 1')
-        self.assertEqual(s.wram(SV_CARS + 32 + 13), 0x28, 'painted gold')
+        self.assertEqual(s.wram(SV_CARS + 48), 12, 'crate car in slot 1')
+        self.assertEqual(s.wram(SV_CARS + 48 + 15), 0x28, 'painted gold')
         # the dealer never sells it: browsing left from the first car wraps to 11
         s.press(B, hold=12)
         s.step(40)

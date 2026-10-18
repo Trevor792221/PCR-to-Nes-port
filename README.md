@@ -23,7 +23,7 @@ runs on real NES / Famicom hardware or any accurate emulator.
 
 ![Splash](docs/splash.png) ![Title](docs/title.png) ![Garage](docs/garage.png)
 ![Race](docs/race.png) ![Dyno](docs/dyno.png)
-![Parts](docs/parts.png) ![Tune](docs/tune.png) ![Stats](docs/stats.png)
+![Parts](docs/parts.png) ![Tune](docs/tune.png) ![Fuel map](docs/fuel.png) ![Stats](docs/stats.png)
 ![World map](docs/map.png)
 
 ## What carried over from the Android game
@@ -33,8 +33,8 @@ runs on real NES / Famicom hardware or any accurate emulator.
 | Garage as the game hub, with your car on display | Garage screen: your car shown 2x size in a workshop (ceiling lamps, roll-up door, pegboard, tire stack, tool chest), plus cash, gems and level. The game boots to a splash screen: an original 90s-style sports coupe in front of a neon sunset |
 | Car dealership | 12 original cars from hatchbacks to a hypercar, each with its own shape, power, weight, redline, gear count, drivetrain (FWD/RWD/AWD) and level requirement |
 | Owning several cars | 8 garage slots. Switch cars, or sell them for half the car's price plus part value |
-| Engine and performance parts | 12 parts at 5 levels each (Stock, Street, Sport, Race, Pro), on two pages (Left/Right to switch). **Engine:** intake, exhaust, ECU tune (also raises the redline), turbo (with boost lag and spool), intercooler (a little power on its own, more boost with a turbo), internals, nitrous. **Chassis:** gearbox (faster shifts), tires, suspension, weight reduction, aero kit (less drag for a higher top speed, plus downforce grip). Each part is priced by how much it actually speeds a car up (measured with the physics model, `tools/part_value.py`): turbo and tires cost the most, intake, exhaust and intercooler the least. Selling a car refunds half of what its upgrades cost |
-| Tuning | Final-drive and individual gear ratios. Each gear shows its top speed. Gear tuning unlocks with any gearbox upgrade |
+| Engine and performance parts | 14 parts at 5 levels each (Stock, Street, Sport, Race, Pro), on two pages (Left/Right to switch). **Engine:** intake, exhaust, ECU tune (also raises the redline and unlocks the 2-step), turbo (with boost lag and spool), intercooler (needs a turbo: more boost and a higher knock limit), injectors (a little power, and fuel for lean maps and overboost), internals, nitrous. **Chassis:** gearbox (faster shifts), tires, suspension, weight reduction, aero kit (less drag for a higher top speed, plus downforce grip), wheelie bars (launch grip: +5 a level on RWD, +3 on AWD; not for FWD). Each part is priced by how much it actually speeds a car up (measured with the physics model, `tools/part_value.py`): turbo and tires cost the most, injectors the least. Selling a car refunds half of what its upgrades cost |
+| Tuning | Garage → TUNE shows the car's peak power and whether the engine knocks or runs lean, live, as you change: **gear ratios** (final drive and each gear, with its top speed; unlocks with any gearbox upgrade), the **fuel map** (its own screen: 8 cells across the rev range, each from rich to lean; lean makes power until the injectors run out of fuel, rich is safe but slower; A copies a cell to all, SELECT clears the map), **ignition timing** (-5 to +5 degrees: advance makes power until it knocks, and knock costs a lot; intercoolers and a rich mixture raise the limit, overboost and lean lower it), **boost** (3 psi up to each turbo's maximum: more psi needs fuel and pulls the knock limit down), **tire pressure** (18-40 psi: soft tires grip at launch but drag at speed) and the **2-step** launch control (after an ECU upgrade: hold A on the line and the revs wait at the rpm you set) |
 | Dyno | Live dyno run that plots horsepower and torque curves, with peak HP and Nm and the rpm where each peaks. The peak HP is the same figure shown in the garage and dealer |
 | Paint shop | Body, rim and window colours (24 colours each) with a live preview. Painting is free |
 | Crates | Standard (cash) and Premium (gems) crates. Rewards are cash, gems, free part upgrades or a whole car. Very rarely (1 in 256 standard, 5 in 256 premium) they hold the **Zenith X400**, a crate-only prototype racer that never spins its tires and tops out over 400 mph. Keep a garage slot free, or the roll goes to a normal reward. Once you beat The Legend (the last ladder boss), the dealer also sells it for $600,000 |
@@ -49,7 +49,7 @@ runs on real NES / Famicom hardware or any accurate emulator.
 | Multiplayer | **2 PLAYER** in race select: a head-to-head drag race on one console. Player 2 uses controller 2 with the same buttons (A gas, Right launch/shift up, Left shift down, B nitrous) and drives any car from your garage (Left/Right on the 2 PLAYER row picks it). Distance follows the DISTANCE setting. Either player can foul by launching early. The HUD splits in two: each player has a rev counter, gear, speed and nitrous bar, with the clock in the middle. The camera keeps both cars on screen until the leader is far ahead. No money, XP or stats are at stake. Online play from the Android game isn't possible on an NES |
 | Practice / test runs | Solo test run with elapsed time, trap speed, reaction time and 0-60 time. The best 1/4-mile time is kept per car |
 | XP, levels and premium currency | XP from every race. Levelling up gives gems, and higher levels unlock better cars |
-| Saving | **Passwords**, like classic NES games. OPTIONS → PASSWORD shows two: a 32-letter **player** password (cash, gems, level, XP, bosses beaten, options, and the stats page: races, wins, losses, crates, street wins, best 1/4-mile time and fastest trap speed with their cars) and a **garage** password (every car with all its parts and body colour, and the car you drive) that is 11 letters for one car and grows by about 8 letters per car, up to 66. Enter them from TITLE → PASSWORD. Gear tunes, rim and glass colours and each car's own best time start fresh after a password. The letters skip I, O, 0 and 1 so nothing looks alike, and a CRC-8 check rejects any password with a wrong letter. 15-letter player passwords from v3.0 (no stats) still work |
+| Saving | **Passwords**, like classic NES games. OPTIONS → PASSWORD shows two: a 32-letter **player** password (cash, gems, level, XP, bosses beaten, options, and the stats page: races, wins, losses, crates, street wins, best 1/4-mile time and fastest trap speed with their cars) and a **garage** password (every car with all its parts and body colour, and the car you drive) that is 12 letters for one car and grows by about 9 letters per car, up to 74. Enter them from TITLE → PASSWORD. Gear and engine tunes, rim and glass colours and each car's own best time start fresh after a password. The letters skip I, O, 0 and 1 so nothing looks alike, and a CRC-8 check rejects any password with a wrong letter. 15-letter player passwords from v3.0 (no stats) and garage passwords from before v4.2 (no wheelie bars or injectors) still work |
 | Stats | Garage → STATS: races completed, wins and losses, your best 1/4-mile time and the car that set it, your fastest trap speed and car, a boss tracker (+ beaten, - not yet), and crates opened |
 | Options | MPH or km/h, music on/off, manual or automatic shifting, quit to title |
 
@@ -81,7 +81,8 @@ light turns green, press **Right** to drop the clutch. Pressing it before
 green is a foul start, and you lose. Shift once the tach passes the orange
 mark (450 rpm under the redline) for a *Perfect* shift, which also makes the
 gear change faster. Pick your launch revs to suit your tires: high revs with
-street tires just make smoke.
+street tires just make smoke. With an ECU upgrade, set a 2-step launch rpm in
+TUNE and just hold **A**: the revs wait there for green.
 
 ## Building
 
@@ -141,10 +142,10 @@ physics runs at 50 Hz.
 | 0 | Tile data, background maps |
 | 1 | Title, garage, race select, my cars, dealer, results |
 | 2 | Race engine (drag, street, test), HUD, AI, traffic |
-| 3 | Parts, tune, paint, crates, dyno, options |
+| 3 | Parts, tune (gears, engine, fuel map), paint, crates, dyno, options |
 | 4 | Race scenery (day, sunset, night) and the boot splash screen |
 | 5 | Passwords (encode, decode, entry and display screens) |
-| 6 | World map (Japan tiles, nametable, region screen) |
+| 6 | World map (Japan tiles, nametable, region screen), engine tune maths |
 | 7 (fixed) | Reset/NMI, PPU helpers, math, physics, sound, game state, car data |
 
 ### Label art

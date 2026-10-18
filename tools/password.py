@@ -8,10 +8,12 @@ PLAYER password, 32 characters:
     best 1/4 ms 15 | its car 4 | top mph 10 | its car 4 | checksum 8
   (15-character version-1 passwords from v3.0, without the stats after
   options, are still accepted.)
-GARAGE password, 11-66 characters (grows with the number of cars):
-    version 2 | cars-1 3 | car in use 3 |
-    per car: model 4, parts as 6 pairs (a*5+b) of 5 bits, body colour 5 |
+GARAGE password, 12-74 characters (grows with the number of cars):
+    version 3 | cars-1 3 | car in use 3 |
+    per car: model 4, parts as 7 pairs (a*5+b) of 5 bits, body colour 5 |
     checksum 8
+  (versions 1-2, 11-66 characters, have 12 parts: still accepted, with no
+  wheelie bars or injectors.)
 
 Bits are written MSB first.  Every 5 bits become one character, XORed with a
 mask that changes per position (7, 20, 1, 14, ... : +13 mod 32).  The
@@ -26,15 +28,17 @@ ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
 SEED_PLAYER, SEED_GARAGE = 0x5A, 0xC3
 PLAYER_LEN = 15             # version 1 (v3.0): no stats
 PLAYER_LEN2 = 32            # version 2: with stats
-NPARTS = 12
+NPARTS = 14
+NPARTS_OLD = 12             # garage versions 1-2
 NCARS = 13
 CASH_MAX = 9999999
 PAINT_LIST = [0x16, 0x06, 0x26, 0x27, 0x17, 0x28, 0x38, 0x2A, 0x1A, 0x0A, 0x2C, 0x1C,
               0x21, 0x11, 0x12, 0x02, 0x13, 0x14, 0x24, 0x07, 0x00, 0x10, 0x30, 0x2D]
 
 
-def garage_len(ncars):
-    return (16 + 39 * ncars + 4) // 5
+def garage_len(ncars, version=3):
+    per = 44 if version == 3 else 39
+    return (16 + per * ncars + 4) // 5
 
 
 class Bits:
@@ -173,41 +177,44 @@ def decode_player(s):
     return out
 
 
-def encode_garage(cars, cur, version=2):
-    """cars: list of (model, parts[12], body colour byte); cur: index.
-    Version 2 uses the CRC; version 1 (v3.0) the field sum."""
-    b = Bits(SEED_GARAGE, crc=version == 2)
+def encode_garage(cars, cur, version=3):
+    """cars: list of (model, parts[14], body colour byte); cur: index.
+    Version 3 has 14 parts; versions 1-2 (v3.0-v4.1) 12.  Versions 2-3 use
+    the CRC; version 1 (v3.0) the field sum."""
+    b = Bits(SEED_GARAGE, crc=version >= 2)
     b.put(version, 2)
     b.put(len(cars) - 1, 3)
     b.put(cur, 3)
+    n = NPARTS if version == 3 else NPARTS_OLD
     for model, parts, paint in cars:
         b.put(model, 4)
-        for k in range(0, NPARTS, 2):
+        for k in range(0, n, 2):
             b.put(parts[k] * 5 + parts[k + 1], 5)
         b.put(PAINT_LIST.index(paint) if paint in PAINT_LIST else 0, 5)
     b.put(b.chk, 8, chk=False)
-    return b.text(garage_len(len(cars)))
+    return b.text(garage_len(len(cars), version))
 
 
 def decode_garage(s):
     ver = Bits.from_text(s, SEED_GARAGE).get(2, chk=False)
-    if ver not in (1, 2):
+    if ver not in (1, 2, 3):
         return None
-    b = Bits.from_text(s, SEED_GARAGE, crc=ver == 2)
+    b = Bits.from_text(s, SEED_GARAGE, crc=ver >= 2)
     b.get(2)
     n = b.get(3) + 1
     cur = b.get(3)
-    if len(s) != garage_len(n) or cur >= n:
+    if len(s) != garage_len(n, ver) or cur >= n:
         return None
     cars = []
     for _ in range(n):
         model = b.get(4)
         parts = []
-        for _ in range(NPARTS // 2):
+        for _ in range((NPARTS if ver == 3 else NPARTS_OLD) // 2):
             v = b.get(5)
             if v > 24:
                 return None
             parts += [v // 5, v % 5]
+        parts += [0] * (NPARTS - len(parts))
         col = b.get(5)
         if model >= NCARS or col > 23:
             return None

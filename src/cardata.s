@@ -18,6 +18,8 @@ part_names:
         .byte "WEIGHT CUT ", 0
         .byte "INTERCOOLER", 0
         .byte "AERO KIT   ", 0
+        .byte "WHEELIE BAR", 0
+        .byte "INJECTORS  ", 0
 level_names:
         .byte "STOCK ", 0
         .byte "STREET", 0

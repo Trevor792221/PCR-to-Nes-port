@@ -53,6 +53,9 @@ ph_nos_add: .res 2
 ph_nos_fr:  .res 2
 ph_shf_fr:  .res 2
 ph_tl:      .res 2          ; turbo level
+ph_roll:    .res 2          ; rolling drag (tire pressure)
+ph_ls_l:    .res 2          ; 2-step launch rpm (0 = off)
+ph_ls_h:    .res 2
 spd_hi:     .res 1          ; high byte of the last phys_speed result
 ep_hp:      .res 2          ; phys_peak_hp results
 ep_hp_rpm:  .res 2
@@ -88,6 +91,9 @@ phys_setup:
         ldy #CR_MODEL
         lda (ptr0),y
         sta ph_model,x
+        FARCALL BANK_MAP, tune_calc     ; engine tune (src/tune.s)
+        ldx cx
+        lda ph_model,x
         tay
         lda car_ngears,y
         sta ph_ngears,x
@@ -122,6 +128,13 @@ phys_setup:
         iny
         cpy #NPARTS
         bne @hp
+        clc                     ; + the tune
+        lda tmp2
+        adc tn_hpm
+        sta tmp2
+        lda tmp3
+        adc tn_hpm+1
+        sta tmp3
         ldx cx
         lda tmp2
         sta ph_hpm_l,x
@@ -254,7 +267,15 @@ phys_setup:
         bcc :+
         lda #255
 :       sta ph_boost
-@noic:  ldx cx                  ; Y = turbo level again
+@noic:  lda tn_bmul              ; boost turned down
+        beq :+
+        sta m_b
+        lda ph_boost
+        sta m_a
+        jsr mul8
+        lda m_r+1
+        sta ph_boost
+:       ldx cx                  ; Y = turbo level again
         ldy ph_tl,x
         lda turbo_start,y
         sta ph_tstart
@@ -326,6 +347,22 @@ phys_setup:
         tay
         lda (ptr2),y
         sta tmp7                ; v
+        tya                     ; fuel map cell min(7, idx/4)
+        lsr a
+        lsr a
+        cmp #NCELLS
+        bcc :+
+        lda #NCELLS-1
+:       tax
+        lda tn_band,x
+        beq :+                  ; 0 = full
+        sta m_b
+        lda tmp7
+        sta m_a
+        jsr mul8
+        lda m_r+1
+        sta tmp7
+:
         lda tmp5
         clc
         adc ph_cb
@@ -459,6 +496,8 @@ phys_setup:
         lda tire_grip,y
         clc
         adc tmp2
+        clc
+        adc tn_grip             ; wheelie bars, tire pressure
         sta m_a
         lda #0
         sta m_a+1
@@ -700,6 +739,18 @@ phys_step:
         lda tmp1
         adc ph_rpm_h,x
         sta ph_rpm_h,x
+        lda ph_ls_h,x           ; 2-step: held at the launch rpm
+        beq @to_res
+        lda ph_ls_l,x
+        cmp ph_rpm_l,x
+        lda ph_ls_h,x
+        sbc ph_rpm_h,x
+        bcs @to_res
+        lda ph_ls_l,x
+        sta ph_rpm_l,x
+        lda ph_ls_h,x
+        sta ph_rpm_h,x
+@to_res:
         jmp @resist
 @nthr:  jsr at_limiter
         bcc @fall
@@ -842,7 +893,7 @@ phys_step:
         ldx cx
         clc
         lda m_r+2
-        adc #9                  ; rolling resistance
+        adc ph_roll,x           ; rolling resistance
         sta ph_res
         lda m_r+3
         adc #0

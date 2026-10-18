@@ -85,7 +85,7 @@ race_diff:  .res 1          ; quick race difficulty 0-2
 race_bet:   .res 3
 race_half:  .res 1          ; 0 = 1/4 mile, 1 = 1/2 mile, 2 = 1 mile (menu setting)
 cruise_empty: .res 1        ; cruise mode: 1 = no traffic
-opp_rec:    .res 32         ; opponent car record
+opp_rec:    .res CR_SIZE    ; opponent car record
 opp_name:   .res 13
 opp_skill:  .res 1
 res_flags:  .res 1          ; RF_* bits
@@ -95,7 +95,7 @@ res_rt:     .res 2          ; reaction time ms
 res_opp_et: .res 2
 res_t60:    .res 2          ; 0-60 time ms
 res_mph:    .res 2          ; trap speed in mph (for the stats page)
-tmp_rec:    .res 32         ; scratch car record (dealer, crates)
+tmp_rec:    .res CR_SIZE    ; scratch car record (dealer, crates)
 race_theme: .res 1          ; 0 day, 1 sunset, 2 night (picked per race)
 copy_bank:  .res 1          ; source bank for chr_copy / bank0_copy (0 = graphics)
 garage_song: .res 1         ; garage theme in use (SONG_GARAGE, SONG_NEON or SONG_NIGHT)
@@ -136,6 +136,7 @@ cheat_debug:     .byte 0        ; $FFC2  non-zero: SELECT in the garage = debug 
 
 .segment "BANK3"
 .include "menus2.s"
+.include "tune_ui.s"
 
 .segment "BANK4"
 .include "scenes.s"
@@ -149,6 +150,7 @@ cheat_debug:     .byte 0        ; $FFC2  non-zero: SELECT in the garage = debug 
 
 .segment "BANK6"
 .include "map.s"
+.include "tune.s"
 
 ; ---------------------------------------------------------------------------
 ; Reset stubs: identical in every bank so the console boots no matter which

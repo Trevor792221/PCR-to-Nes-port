@@ -7,9 +7,11 @@
 ;                    its car 4 | top mph 10 | its car 4 | checksum 8
 ;                    (15-char version 1 passwords from v3.0 stop after
 ;                    options and still work)
-; GARAGE (11-66 chars): version 2 | cars-1 3 | car in use 3 |
-;                    per car: model 4, parts as 6 pairs (a*5+b) x 5 bits,
+; GARAGE (12-74 chars): version 3 | cars-1 3 | car in use 3 |
+;                    per car: model 4, parts as 7 pairs (a*5+b) x 5 bits,
 ;                    body colour 5 | checksum 8
+;                    (versions 1-2, 11-66 chars, have 6 pairs: no wheelie
+;                    bars or injectors; they still work)
 ; Bits go MSB first; each 5 bits is one character XORed with a mask that
 ; steps by 13 per position.  The checksum (rotate left, add) runs over every
 ; field and is seeded differently per password.  tools/password.py is the
@@ -47,18 +49,21 @@ PW_TEXT   = DYNO_BMP + $40      ; up to 72 symbols (0-31)
 PW_PL     = DYNO_BMP + $90      ; decoded player fields (25 bytes, see pw_apply)
 PW_N      = DYNO_BMP + $B0      ; decoded garage: cars
 PW_CUR    = DYNO_BMP + $B1      ;   car in use
-PW_CARS   = DYNO_BMP + $C0      ;   8 x 14: model, 12 parts, colour index
+PW_CARS   = DYNO_BMP + $C0      ;   8 x 16: model, 14 parts, colour index
+PWC_SIZE  = 16
+PWC_PAINT = 1 + NPARTS
 
 PW_PL_SIZE   = 25
 SEED_PLAYER  = $5A
 SEED_GARAGE  = $C3
 PLAYER_LEN   = 15               ; version 1 (v3.0): no stats
 PLAYER_LEN2  = 32               ; version 2: with stats
-GARAGE_MAX   = 66
+GARAGE_MAX   = 74
 
 pw_alpha:   .byte "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
-garage_len: .byte 11, 19, 27, 35, 43, 50, 58, 66    ; (16 + 39*cars + 4) / 5
-garage_pad: .byte 0, 1, 2, 3, 4, 0, 1, 2            ; 5*len - (16 + 39*cars)
+garage_len: .byte 12, 21, 30, 39, 48, 56, 65, 74    ; version 3: (16 + 44*cars + 4) / 5
+garage_len2: .byte 11, 19, 27, 35, 43, 50, 58, 66   ; versions 1-2: 12 parts, 39 bits a car
+garage_pad: .byte 0, 1, 2, 3, 4, 0, 1, 2            ; 5*len - bits (the same for both)
 
 ; ---------------------------------------------------------------------------
 ; Bit buffer
@@ -518,7 +523,7 @@ pw_enc_garage:
         sta pw_mode
         lda #SEED_GARAGE
         sta pw_chk
-        lda #2                  ; version 2: CRC
+        lda #3                  ; version 3: CRC, 14 parts
         ldx #2
         jsr pw_put
         ; count the cars and find the one in use
@@ -607,13 +612,14 @@ pw_dec_garage:
         cmp #11
         jcc pw_bad
         jsr pw_from_text
-        ldx #2                  ; version 1 (v3.0) field sum, 2 CRC
-        jsr pw_getb
+        ldx #2                  ; version 1 (v3.0) field sum, 2 CRC,
+        jsr pw_getb             ; 3 (v4.2) CRC and 14 parts
         sta pw_ver
         beq @bad
-        cmp #3
-        bcs @bad
-        sec
+        cmp #1
+        beq :+
+        lda #2                  ; (versions 2 and 3: CRC)
+:       sec
         sbc #1
         sta pw_mode
         jsr pw_rewind
@@ -631,7 +637,11 @@ pw_dec_garage:
         inx
         stx PW_N
         lda garage_len-1,x
-        cmp pw_len
+        ldy pw_ver
+        cpy #3
+        beq :+
+        lda garage_len2-1,x
+:       cmp pw_len
         jne pw_bad
         ldx #3
         jsr pw_get
@@ -668,17 +678,27 @@ pw_dec_garage:
         sta (ptr2),y
         iny
         sty pw_j
-        cpy #1+NPARTS
+        cpy #1+12               ; versions 1-2 stop after 12 parts
+        bne :+
+        lda pw_ver
+        cmp #3
+        bcc @old
+:       cpy #1+NPARTS
         bne @pair
-        ldx #5
+        jmp @col
+@old:   lda #0                  ; ... wheelie bars and injectors: stock
+        sta (ptr2),y
+        iny
+        sta (ptr2),y
+@col:   ldx #5
         jsr pw_get
-        ldy #13
+        ldy #PWC_PAINT
         sta (ptr2),y
         cmp #24
         jcs pw_bad
         clc
         lda ptr2
-        adc #14
+        adc #PWC_SIZE
         sta ptr2
         bcc :+
         inc ptr2+1
@@ -782,7 +802,7 @@ pw_apply:
         iny
         cpy #1+NPARTS
         bne :-
-        ldy #13
+        ldy #PWC_PAINT
         lda (ptr2),y
         tax
         lda paint_list,x
@@ -790,7 +810,7 @@ pw_apply:
         sta (ptr1),y
         clc
         lda ptr2
-        adc #14
+        adc #PWC_SIZE
         sta ptr2
         bcc @next
         inc ptr2+1
@@ -1122,7 +1142,7 @@ pw_hints_hi:  .byte >str_pw_h1, >str_pw_h2
 str_pw_t1:     .byte "PASSWORD 1: PLAYER", 0
 str_pw_t2:     .byte "PASSWORD 2: GARAGE", 0
 str_pw_h1:     .byte "32 LETTERS", 0
-str_pw_h2:     .byte "11 LETTERS, MORE WITH MORE CARS", 0
+str_pw_h2:     .byte "12 LETTERS, MORE WITH MORE CARS", 0
 str_pw_help1:  .byte "A:ADD  B:DELETE  START:DONE", 0
 str_pw_help2:  .byte "SELECT:BACK TO THE TITLE", 0
 str_pw_wrong:  .byte "WRONG PASSWORD, CHECK IT", 0

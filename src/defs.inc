@@ -59,7 +59,7 @@ BANK_RACE  = 2
 BANK_MENU2 = 3
 BANK_SCENE = 4                  ; race background themes
 BANK_PW    = 5                  ; passwords
-BANK_MAP   = 6                  ; world map
+BANK_MAP   = 6                  ; world map, engine tune maths
 NREGIONS   = 7                  ; map regions (FUKUOKA .. TOKYO)
 
 ; --- game modes (index into mode table in main.s) ----------------------------
@@ -88,11 +88,10 @@ SV_RACES     = $6019            ; races completed (2 bytes)
 SV_PBEST     = $601B            ; best 1/4 mile time in ms, any car (2 bytes)
 SV_PBCAR     = $601D            ; model that set it
 SV_TOPSPD    = $601E            ; top trap speed: mph (bits 0-9) | model << 12
-SV_CARS      = $6020            ; 8 slots x 32 bytes
-SV_BESTS     = SV_CARS + 8*32   ; $6120: best 1/4 mile ET per slot in ms (8 x 2)
-SV_END       = SV_BESTS + 16    ; $6130
+SV_CARS      = $6020            ; 8 slots x 48 bytes
+SV_BESTS     = SV_CARS + 8*CR_SIZE  ; $61A0: best 1/4 mile ET per slot in ms (8 x 2)
+SV_END       = SV_BESTS + 16    ; $61B0
 SV_SUM       = SV_END           ; 2-byte checksum over $6004..SV_END-1
-SV_END_V1    = $6120            ; "PXR1" saves: 10 parts, best time in the record
 NSLOTS       = 8
 
 OPT_KMH      = $01
@@ -101,17 +100,24 @@ OPT_AUTO     = $04
 
 CASH_MAX     = 9999999          ; cash never goes past this (fits every display)
 
-; --- car record (32 bytes, same layout in save slots and RAM records) --------
+; --- car record (48 bytes, same layout in save slots and RAM records) --------
 CR_MODEL  = 0                   ; $FF = empty slot
-CR_PARTS  = 1                   ; 12 bytes
-CR_PAINT  = 13
-CR_RIM    = 14
-CR_GLASS  = 15
-CR_FINAL  = 16                  ; 2 bytes 8.8
-CR_GEARS  = 18                  ; 7 x 2 bytes 8.8
-CR_SIZE   = 32
+CR_PARTS  = 1                   ; 14 bytes
+CR_PAINT  = 15
+CR_RIM    = 16
+CR_GLASS  = 17
+CR_FINAL  = 18                  ; 2 bytes 8.8
+CR_GEARS  = 20                  ; 7 x 2 bytes 8.8
+CR_FUEL   = 34                  ; engine tune, signed, 0 = stock: fuel map
+                                ;   (8 cells, -5 rich .. +5 lean),
+CR_TIMING = 42                  ;   ignition advance (-5 .. +5),
+CR_TIREP  = 43                  ;   tire psi from 32 (-14 .. +8),
+CR_BOOST  = 44                  ;   boost psi from the turbo's own,
+CR_LAUNCH = 45                  ;   2-step launch rpm/100 (0 off)
+CR_SIZE   = 48
+NCELLS    = 8                   ; fuel map cells
 
-NPARTS     = 12
+NPARTS     = 14
 P_INTAKE   = 0
 P_EXHAUST  = 1
 P_ECU      = 2
@@ -124,6 +130,8 @@ P_SUSP     = 8
 P_WEIGHT   = 9
 P_ICOOL    = 10                 ; intercooler
 P_AERO     = 11
+P_WHEELIE  = 12                 ; wheelie bars
+P_INJECT   = 13                 ; injectors
 
 ; --- WRAM work areas -------------------------------------------------------
 WBUF      = $6400               ; 1 KB general buffer (big car tiles etc.)

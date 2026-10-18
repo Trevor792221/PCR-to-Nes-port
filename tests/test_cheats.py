@@ -115,7 +115,7 @@ class Cheats(unittest.TestCase):
         s.step(5)
         s.press(A)
         s.step(10)
-        self.assertEqual(s.wram(SV_CARS + 32), 12)
+        self.assertEqual(s.wram(SV_CARS + 48), 12)
         # add $100,000 and 100 gems
         s.list_goto('ui_sel', 2)
         s.press(A)

@@ -134,9 +134,37 @@ pt_index:
         rts
 
 PT_ROW0 = 8                     ; first part row (two apart)
-pt_engine:   .byte P_INTAKE, P_EXHAUST, P_ECU, P_TURBO, P_ICOOL, P_INTERNAL, P_NITROUS
-pt_chassis:  .byte P_GEARBOX, P_TIRES, P_SUSP, P_WEIGHT, P_AERO
-pt_sizes:    .byte 7, 5
+pt_engine:   .byte P_INTAKE, P_EXHAUST, P_ECU, P_TURBO, P_ICOOL, P_INJECT, P_INTERNAL, P_NITROUS
+pt_chassis:  .byte P_GEARBOX, P_TIRES, P_SUSP, P_WEIGHT, P_AERO, P_WHEELIE
+pt_sizes:    .byte 8, 6
+
+; pt_locked: A = part -> carry set if the car in use can't take it, with
+; ptr0 = why.  Intercoolers need a turbo; wheelie bars need RWD or AWD.
+; Keeps tmp4-tmp6.
+pt_locked:
+        cmp #P_ICOOL
+        bne @wb
+        jsr cur_car_ptr
+        ldy #CR_PARTS+P_TURBO
+        lda (ptr1),y
+        bne @ok
+        MOVI16 ptr0, str_pl_turbo
+        sec
+        rts
+@wb:    cmp #P_WHEELIE
+        bne @ok
+        jsr cur_car_ptr
+        tax
+        lda car_drive,x
+        bne @ok                 ; FWD = 0
+        MOVI16 ptr0, str_pl_fwd
+        sec
+        rts
+@ok:    clc
+        rts
+str_pl_turbo: .byte "NEEDS A TURBO FIRST", 0
+str_pl_fwd:   .byte "RWD AND AWD CARS ONLY", 0
+str_locked2:  .byte "LOCKED", 0
 pt_titles_lo: .byte <str_pt_eng, <str_pt_chs
 pt_titles_hi: .byte >str_pt_eng, >str_pt_chs
 str_pt_eng:  .byte "< ENGINE >", 0
@@ -171,6 +199,11 @@ part_line:
         cmp #4
         bcc :+
         MOVI16 ptr0, str_maxed
+        jmp @p
+:       lda tmp6                ; can't be fitted: "LOCKED"
+        jsr pt_locked
+        bcc :+
+        MOVI16 ptr0, str_locked2
         jmp @p
 :       jsr cur_car_ptr
         tax
@@ -228,7 +261,13 @@ pt_buy:
         cmp #4
         bcs @fail
         sta tmp4
-        jsr cur_car_ptr
+        lda pt_part
+        jsr pt_locked
+        bcc :+
+        ldy #26                 ; say why
+        jsr vb_msg
+        jmp @fail
+:       jsr cur_car_ptr
         tax
         lda car_tier,x
         tax
@@ -275,24 +314,26 @@ str_pt_help: .byte "A:BUY  B:BACK  L/R:PAGE", 0
 part_desc:
         .word str_pd0, str_pd1, str_pd2, str_pd3, str_pd4
         .word str_pd5, str_pd6, str_pd7, str_pd8, str_pd9
-        .word str_pd10, str_pd11
+        .word str_pd10, str_pd11, str_pd12, str_pd13
 str_pd0: .byte "COLD AIR: +4% POWER/LEVEL", 0
 str_pd1: .byte "FREE FLOW: +4% POWER/LEVEL", 0
-str_pd2: .byte "+3% POWER, +200 RPM REDLINE", 0
-str_pd3: .byte "BIG POWER, NEEDS RPM TO SPOOL", 0
+str_pd2: .byte "+3% POWER, +200 RPM, 2-STEP", 0
+str_pd3: .byte "BIG POWER, BOOST IS TUNABLE", 0
 str_pd4: .byte "FORGED PARTS: +5% POWER", 0
 str_pd5: .byte "B BUTTON: A SHOT OF POWER", 0
 str_pd6: .byte "FASTER SHIFTS, TUNABLE GEARS", 0
 str_pd7: .byte "MORE GRIP OFF THE LINE", 0
 str_pd8: .byte "+4 GRIP AT LAUNCH PER LEVEL", 0
 str_pd9: .byte "-4% WEIGHT PER LEVEL", 0
-str_pd10: .byte "+2% POWER, MUCH MORE W/ TURBO", 0
+str_pd10: .byte "MORE BOOST, LESS KNOCK", 0
 str_pd11: .byte "LESS DRAG, +3 GRIP PER LEVEL", 0
+str_pd12: .byte "LAUNCH GRIP: RWD +5, AWD +3", 0
+str_pd13: .byte "FUEL TO RUN LEAN OR OVERBOOST", 0
 
 ; ===========================================================================
-; TUNE
+; GEAR RATIOS (from the TUNE screen, tune_ui.s)
 ; ===========================================================================
-tune_screen:
+gear_screen:
         lda #0
         jsr screen_begin
         jsr use_menu_palette
@@ -1183,7 +1224,8 @@ give_part_silent:
         lda #NPARTS
         jsr rand_below
         sta tmp4
-        ldx #NPARTS
+        lda #NPARTS
+        sta tmp5                ; tries (pt_locked uses X)
 @try:   jsr cur_car_ptr
         lda tmp4
         clc
@@ -1191,18 +1233,31 @@ give_part_silent:
         tay
         lda (ptr1),y
         cmp #4
-        bcc @up
-        inc tmp4
+        bcs @skip
+        pha
+        lda tmp4
+        jsr pt_locked           ; (keeps tmp4)
+        pla
+        bcc @upy
+@skip:  inc tmp4
         lda tmp4
         cmp #NPARTS
         bcc :+
         lda #0
         sta tmp4
-:       dex
+:       dec tmp5
         bne @try
         sec
         rts
-@up:    adc #1
+@upy:   pha                     ; pt_locked moved ptr1 / Y
+        jsr cur_car_ptr
+        lda tmp4
+        clc
+        adc #CR_PARTS
+        tay
+        pla
+        clc
+        adc #1
         sta (ptr1),y
         clc
         rts

@@ -21,11 +21,33 @@ def labels():
     return out
 
 
+class Memory(bytearray):
+    """64 KB with MMC1 PRG banking: writes to $8000+ go to the mapper's
+    shift register instead of the ROM (FARCALL switches banks this way)."""
+
+    def __setitem__(self, a, v):
+        if isinstance(a, int) and a >= 0x8000:
+            if v & 0x80:
+                self.shift = self.count = 0
+                return
+            self.shift |= (v & 1) << self.count
+            self.count += 1
+            if self.count == 5:
+                if a >= 0xE000:
+                    b = self.shift & 0x0F
+                    bytearray.__setitem__(self, slice(0x8000, 0xC000),
+                                          self.rom[b * 0x4000:(b + 1) * 0x4000])
+                self.shift = self.count = 0
+            return
+        bytearray.__setitem__(self, a, v)
+
+
 class CPU:
     def __init__(self, bank=2):
         with open(ROM, 'rb') as f:
             rom = f.read()[16:]
-        self.mem = bytearray(0x10000)
+        self.mem = Memory(0x10000)
+        self.mem.rom, self.mem.shift, self.mem.count = rom, 0, 0
         self.mem[0x8000:0xC000] = rom[bank * 0x4000:(bank + 1) * 0x4000]
         self.mem[0xC000:0x10000] = rom[7 * 0x4000:8 * 0x4000]
         self.mpu = MPU(memory=self.mem)
