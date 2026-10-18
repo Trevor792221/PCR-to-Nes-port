@@ -914,8 +914,8 @@ has_zenith:
         cmp #CRATE_CAR
         rts
 
-; rs_locked: carry set if the race-select row picked is a boss the player's
-; level doesn't allow yet (tmp6 = the level needed)
+; rs_locked: carry set if the race-select row picked is a boss that can't be
+; raced here yet (boss_open says why)
 rs_locked:
         lda ui_sel
         bne :+
@@ -931,20 +931,44 @@ rs_locked:
 @shut:  sec
         rts
 
-; boss_open: A = boss -> carry set if the player's level allows the race,
-; tmp6 = the level needed (the level that opens the boss's home region)
+; boss_open: A = boss -> carry set if it can be raced: the player's level
+; opens the boss's home region and that is the region picked on the map.
+; Else carry clear, tmp6 = the level needed, tmp5 = its home region if the
+; level is enough but this is the wrong region ($FF if the level is short).
 boss_open:
         tax
         ldy boss_home,x
+        sty tmp5
         lda region_lv,y
         sta tmp6
         lda SV_LEVEL
         cmp tmp6
+        bcc @low
+        lda map_region          ; bosses only race at home
+        cmp tmp5
+        beq :+
+        clc
+        rts
+:       sec
+        rts
+@low:   lda #$FF
+        sta tmp5
+        clc
         rts
 
-; lock_line: ptr0 = "LOCKED: REACH LEVEL 11" for tmp6
+; lock_line: ptr0 = "LOCKED: REACH LEVEL 11" for tmp6, or "BOSS IS IN
+; OSAKA" for home region tmp5
 lock_line:
-        MOVI16 ptr0, str_locked
+        lda tmp5
+        bmi :+
+        MOVI16 ptr0, str_bossin
+        ldy #0
+        jsr cat_ptr0
+        sty tmp7
+        lda tmp5
+        jsr region_name_ptr
+        jmp @end
+:       MOVI16 ptr0, str_locked
         ldy #0
         jsr cat_ptr0
         sty tmp7
@@ -953,7 +977,7 @@ lock_line:
         lda #0
         sta m_a+1
         jsr num_text
-        ldy tmp7
+@end:   ldy tmp7
         jsr cat_ptr0
         lda #0
         sta linebuf,y
@@ -961,6 +985,7 @@ lock_line:
         rts
 
 str_rsel:   .byte "RACE", 0
+str_bossin: .byte "BOSS IS IN ", 0
 str_rs_in:  .byte "RACE: ", 0
 str_locked: .byte "LOCKED: REACH LEVEL ", 0
 str_rs0:    .byte "LADDER BOSS", 0

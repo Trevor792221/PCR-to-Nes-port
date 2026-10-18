@@ -95,6 +95,7 @@ class Map(unittest.TestCase):
         open_map(s, 3)
         pick_region(s, FUKUOKA)
         s.list_goto('rs_sel', 0)
+        s.nes[s.sym['bi_boss']] = 0xFF
         s.press(A)
         s.step(40)
         self.assertEqual(s.mem('ui_count'), 8, 'locked: still on race select')
@@ -102,7 +103,31 @@ class Map(unittest.TestCase):
         s.nes[SV_LEVEL] = 4
         s.press(A)
         s.step(45)
-        self.assertEqual(s.mem('bi_boss'), 4, 'level 4: the intro opens')
+        self.assertNotEqual(s.mem('bi_boss'), 4, 'level 4, but in Fukuoka: still locked')
+        s.press(B)                                   # to the map, then Osaka
+        s.step(40)
+        pick_region(s, OSAKA)
+        s.list_goto('rs_sel', 0)
+        s.press(A)
+        s.step(45)
+        self.assertEqual(s.mem('bi_boss'), 4, 'in Osaka: the intro opens')
+
+    def test_every_boss_only_races_at_home(self):
+        home = [FUKUOKA, FUKUOKA, HIROSHIMA, HIROSHIMA, OSAKA, OSAKA, NAGOYA, GUNMA,
+                SAPPORO, TOKYO, TOKYO]
+        for boss, region in enumerate(home):
+            for here in (region, (region + 3) % 7):
+                s = new_game()
+                s.nes[SV_LADDER] = boss
+                open_map(s, 30)                      # every region open
+                pick_region(s, here)
+                s.list_goto('rs_sel', 0)
+                s.nes[s.sym['bi_boss']] = 0xFF
+                s.press(A)
+                s.step(45)
+                opened = s.mem('bi_boss') == boss    # the boss intro opened
+                self.assertEqual(opened, here == region,
+                                 'boss %d in region %d' % (boss + 1, here))
 
     def test_new_region_on_level_up(self):
         s = new_game()

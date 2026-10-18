@@ -3,6 +3,10 @@
 Every version of Pixel Racer NES, newest first. Downloads are on the
 [Releases page](https://github.com/Trevor792221/PCR-to-Nes-port/releases).
 
+## v5.2: Bosses race at home (2026-10-18)
+
+* Each ladder boss can now only be raced in its home region. Bosses 1-2 are in Fukuoka, 3-4 in Hiroshima, 5-6 in Osaka, 7 in Nagoya, 8 in Gunma, 9 in Sapporo, and 10-11 in Tokyo. Elsewhere, race select tells you where the next boss is, e.g. "BOSS IS IN OSAKA". Before, any region worked once your level was high enough.
+
 ## v5.1: Weather (2026-10-18)
 
 * **Weather.** Every race now has weather as well as a time of day:
