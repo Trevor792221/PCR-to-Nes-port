@@ -3,6 +3,10 @@
 Every version of Pixel Racer NES, newest first. Downloads are on the
 [Releases page](https://github.com/Trevor792221/PCR-to-Nes-port/releases).
 
+## v4.8: New wheelie bars (2026-10-18)
+
+* Wheelie bars are redrawn as an angled truss down to a small wheel. In races the struts are painted in your car's colour.
+
 ## v4.7: New highway traffic (2026-10-18)
 
 * All five traffic vehicles are redrawn: a company van, a work pickup with a ladder rack, a camper van with a pop-top roof, a removal truck with a square cab, and a yellow taxi with a roof sign.

@@ -299,14 +299,16 @@ def big_letter(ch):
     return [''.join(r) for r in pix]
 
 
-WBAR = ['........', '........', '........', '.1111111', '.1......', '111.....', '131.....', '111.....']
+# wheelie bars (v4.8 truss): 1 outline, 2 the car's paint, 3 its rim colour
+WBAR = ['........', '........', '.......1', '.....112', '...11.21', '.1111111', '1331....', '.11.....']
 FLOOR_A_ROWS = ['33333333', '22222222', '22222222', '22222222', '11111111', '11111111', '11111111', '11111111']
 WB_COL, WB_ROW = 10, 9           # garage: 3x3 tiles behind the showroom car's rear
 
 
 def garage_wheelie(pix, ts):
     """The garage tiles under the 2x wheelie bars (16x16 at x 84, screen y
-    76, 12 pixels behind the showroom car) with the bars drawn in black.
+    76, 12 pixels behind the showroom car) with the bars drawn in black and
+    the backdrop's greys.
     The showroom car is 8 sprites wide, so the bars can't be sprites there."""
     big = [''.join(c * 2 for c in r) for r in WBAR for _ in (0, 1)]
     out = []
@@ -318,8 +320,8 @@ def garage_wheelie(pix, ts):
                 row = list(pix[py][(WB_COL + tx) * 8:(WB_COL + tx) * 8 + 8])
                 for x in range(8):
                     bx, by = (WB_COL + tx) * 8 + x - 84, py + 32 - 76
-                    if 0 <= bx < 16 and 0 <= by < 16 and big[by][bx] == '1':
-                        row[x] = '0'
+                    if 0 <= bx < 16 and 0 <= by < 16 and big[by][bx] != '.':
+                        row[x] = {'1': '0', '2': '2', '3': '3'}[big[by][bx]]   # black, greys
                 rows.append(''.join(row))
             out.append(ts.add(tile(rows)))
     return out
@@ -573,8 +575,7 @@ def build_sprites():
     t[0x0D] = tile(['33......'] * 8)                                        # perfect-shift mark on the tach
     t[0x0E] = tile(['........', '..1111..', '.122221.', '.122221.', '.122221.', '.122221.', '..1111..', '........'])  # map: open city
     t[0x0F] = tile(['........', '..1111..', '.133331.', '.131131.', '.131131.', '.133331.', '..1111..', '........'])  # map: locked city
-    # wheelie bars: a strut from the rear bumper to a small wheel, next to
-    # the car's lower half (colours 1 outline, 3 rims)
+    # wheelie bars: the truss behind the rear wheel (WBAR), next to the car's lower half
     t[0x28] = tile(WBAR)
     return b''.join(t)
 
