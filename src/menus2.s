@@ -22,6 +22,16 @@ dy_peak_tr: .res 2
 dy_x:       .res 1
 dy_rpm:     .res 2
 dy_step:    .res 2
+dy_py:      .res 1          ; dyno_join: the curve's last row ($FF: none yet)
+dy_pt:      .res 1          ;   torque's,
+dy_ph:      .res 1          ;   power's
+dy_c:       .res 1
+dy_lx:      .res 1
+dy_ly:      .res 1
+dy_m:       .res 1
+dy_b:       .res 2          ; dyno_compute: torque fraction at this rpm,
+dy_d:       .res 2          ;   the step to the next 256 rpm,
+dy_neg:     .res 1          ;   and whether that step goes down
 
 DY_HP   = WBUF              ; 128 words: hp per column
 DY_TQ   = WBUF + 256        ; 128 words: torque (Nm) per column
@@ -1373,13 +1383,13 @@ dyno_screen:
         iny
         cpy #15
         bne @gr
-        lda #4
-        sta tmp0
+        lda #4                  ; graph palette over rows 6-15 (the graph is
+        sta tmp0                ; rows 7-14), columns 8-23
         lda #3
         sta tmp1
         lda #8
         sta tmp2
-        lda #4
+        lda #5
         sta tmp3
         lda #3
         jsr attr_rect
@@ -1458,9 +1468,69 @@ dyno_compute:
         clc
         lda ph_curve,y
         adc ph_bcurve,y
-        sta m_a
+        sta dy_b
         lda #0
         adc #0
+        sta dy_b+1
+        ; the curve is stored every 256 rpm: blend toward the next point so
+        ; the graph is smooth (the peak figures come from phys_peak_hp)
+        cpy #48+47
+        jcs @frac
+        clc
+        lda ph_curve+1,y
+        adc ph_bcurve+1,y
+        sta dy_d
+        lda #0
+        adc #0
+        sta dy_d+1
+        sec
+        lda dy_d
+        sbc dy_b
+        sta dy_d
+        lda dy_d+1
+        sbc dy_b+1
+        sta dy_d+1
+        lda #0
+        sta dy_neg
+        lda dy_d+1
+        bpl :+
+        inc dy_neg
+        sec
+        lda #0
+        sbc dy_d
+        sta dy_d
+        lda #0
+        sbc dy_d+1
+        sta dy_d+1
+:       lda dy_d                ; |step| * (rpm & 255) / 256
+        sta m_a
+        lda dy_d+1
+        sta m_a+1
+        lda dy_rpm
+        sta m_b
+        lda #0
+        sta m_b+1
+        jsr mul16
+        lda dy_neg
+        bne :+
+        clc
+        lda dy_b
+        adc m_r+1
+        sta dy_b
+        lda dy_b+1
+        adc m_r+2
+        sta dy_b+1
+        jmp @frac
+:       sec
+        lda dy_b
+        sbc m_r+1
+        sta dy_b
+        lda dy_b+1
+        sbc m_r+2
+        sta dy_b+1
+@frac:  lda dy_b
+        sta m_a
+        lda dy_b+1
         sta m_a+1
         ; Nm = teff * frac / 255  (~ >> 8 with a small correction)
         ldx #1
@@ -1626,25 +1696,14 @@ dyno_plot:
         lda tmp5
         cmp #64
         bne @gy
-        ; curves: y = 63 - value*60/peak
+        ; curves: y = 63 - value*60/peak, joined up where they climb or
+        ; fall fast; power first, so torque is drawn over it where they cross
+        lda #$FF
+        sta dy_pt
+        sta dy_ph
         lda #0
         sta tmp4
 @cx:    lda tmp4
-        asl a
-        tay
-        lda DY_TQ,y
-        sta m_a
-        lda DY_TQ+1,y
-        sta m_a+1
-        lda dy_peak_tq
-        sta m_b
-        lda dy_peak_tq+1
-        sta m_b+1
-        jsr dyno_scale
-        ldx tmp4
-        lda #3
-        jsr dyno_pset
-        lda tmp4
         asl a
         tay
         lda DY_HP,y
@@ -1656,9 +1715,32 @@ dyno_plot:
         lda dy_peak_hp+1
         sta m_b+1
         jsr dyno_scale
+        lda dy_ph
+        sta dy_py
         ldx tmp4
         lda #2
-        jsr dyno_pset
+        jsr dyno_join
+        lda dy_py
+        sta dy_ph
+        lda tmp4
+        asl a
+        tay
+        lda DY_TQ,y
+        sta m_a
+        lda DY_TQ+1,y
+        sta m_a+1
+        lda dy_peak_tq
+        sta m_b
+        lda dy_peak_tq+1
+        sta m_b+1
+        jsr dyno_scale
+        lda dy_pt
+        sta dy_py
+        ldx tmp4
+        lda #3
+        jsr dyno_join
+        lda dy_py
+        sta dy_pt
         inc tmp4
         lda tmp4
         cmp #128
@@ -1694,7 +1776,36 @@ dyno_scale:
 :       tay
         rts
 
-; dyno_pset: pixel X,Y (0-127, 0-63) colour A (1-3), OR'd in
+; dyno_join: column X, row Y in colour A, and a run down that column from
+; the curve's last row (dy_py; $FF = the first column) so steep parts of
+; the curve stay joined.  dy_py = Y after.
+dyno_join:
+        sta dy_c
+        stx dy_lx
+        sty dy_ly
+        lda dy_py
+        cmp #$FF
+        beq @last
+@step:  lda dy_py
+        cmp dy_ly
+        beq @last
+        bcc :+
+        dec dy_py               ; climbing (rows count down)
+        jmp @plot
+:       inc dy_py
+@plot:  ldx dy_lx
+        ldy dy_py
+        lda dy_c
+        jsr dyno_pset
+        jmp @step
+@last:  ldx dy_lx
+        ldy dy_ly
+        sty dy_py
+        lda dy_c
+        jmp dyno_pset
+
+; dyno_pset: pixel X,Y (0-127, 0-63) set to colour A (1-3).  Later
+; pixels replace earlier ones (a curve over the grid keeps its colour).
 dyno_pset:
         sta tmp6
         ; tile = (y>>3)*16 + (x>>3); addr = DYNO_BMP + tile*16 + (y&7)
@@ -1718,21 +1829,23 @@ dyno_pset:
         tax
         lda bitmask,x
         sta tmp7
-        ldy #0
-        lda tmp6
-        lsr a
+        eor #$FF
+        sta dy_m
+        ldy #0                  ; plane 0: colour bit 0
+        lda (ptr3),y
+        and dy_m
+        lsr tmp6
         bcc :+
-        lda (ptr3),y
         ora tmp7
-        sta (ptr3),y
-:       lda tmp6
-        and #2
-        beq :+
-        ldy #8
+:       sta (ptr3),y
+        ldy #8                  ; plane 1: colour bit 1
         lda (ptr3),y
+        and dy_m
+        lsr tmp6
+        bcc :+
         ora tmp7
-        sta (ptr3),y
-:       rts
+:       sta (ptr3),y
+        rts
 
 bitmask: .byte $80, $40, $20, $10, $08, $04, $02, $01
 

@@ -383,6 +383,31 @@ class Features(unittest.TestCase):
             s.step(400)
             self.assertEqual(s.mem16('ep_hp'), garage)
 
+    def test_dyno_graph_is_clean(self):
+        """Both curves are unbroken lines in their own colours across the
+        whole graph (steep turbo sections included), over the grid too."""
+        for model, lvl in ((12, 4), (4, 0)):         # tuned Zenith (turbo), stock Hollis
+            s = new_game()
+            give_car(s, 0, model, lvl)
+            s.nes[SV_CARS + 4] = lvl                 # turbo
+            s.garage_goto(G_DYNO)
+            s.press(A)
+            s.step(400)
+            g = s.frame[56:120, 64:192].astype(int)  # graph: rows 7-14, columns 8-23
+            r, gr, b = g[:, :, 0], g[:, :, 1], g[:, :, 2]
+            orange = (r > 150) & (b < 100)
+            blue = (b > 150) & (r < 120)
+            grey = (abs(r - gr) < 20) & (abs(gr - b) < 20) & (r > 60)
+            self.assertFalse(grey[:, :1].all(), 'grid dots, not a solid line')
+            for name, curve in (('power', orange), ('torque', blue)):
+                # where the curves cross, torque is drawn over power
+                rows = [set(curve[:, x].nonzero()[0]) or set(blue[:, x].nonzero()[0])
+                        for x in range(128)]
+                self.assertTrue(all(rows), '%s: a gap in the curve' % name)
+                for x in range(1, 128):          # each column joins the last
+                    near = {y + d for y in rows[x - 1] for d in (-1, 0, 1)}
+                    self.assertTrue(rows[x] & near, '%s: broken at column %d' % (name, x))
+
     def test_boss_intro_back_and_race(self):
         s = new_game()
         s.garage_goto(G_RACE)

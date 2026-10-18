@@ -10,6 +10,7 @@ Every version of Pixel Racer NES, newest first. Downloads are on the
   * **Rain:** rain falls over the road and the sky, and the road turns dark and wet. Every car in the race has less launch grip.
   * **Snow:** snow drifts down and the pavements turn white. Grip drops even more than in the rain.
 * Weather depends on the region. Rain and clouds can come anywhere. Snow only falls in Gunma and Sapporo, and Sapporo snows more often than not. Elsewhere clear skies are the most common.
+* Fixed glitches in the dyno graph. The bottom strip was drawn in the wrong colours, the power line turned blue where it crossed the grid, and steep parts of a curve (a big turbo coming on boost) broke into dashes. Both curves are now smooth, unbroken lines in their own colours.
 
 ## v5.0: Engine and drivetrain swaps (2026-10-18)
 
