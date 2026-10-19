@@ -130,6 +130,170 @@ race_main:
         rts
 
 ; ---------------------------------------------------------------------------
+; Pixel-perfect hits
+; ---------------------------------------------------------------------------
+hit_masks:  .incbin "build/hitmask.bin"     ; cars: 16 rows x 4 bytes (mkchr.py)
+hit_shift:  .incbin "build/hitshift.bin"    ; traffic, moved right 0-7: 16 x 5 bytes each
+
+.segment "BSS"
+hb_car:     .res 1
+hb_sa:      .res 1          ; car shape
+hb_sb:      .res 1          ; traffic type (0-4), at hb_dx, hb_dy from the car
+hb_dx:      .res 1
+hb_dy:      .res 1
+hb_k:       .res 1          ; whole bytes of dx (-4..3)
+hb_ilo:     .res 1          ; bytes of the car's rows that the traffic covers
+hb_ihi:     .res 1
+hb_n:       .res 1          ; rows that overlap
+hb_t:       .res 2
+.segment "BANK2"
+
+; pix_hit: does car shape hb_sa meet traffic type hb_sb drawn hb_dx (-31..31)
+; right and hb_dy (-15..15) down of it?  Carry set if any pixels meet.
+; Uses ptr2, ptr3.  The traffic mask comes pre-shifted by dx & 7, so each
+; overlapping row is at most 4 byte ANDs.
+pix_hit:
+        lda hb_dx               ; k = dx >> 3 (signed)
+        cmp #$80
+        ror a
+        cmp #$80
+        ror a
+        cmp #$80
+        ror a
+        sta hb_k
+        bpl :+                  ; car bytes covered: max(0, k) ..
+        lda #0
+:       sta hb_ilo
+        clc                     ; .. min(4, 5 + k)
+        lda hb_k
+        adc #5
+        cmp #5
+        bcc :+
+        lda #4
+:       sta hb_ihi
+        ; car rows max(0, dy) .. min(16, 16 + dy); traffic row = car row - dy
+        lda hb_sa               ; ptr2 = hit_masks + shape * 64
+        sta hb_t
+        lda #0
+        sta hb_t+1
+        ldx #6
+:       asl hb_t
+        rol hb_t+1
+        dex
+        bne :-
+        clc
+        lda hb_t
+        adc #<hit_masks
+        sta ptr2
+        lda hb_t+1
+        adc #>hit_masks
+        sta ptr2+1
+        lda hb_sb               ; ptr3 = hit_shift + (type * 8 + dx & 7) * 80
+        asl a
+        asl a
+        asl a
+        sta hb_t
+        lda hb_dx
+        and #7
+        ora hb_t
+        sta hb_t                ; n (< 40): n * 80 = n * 64 + n * 16
+        lda #0
+        sta hb_t+1
+        ldx #4
+:       asl hb_t
+        rol hb_t+1
+        dex
+        bne :-
+        lda hb_t                ; n * 16
+        sta ptr3
+        lda hb_t+1
+        sta ptr3+1
+        asl hb_t
+        rol hb_t+1
+        asl hb_t
+        rol hb_t+1              ; n * 64
+        clc
+        lda ptr3
+        adc hb_t
+        sta ptr3
+        lda ptr3+1
+        adc hb_t+1
+        sta ptr3+1
+        clc
+        lda ptr3
+        adc #<hit_shift
+        sta ptr3
+        lda ptr3+1
+        adc #>hit_shift
+        sta ptr3+1
+        sec                     ; - k: index the traffic row by the car's byte
+        lda ptr3
+        sbc hb_k
+        sta ptr3
+        lda ptr3+1
+        sbc #0
+        sta ptr3+1
+        lda hb_k
+        bpl :+
+        inc ptr3+1              ; (k < 0: - k was a borrow too many)
+:       lda hb_dy
+        bmi @up
+        sta hb_t                ; dy >= 0: car rows dy .. 15, traffic 0 ..
+        asl a
+        asl a
+        clc
+        adc ptr2
+        sta ptr2
+        bcc :+
+        inc ptr2+1
+:       sec
+        lda #16
+        sbc hb_dy
+        sta hb_n
+        jmp @rows
+@up:    eor #$FF                ; dy < 0: car rows 0 .. 15 + dy, traffic -dy ..
+        clc
+        adc #1
+        sta hb_t                ; -dy
+        asl a
+        asl a
+        adc hb_t                ; * 5
+        clc
+        adc ptr3
+        sta ptr3
+        bcc :+
+        inc ptr3+1
+:       sec
+        lda #16
+        sbc hb_t
+        sta hb_n
+@rows:  ldy hb_ilo
+@byte:  lda (ptr2),y
+        and (ptr3),y
+        bne @hit
+        iny
+        cpy hb_ihi
+        bcc @byte
+        clc                     ; next row: car + 4, traffic + 5
+        lda ptr2
+        adc #4
+        sta ptr2
+        bcc :+
+        inc ptr2+1
+:       clc
+        lda ptr3
+        adc #5
+        sta ptr3
+        bcc :+
+        inc ptr3+1
+:       dec hb_n
+        bne @rows
+        clc
+        rts
+@hit:   sec
+        rts
+
+; ---------------------------------------------------------------------------
 race_setup:
         lda #1                  ; back in the garage: a random theme
         sta new_song
@@ -1745,40 +1909,59 @@ traffic_update:
         bpl :--
         rts
 
-; crash_check: traffic tmp7 vs car Y
+; crash_check: traffic tmp7 vs car Y, pixel for pixel: the two vehicles'
+; boxes first (32x16 each, at their drawn positions), then their pixels
+; (hit_masks) where the boxes overlap.  Lanes are 32 apart, so cars only
+; meet across lanes while one changes lane.
 crash_check:
         ldx tmp7
         lda crash_t,y
         jne @r
-        lda tr_lane,x
-        cmp car_lane,y
+        sty hb_car
+        lda tr_lane,x           ; dy = traffic y - car y: -15..15
+        tay
+        lda lane_y,y
+        ldy hb_car
+        sec
+        sbc car_y,y
+        sta hb_dy
+        clc
+        adc #15
+        cmp #31
+        jcs @r
+        clc                     ; dx = traffic x - car x (64 + pos): -31..31
+        lda ph_p1,y
+        adc #64
+        sta tmp0
+        lda ph_p2,y
+        adc #0
+        sta tmp1
+        sec
+        lda tr_x_l,x
+        sbc tmp0
+        sta hb_dx
+        lda tr_x_h,x
+        sbc tmp1
+        beq @pos
+        cmp #$FF
         jne @r
-        ; same lane and the car's sprite is near its lane centre?
-        ; overlap: car front (96+pos) > tr_x+4 and car rear (64+pos) < tr_x+28
-        clc
-        lda ph_p1,y
-        adc #<(96-4)
-        sta tmp0
-        lda ph_p2,y
-        adc #0
-        sta tmp1
-        lda tmp0
-        cmp tr_x_l,x
-        lda tmp1
-        sbc tr_x_h,x
-        bcc @r                  ; front behind the traffic car
-        clc
-        lda ph_p1,y
-        adc #<(64-28)
-        sta tmp0
-        lda ph_p2,y
-        adc #0
-        sta tmp1
-        lda tmp0
-        cmp tr_x_l,x
-        lda tmp1
-        sbc tr_x_h,x
-        bcs @r                  ; rear past the traffic car
+        lda hb_dx
+        cmp #$E1
+        jcc @r
+        jmp @box
+@pos:   lda hb_dx
+        cmp #32
+        jcs @r
+@box:   lda ph_model,y          ; the boxes touch: do the pixels?
+        tay
+        lda car_shape,y
+        sta hb_sa
+        lda tr_type,x
+        sta hb_sb
+        jsr pix_hit
+        ldx tmp7
+        ldy hb_car
+        jcc @r
         ; crash: drop to the traffic car's speed, bump it ahead
         lda #60
         sta crash_t,y
