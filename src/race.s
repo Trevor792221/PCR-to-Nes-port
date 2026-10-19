@@ -2576,16 +2576,38 @@ race_sprites:
         beq :+
         ldx #1
         jsr marker
-:       ; alternate order for flicker when crowded
+:       ; alternate order for flicker when crowded.  The NES shows 8 sprites
+        ; a line and drops the rest in OAM order: the cars' smoke, flames and
+        ; wheelie bars go last, so a busy lane loses those, not a car's body.
         lda frame
         and #1
         beq :+
         jsr spr_traffic
         jsr spr_cars
-        jmp oam_clear
+        jmp :++
 :       jsr spr_cars
         jsr spr_traffic
+:       jsr spr_extras
         jmp oam_clear
+
+; spr_extras: wheelie bars and smoke / flames of the cars drawn this frame
+spr_extras:
+        ldx #0
+@car:   lda cs_vis,x
+        beq @n
+        lda cs_sxl,x
+        sta sx_l
+        lda cs_sxh,x
+        sta sx_h
+        stx tmp7
+        jsr wb_sprite
+        ldx tmp7
+        jsr car_fx
+        ldx tmp7
+@n:     inx
+        cpx #2
+        bne @car
+        rts
 
 ; marker: X = car.  The position is recomputed every other frame.
 marker:
@@ -2629,6 +2651,9 @@ marker:
 marker_pal: .byte 0, 2
 
 spr_cars:
+        lda #0                  ; cars drawn this frame (for spr_extras)
+        sta cs_vis
+        sta cs_vis+1
         ; player at x 64 (two players: 64 + pos - cam, like the other car)
         lda race_kind
         cmp #RK_2P
@@ -2668,11 +2693,9 @@ spr_cars:
         ldx #0
         jsr wheel_frame
         sta tmp1
+        ldx #0
+        jsr cs_keep
         jsr draw_car_s
-        ldx #0
-        jsr wb_sprite
-        ldx #0
-        jsr car_fx
 @opp:   lda rc_opp
         beq @r
         ; screen x = 64 + opp_pos - cam
@@ -2701,25 +2724,51 @@ spr_cars:
         ldx #1
         jsr wheel_frame
         sta tmp1
+        ldx #1
+        jsr cs_keep
         jsr draw_car_s
-        ldx #1
-        jsr wb_sprite
-        ldx #1
-        jsr car_fx
 @r:     rts
+
+; cs_keep: car X is drawn at sx_l/sx_h this frame (keeps A)
+cs_keep:
+        pha
+        lda sx_l
+        sta cs_sxl,x
+        lda sx_h
+        sta cs_sxh,x
+        lda #1
+        sta cs_vis,x
+        pla
+        rts
+
+.segment "BSS"
+cs_sxl:     .res 2          ; each car's screen x this frame,
+cs_sxh:     .res 2
+cs_vis:     .res 2          ;   and whether it was drawn
+.segment "BANK2"
 
 ; wb_sprite: wheelie bars behind car X's rear wheel, if it has them.
 ; sx_l/sx_h = car x (from draw_car_s), car_y,x = y.
 wb_sprite:
         lda wb_on,x
         beq @r
-        sec                     ; 6 left of the car: the bar meets the bumper
-        lda sx_l
-        sbc #6
+        ldy ph_model,x          ; just behind this car's rear bumper
+        lda car_shape,y
+        tay
+        lda wb_dx,y             ; (negative: left of the car)
+        bmi :+
+        clc
+        adc sx_l
         sta sp_x
         lda sx_h
-        sbc #0
-        bne @r                  ; off screen
+        adc #0
+        jmp :++
+:       clc
+        adc sx_l
+        sta sp_x
+        lda sx_h
+        adc #$FF
+:       bne @r                  ; off screen
         lda car_y,x
         clc
         adc #8
@@ -2731,6 +2780,7 @@ wb_sprite:
         jmp spr_add
 @r:     rts
 wb_attr:    .byte 1, 2          ; each car's lower-half palette
+wb_dx:      .byte WB_DX_MAP     ; per car shape (tools/mkchr.py)
 
 ; wheel_frame: X = car -> A = 0/1
 wheel_frame:

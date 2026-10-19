@@ -3,6 +3,12 @@
 Every version of Pixel Racer NES, newest first. Downloads are on the
 [Releases page](https://github.com/Trevor792221/PCR-to-Nes-port/releases).
 
+## v5.3: Fixes (2026-10-19)
+
+* Fixed: right after you buy a turbo, the intercooler now shows its price instead of LOCKED. Before, it only updated when the screen was redrawn.
+* Fixed: wheelie bars now meet each car's own rear bumper in races. On some cars (the Pukku Mini most of all) they used to float a pixel or two behind the car, and on others they overlapped the body.
+* Fixed: graphical glitches in busy street races. The NES can only show 8 sprites on a line. Exhaust smoke, nitrous flames and wheelie bars are now drawn after every car, so when a lane gets crowded the console drops an effect rather than part of a car. Before, the front of a traffic car could go missing.
+
 ## v5.2: Balance, nitrous tuning, bosses race at home (2026-10-18)
 
 * Each ladder boss can now only be raced in its home region. Bosses 1-2 are in Fukuoka, 3-4 in Hiroshima, 5-6 in Osaka, 7 in Nagoya, 8 in Gunma, 9 in Sapporo, and 10-11 in Tokyo. Elsewhere, race select tells you where the next boss is, e.g. "BOSS IS IN OSAKA". Before, any region worked once your level was high enough.

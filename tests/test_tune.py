@@ -205,6 +205,23 @@ class Tune(unittest.TestCase):
         s.step(20)
         self.assertEqual(s.wram(SV_CARS + CR_PARTS + P_WHEELIE), 1, 'FWD cars can fit them too')
 
+    def test_turbo_unlocks_the_intercooler_row_at_once(self):
+        s = car_with(9)                              # no turbo
+        set_cash(s, 9000000)
+        s.garage_goto(G_PARTS)
+        s.press(A)
+        s.step(60)
+        row = lambda: s.frame[128:136].copy()        # nametable row 16: the intercooler
+        s.list_goto('ui_sel', 3)                     # turbo
+        s.press(A)
+        s.step(30)
+        after_buy = row()
+        s.press(RIGHT)                               # other page and back: a full redraw
+        s.step(60)
+        s.press(LEFT)
+        s.step(60)
+        self.assertTrue((row() == after_buy).all(), 'the intercooler row shows its price straight away')
+
     def test_wheelie_bar_graphics(self):
         oam = lambda s: [(s.nes[0x200 + i + 1], s.nes[0x200 + i + 2]) for i in range(0, 256, 4)]
         for model, bars, shown in ((8, 2, True), (8, 0, False), (1, 3, True)):  # RWD; FWD
@@ -212,6 +229,20 @@ class Tune(unittest.TestCase):
             start_race(s, 4)
             s.step(30)
             self.assertEqual((0x28, 1) in oam(s), shown, 'model %d bars %d' % (model, bars))
+
+    def test_wheelie_bars_meet_every_bumper(self):
+        sys.path.insert(0, os.path.join(HERE, '..', 'tools'))
+        import art
+        for model in range(13):
+            s = car_with(model, wheelie=1)
+            start_race(s, 4)
+            s.step(30)
+            spr = [(s.nes[0x200 + i + 3], s.nes[0x200 + i + 1]) for i in range(0, 256, 4)]
+            car_x = min(x for x, tile in spr if 0x10 <= tile < 0x1C)
+            bar_x = [x for x, tile in spr if tile == 0x28][0]
+            g = art.car_pixels(model, 0)
+            bumper = min(next(x for x, c in enumerate(g[y]) if c != '.') for y in (10, 11, 12))
+            self.assertEqual(bar_x + 7, car_x + bumper - 1, 'model %d: the truss ends at the bumper' % model)
 
     def test_a_safe_tune_makes_more_power(self):
         s = car_with(9, turbo=3, icool=3, inject=3, ecu=2)

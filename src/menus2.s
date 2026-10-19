@@ -145,6 +145,7 @@ pt_index:
 
 PT_ROW0 = 8                     ; first part row (two apart)
 pt_engine:   .byte P_INTAKE, P_EXHAUST, P_ECU, P_TURBO, P_ICOOL, P_INJECT, P_INTERNAL, P_NITROUS
+PT_ICOOL_ROW = 4                ; the intercooler's row in pt_engine
 pt_chassis:  .byte P_GEARBOX, P_TIRES, P_SUSP, P_WEIGHT, P_AERO, P_WHEELIE
 pt_sizes:    .byte 8, 6
 
@@ -303,7 +304,16 @@ pt_buy:
         jsr wait_frame
         jsr pt_stats
         jsr wait_frame
-        jmp pt_info
+        lda pt_part             ; a turbo unlocks the intercooler: its row
+        cmp #P_TURBO            ; (same page) gets its price
+        bne :+
+        ldx #P_ICOOL
+        jsr part_line
+        ldy #PT_ROW0 + 2*PT_ICOOL_ROW
+        ldx #3
+        jsr vb_str
+        jsr wait_frame
+:       jmp pt_info
 @fail:  lda #SFX_ERROR
         jmp sfx_play
 

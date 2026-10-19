@@ -672,6 +672,14 @@ def weather_frames():
     return out
 
 
+def wbar_dx(name):
+    """Wheelie bar sprite x relative to the car sprite: its last column (7)
+    lands just behind the rear bumper (the first body pixel, rows 10-12)."""
+    g = art.car_pixels(name, 0)
+    bumper = min(next(x for x, c in enumerate(g[y]) if c != '.') for y in (10, 11, 12))
+    return bumper - 8
+
+
 def main():
     out = sys.argv[1]
     os.makedirs(out, exist_ok=True)
@@ -711,6 +719,10 @@ def main():
                 f.write('.define T_%s_MAP %s\n' % (k, ', '.join('$%02X' % x for x in v)))
             else:
                 f.write('T_%s = $%02X\n' % (k, v))
+        # wheelie bars in races: sprite x from the car's x, per car shape, so
+        # the truss meets each car's own rear bumper (rows 10-12)
+        dx = [wbar_dx(n) for n in cars]
+        f.write('.define WB_DX_MAP %s\n' % ', '.join('$%02X' % (d & 0xFF) for d in dx))
         f.write('LOGO_W = %d\n' % (len(logo_map) // 2))
         f.write('NTHEMES = %d\n' % len(RACE_THEMES))
     print('race tiles (of 128): %s; menu tiles %d/128' % (nrace, nmenu), file=sys.stderr)

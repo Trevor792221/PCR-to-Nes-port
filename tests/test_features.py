@@ -90,6 +90,41 @@ class Features(unittest.TestCase):
             self.assertEqual(s.mem('opp_cap'), 0, 'no handicap outside the race')
         self.assertGreaterEqual(wins, 5)
 
+    def test_busy_lanes_drop_effects_not_cars(self):
+        """The NES shows 8 sprites a line and drops the rest in OAM order.  A
+        car's smoke, flames and wheelie bars come after every car body, so a
+        busy lane never loses a piece of a car while an effect still shows.
+        (Bodies alone past 8 take turns: race_sprites alternates its order.)"""
+        body = lambda tile: 0x10 <= tile < 0x28 or 0x40 <= tile < 0x7C
+        s = new_game()
+        give_car(s, 0, 5, 3)                         # turbo, nitrous: flames
+        s.nes[SV_CARS + 1 + 12] = 2                  # and wheelie bars
+        start_race(s, 3)                             # street race: traffic
+        crowded, f = 0, 0
+        while s.mem('game_mode') == 2 and f < 2400:
+            st, b = s.mem('rc_state'), 0
+            if st == 0:
+                b = A if rpm(s) < 5000 else 0
+            elif st == 1:
+                b = A | (B if f % 4 < 2 else 0)
+                if s.mem('ph_gear') == 0 or (rpm(s) >= redline(s) - 300 and s.mem('ph_shift_t') == 0
+                                             and f % 4 < 2):
+                    b |= RIGHT if f % 4 < 2 else 0
+                if f % 120 == 60:
+                    b |= UP if (f // 120) % 2 else DOWN
+            s.step(1, b)
+            f += 1
+            oam = [(s.nes[0x200 + 4 * i], s.nes[0x201 + 4 * i]) for i in range(64)]
+            for line in range(48, 232):
+                on = [tile for y, tile in oam if y < 0xEF and y + 1 <= line <= y + 8]
+                extras = [i for i, tile in enumerate(on) if not body(tile)]
+                if extras and len(on) > 8:
+                    crowded += 1
+                    self.assertTrue(all(body(tile) for tile in on[:extras[0]]) and
+                                    not any(body(tile) for tile in on[extras[0]:]),
+                                    'frame %d line %d: %r' % (f, line, on))
+        self.assertGreater(crowded, 0, 'the race did get crowded with effects')
+
     def test_secret_boss_hidden_without_zenith(self):
         s = new_game()
         self.assertEqual(self.race_select_count(s), 8)
