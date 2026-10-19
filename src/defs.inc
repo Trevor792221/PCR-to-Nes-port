@@ -160,6 +160,7 @@ RF_WIN    = $01
 RF_FOUL   = $02
 RF_OPPFIN = $04         ; opponent finished (has an ET)
 RF_P2FOUL = $08         ; two players: player 2 jumped the start
+RF_LAUNCH = $10         ; player launched (has a reaction time)
 RF_DONE   = $80
 
 ; --- misc ---------------------------------------------------------------------

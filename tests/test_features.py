@@ -593,6 +593,36 @@ class Features(unittest.TestCase):
         tiles = [s.nes[0x200 + i * 4 + 1] for i in range(64)]
         self.assertIn(0x0D, tiles, 'mark sprite on screen')
 
+    def test_perfect_launch_is_zero(self):
+        def launch(late):
+            """Rev to the green, then launch `late` frames after the first frame that counts."""
+            s = new_game()
+            start_race(s, 4)
+            s.step(green + late, A)
+            s.step(2, RIGHT | A)
+            for _ in range(60):                      # to the finish and the results
+                if s.mem('game_mode') == 3:
+                    break
+                s.step(40, A)
+                s.step(2, RIGHT | A)
+            s.step(60)
+            self.assertEqual(s.mem('game_mode'), 3)
+            return s
+        s = new_game()
+        start_race(s, 4)
+        green = 0
+        while s.mem('rc_state') == 0:
+            s.step(1, A)
+            green += 1
+        s = launch(0)
+        self.assertEqual(s.mem('res_flags') & 0x12, 0x10, 'launched, no foul')
+        self.assertEqual(s.mem16('res_rt'), 0, '0.000')
+        perfect = s.frame[88:96, 152:200].copy()     # the REACTION time
+        self.assertEqual(launch(1).mem16('res_rt'), 16, 'a frame late')
+        s = launch(-1)                               # a frame early: still a foul
+        self.assertEqual(s.mem('res_flags') & 0x12, 0x02, 'foul, no launch')
+        self.assertFalse((s.frame[88:96, 152:200] == perfect).all(), 'a dash, not 0.000')
+
     def test_two_player_foul_start(self):
         s = new_game()
         self.start_two(s)

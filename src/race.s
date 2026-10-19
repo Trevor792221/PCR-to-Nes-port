@@ -1322,9 +1322,12 @@ player_shift_up:
         jcc @r
         lda #1
         sta rc_launch
-        lda rc_t
+        sec                     ; timed from the green: a launch on the
+        lda rc_t                ; first frame it can count is 0.000
+        sbc #1
         sta rc_rt
         lda rc_t+1
+        sbc #0
         sta rc_rt+1
         lda #SFX_SHIFT
         jmp sfx_play
@@ -3217,6 +3220,9 @@ race_results:
         stx res_opp_et+1
 :       lda rc_launch
         beq :+
+        lda res_flags
+        ora #RF_LAUNCH
+        sta res_flags
         lda rc_rt
         ldx rc_rt+1
         jsr frames_ms

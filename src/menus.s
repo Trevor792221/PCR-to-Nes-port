@@ -2528,7 +2528,13 @@ results_main:
         sta m_a
         lda res_rt+1
         sta m_a+1
-        jsr ms_or_dash
+        MOVI16 ptr0, str_dash   ; 0.000 is a perfect launch, so the dash
+        lda res_flags           ; is for no launch at all
+        and #RF_LAUNCH
+        beq :+
+        jsr fmt_ms
+        MOVI16 ptr0, numbuf
+:
         ldx #19
         ldy #11
         jsr print

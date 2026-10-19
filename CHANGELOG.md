@@ -3,6 +3,10 @@
 Every version of Pixel Racer NES, newest first. Downloads are on the
 [Releases page](https://github.com/Trevor792221/PCR-to-Nes-port/releases).
 
+## v5.4: Perfect launches (2026-10-19)
+
+* A perfect launch now reads **0.000** reaction time, as on a real drag strip: the time counts from the green light, so pressing Right on the first frame you can launch scores 0.000. One frame earlier is still a foul start. Before, the best possible time was 0.016.
+
 ## v5.3: Fixes (2026-10-19)
 
 * Fixed: right after you buy a turbo, the intercooler now shows its price instead of LOCKED. Before, it only updated when the screen was redrawn.
