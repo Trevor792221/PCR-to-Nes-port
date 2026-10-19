@@ -3,9 +3,10 @@
 Every version of Pixel Racer NES, newest first. Downloads are on the
 [Releases page](https://github.com/Trevor792221/PCR-to-Nes-port/releases).
 
-## v5.4: Perfect launches (2026-10-19)
+## v5.4: Perfect launches, keyboard passwords (2026-10-19)
 
 * A perfect launch now reads **0.000** reaction time, as on a real drag strip: the time counts from the green light, so pressing Right on the first frame you can launch scores 0.000. One frame earlier is still a foul start. Before, the best possible time was 0.016.
+* **Famicom keyboard.** Passwords can be typed on a Family BASIC keyboard plugged into the Famicom's expansion port: letter and number keys type (the cursor jumps to the letter), DEL deletes, RETURN finishes. I, O, 0 and 1 aren't in passwords and just buzz. The controller works as before, and with no keyboard plugged in nothing changes.
 
 ## v5.3: Fixes (2026-10-19)
 

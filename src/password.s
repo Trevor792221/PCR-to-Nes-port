@@ -49,6 +49,9 @@ pw_rstep:   .res 1          ; pw_print_rows: rows apart
 pw_any:     .res 1
 pw_ng:      .res 1
 pw_d:       .res 2
+kb_now:     .res 18         ; keyboard: keys down this scan, a nibble per
+kb_old:     .res 18         ;   row and column (bit 0 = $4017 bit 1); last scan's
+kb_n:       .res 1          ; keys down this scan
 
 .segment "BANK5"
 
@@ -84,6 +87,115 @@ garage_len2: .byte 11, 19, 27, 35, 43, 50, 58, 66   ; versions 1-2: 12 parts, 39
 garage_pad: .byte 0, 1, 2, 3, 4, 0, 1, 2            ; 5*len - bits (the same for both)
 garage_len4: .byte 14, 24, 34, 44, 55, 65, 75, 85   ; version 4: + swaps, 51 bits a car
 garage_pad4: .byte 3, 2, 1, 0, 4, 3, 2, 1
+
+; ---------------------------------------------------------------------------
+; Family keyboard: type passwords on it.  $4016 writes: bit 0 resets to row
+; 0, bit 1 picks the column (the row steps when it goes 1 -> 0), bit 2
+; turns the keyboard on.  $4017 bits 1-4 read a row's column, 0 = key down.
+; Nothing plugged in reads every key as down, and so does anything else on
+; the expansion port (it can only drive some of the bits), so a scan with
+; more than KB_MAXDOWN keys down counts as no keyboard.
+; ---------------------------------------------------------------------------
+KB_MAXDOWN = 4
+KB_DEL  = $40
+KB_RET  = $41
+KB_BAD  = $42                   ; I, O, 0, 1: not in passwords
+KB_NONE = $FF
+
+; kb_scan: A = the key (0-71: row*8 + column*4 + bit) that went down this
+; scan, or $FF.  Clobbers X, Y.
+kb_scan:
+        lda #$05                ; row 0, keyboard on
+        sta JOY1
+        jsr kb_wait
+        ldy #0
+        sty kb_n
+@row:   lda #$04                ; column 0 (the next row after column 1)
+        jsr kb_col
+        lda #$06                ; column 1
+        jsr kb_col
+        cpy #18
+        bne @row
+        lda #0                  ; keyboard off
+        sta JOY1
+        lda kb_n
+        cmp #KB_MAXDOWN + 1
+        bcc :+
+        lda #0                  ; no keyboard
+        ldy #17
+@clr:   sta kb_now,y
+        dey
+        bpl @clr
+:       lda #KB_NONE
+        sta pw_tb
+        ldy #17
+@new:   lda kb_old,y
+        eor #$FF
+        and kb_now,y
+        beq @nx
+        ldx #$FF                ; lowest new bit
+@bit:   inx
+        lsr a
+        bcc @bit
+        stx pw_tb
+        tya
+        asl a
+        asl a
+        ora pw_tb
+        sta pw_tb
+@nx:    lda kb_now,y
+        sta kb_old,y
+        dey
+        bpl @new
+        lda pw_tb
+        rts
+
+; kb_col: write A to $4016, wait, keys down -> kb_now,y (1 = down); y++
+kb_col:
+        sta JOY1
+        jsr kb_wait
+        lda JOY2
+        lsr a
+        and #$0F
+        eor #$0F
+        sta kb_now,y
+        tax
+        lda kb_n
+        clc
+        adc kb_bits,x
+        sta kb_n
+        iny
+        rts
+
+; kb_wait: the keyboard needs about 50 cycles after a write (this is 59)
+kb_wait:
+        ldx #9
+:       dex
+        bne :-
+        rts
+
+kb_bits:    .byte 0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4
+
+; kb_map: key -> letter (0-31, pw_alpha), KB_DEL, KB_RET, KB_BAD or KB_NONE
+kb_map:
+        .byte KB_NONE, KB_RET, KB_NONE, KB_NONE  ; row 0: F8 RETURN [ ]
+        .byte KB_NONE, KB_NONE, KB_NONE, KB_NONE ;        KANA RSHIFT YEN STOP
+        .byte KB_NONE, KB_NONE, KB_NONE, KB_NONE ; row 1: F7 @ : ;
+        .byte KB_NONE, KB_NONE, KB_NONE, KB_NONE ;        _ / - ^
+        .byte KB_NONE, KB_BAD, 10, 9             ; row 2: F6 O L K
+        .byte KB_NONE, KB_NONE, 13, KB_BAD       ;        . , P 0
+        .byte KB_NONE, KB_BAD, 18, 8             ; row 3: F5 I U J
+        .byte 11, 12, 31, 30                     ;        M N 9 8
+        .byte KB_NONE, 22, 6, 7                  ; row 4: F4 Y G H
+        .byte 1, 19, 29, 28                      ;        B V 7 6
+        .byte KB_NONE, 17, 15, 3                 ; row 5: F3 T R D
+        .byte 5, 2, 27, 26                       ;        F C 5 4
+        .byte KB_NONE, 20, 16, 0                 ; row 6: F2 W S A
+        .byte 21, 23, 4, 25                      ;        X Z E 3
+        .byte KB_NONE, KB_NONE, 14, KB_NONE      ; row 7: F1 ESC Q CTR
+        .byte KB_NONE, KB_NONE, KB_BAD, 24       ;        LSHIFT GRPH 1 2
+        .byte KB_NONE, KB_NONE, KB_NONE, KB_NONE ; row 8: CLR UP RIGHT LEFT
+        .byte KB_NONE, KB_NONE, KB_DEL, KB_NONE  ;        DOWN SPACE DEL INS
 
 ; ---------------------------------------------------------------------------
 ; Bit buffer
@@ -1722,6 +1834,7 @@ pw_enter:
         bne @g
         PRINT str_pw_help1, 2, 26
         PRINT str_pw_help2, 2, 27
+        PRINT str_pw_help3, 2, 28
         jsr attr_upload
         lda #0
         sta oam_idx
@@ -1734,6 +1847,7 @@ pw_enter:
         ldx pw_kind
         lda pw_maxes,x
         sta pw_max
+        jsr kb_scan             ; keys already down don't type
 @loop:  jsr wait_frame
         jsr read_pad
         lda pw_sel
@@ -1741,6 +1855,23 @@ pw_enter:
         jsr pw_grid_xy
         dex
         jsr ui_cursor
+        jsr kb_scan
+        tax
+        bmi @pad
+        lda kb_map,x
+        cmp #32
+        bcs :+
+        sta pw_sel              ; a letter: the cursor jumps to it
+        jmp @add
+:       cmp #KB_DEL
+        jeq @del
+        cmp #KB_RET
+        jeq @done
+        cmp #KB_BAD
+        bne @pad
+        lda #SFX_ERROR
+        jsr sfx_play
+@pad:
         lda pad_rpt
         and #BTN_RIGHT
         beq :+
@@ -1792,7 +1923,7 @@ pw_enter:
         bne @done
         lda pad_new
         and #BTN_SELECT
-        beq @loop
+        jeq @loop
         lda #SFX_BACK
         jsr sfx_play
         sec
@@ -2023,6 +2154,7 @@ str_pw_h1:     .byte "32 LETTERS", 0
 str_pw_h2:     .byte "12 LETTERS, MORE WITH MORE CARS", 0
 str_pw_help1:  .byte "A:ADD  B:DELETE  START:DONE", 0
 str_pw_help2:  .byte "SELECT:BACK TO THE TITLE", 0
+str_pw_help3:  .byte "OR TYPE IT ON A KEYBOARD", 0
 str_pw_wrong:  .byte "WRONG PASSWORD, CHECK IT", 0
 str_pw_clear:  .byte "                        ", 0
 str_pw_yours:  .byte "YOUR PASSWORDS", 0
