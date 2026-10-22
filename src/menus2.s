@@ -1219,7 +1219,11 @@ give_part:
 
 ; give_part_silent: carry set if everything is maxed; tmp4 = part
 give_part_silent:
-        lda #NPARTS
+        jsr cur_boss            ; a boss's car: no part (cash instead)
+        beq :+
+        sec
+        rts
+:       lda #NPARTS
         jsr rand_below
         sta tmp4
         lda #NPARTS
@@ -2066,12 +2070,13 @@ options_screen:
         jsr use_menu_palette
         MOVI16 ptr0, str_options
         jsr draw_header
-        PRINT str_op0, 4, 5
-        PRINT str_op1, 4, 7
-        PRINT str_op2, 4, 9
-        PRINT str_op3, 4, 11
-        PRINT str_op5, 4, 13
-        PRINT str_op4, 4, 15
+        PRINT str_op0, 4, 4
+        PRINT str_op1, 4, 6
+        PRINT str_op2, 4, 8
+        PRINT str_op3, 4, 10
+        PRINT str_op6, 4, 12
+        PRINT str_op5, 4, 14
+        PRINT str_op4, 4, 16
         BOX 1, 17, 30, 12
         PRINT str_c0, 3, 18
         PRINT str_c1, 3, 19
@@ -2090,11 +2095,11 @@ options_screen:
         jsr ppu_on
         lda #0
         sta ui_sel
-        lda #6
+        lda #7
         sta ui_count
         lda #2
         sta ui_x
-        lda #5
+        lda #4
         sta ui_y0
         lda #2
         sta ui_dy
@@ -2115,10 +2120,12 @@ options_screen:
         beq @toggle
         jmp @loop
 @a:     lda ui_sel
-        cmp #5
+        cmp #6
         beq @back
-        cmp #4
+        cmp #5
         beq @title
+        cmp #4
+        beq @tape
         cmp #3
         beq @erase
 @toggle:
@@ -2148,6 +2155,10 @@ options_screen:
         rts
 @erase: FARCALL BANK_PW, pw_show
         jmp options_screen
+@tape:  FARCALL BANK_MAP, tape_screen
+        bne :+
+        rts                     ; a game came off the tape: the garage
+:       jmp options_screen
 @back:  rts
 
 op_bits: .byte OPT_KMH, OPT_NOMUSIC, OPT_AUTO
@@ -2160,7 +2171,7 @@ op_values:
         jmp :++
 :       MOVI16 ptr0, str_ov_mph
 :       ldx #18
-        ldy #5
+        ldy #4
         jsr vb_str
         lda SV_OPTIONS
         and #OPT_NOMUSIC
@@ -2169,7 +2180,7 @@ op_values:
         jmp :++
 :       MOVI16 ptr0, str_ov_on
 :       ldx #18
-        ldy #7
+        ldy #6
         jsr vb_str
         lda SV_OPTIONS
         and #OPT_AUTO
@@ -2178,7 +2189,7 @@ op_values:
         jmp :++
 :       MOVI16 ptr0, str_ov_man
 :       ldx #18
-        ldy #9
+        ldy #8
         jmp vb_str
 
 str_options:  .byte "OPTIONS", 0
@@ -2188,6 +2199,7 @@ str_op2:      .byte "GEAR SHIFTS", 0
 str_op3:      .byte "PASSWORD", 0
 str_op4:      .byte "BACK", 0
 str_op5:      .byte "QUIT TO TITLE", 0
+str_op6:      .byte "DATA RECORDER", 0
 str_ov_mph:   .byte "< MPH  >", 0
 str_ov_kmh:   .byte "< KM/H >", 0
 str_ov_on:    .byte "< ON   >", 0

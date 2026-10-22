@@ -300,7 +300,11 @@ race_setup:
         jsr rng_stir
         lda #NTHEMES            ; random background: day, sunset or night
         jsr rand_below
-        sta race_theme
+        ldx theme_force         ; (tests can pick it)
+        beq :+
+        dex
+        txa
+:       sta race_theme
         jsr pick_weather        ; and the weather: race_weather, race_scene
         lda #1
         jsr screen_begin        ; race tiles for that scene
@@ -2488,9 +2492,10 @@ shift_mark:
 ; middle.  Like the one-player HUD, row 3 takes turns: clock, speeds, bars.
 ; ---------------------------------------------------------------------------
 hud_2p:
-        lda #0
-        sta hc
-@car:   ldx hc                  ; tach px = rpm * k >> 16 (0-160), halved
+        lda frame               ; one player's tach and gear a frame, in
+        and #1                  ; turns (two at once overran the frame when
+        sta hc                  ; both launched together)
+        ldx hc                  ; tach px = rpm * k >> 16 (0-160), halved
         lda ph_rpm_l,x
         sta m_a
         lda ph_rpm_h,x
@@ -2569,11 +2574,7 @@ hud_2p:
 :       sta vbuf,x
         inx
         jsr vb_close
-@nog:   inc hc
-        lda hc
-        cmp #2
-        jne @car
-        lda frame
+@nog:   lda frame
         and #1
         beq @clock
         lda frame

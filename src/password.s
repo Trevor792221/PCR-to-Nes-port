@@ -14,7 +14,8 @@
 ;                    bars or injectors; they still work)
 ;                    Version 4 (0 in the field), 14-85 chars, only when a
 ;                    car is swapped: after each colour, engine 5 | drive 2
-;                    (from the record's CR_SWAP byte)
+;                    (from the record's CR_SWAP byte; engine 31, drive 0 =
+;                    a car won from a boss: CR_SWAP SWAP_BOSS)
 ;                    Version 5 (0 too, but longer than version 4), up to 119
 ;                    chars, only when a car has paid for swaps it hasn't
 ;                    fitted: after the swaps, spare 1 | if 1: engines 17 |
@@ -84,6 +85,7 @@ SEED_TUNE    = $A5
 TUNE_MAX     = 237              ; letters (8 fully tuned cars, nitrous too, need up to 237)
 PLAYER_LEN   = 15               ; version 1 (v3.0): no stats
 PLAYER_LEN2  = 32               ; version 2: with stats
+PW_BOSS      = 31               ; garage engine field: a car won from a boss
 GARAGE_MAX   = 119              ; version 5: 8 cars, each with spare swaps
 
 pw_alpha:   .byte "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
@@ -768,7 +770,13 @@ pw_enc_garage:
         jcc @next
         ldy #CR_SWAP            ; versions 4-5: the swaps
         lda (ptr1),y
-        and #SWAP_ENG
+        bpl @swe
+        lda #PW_BOSS            ; a boss's car: engine 31, drivetrain 0
+        ldx #5
+        jsr pw_put
+        lda #0
+        beq @swd
+@swe:   and #SWAP_ENG
         ldx #5
         jsr pw_put
         ldy #CR_SWAP
@@ -778,7 +786,7 @@ pw_enc_garage:
         lsr a
         lsr a
         lsr a
-        ldx #2
+@swd:   ldx #2
         jsr pw_put
         lda pw_ver              ; version 5: the swaps paid for
         cmp #5
@@ -1004,7 +1012,16 @@ pw_dec_garage:
         ldx #5
         jsr pw_get
         sta pw_lo
-        cmp #NENGINES+1
+        cmp #PW_BOSS            ; a boss's car
+        bne @eng
+        ldx #2
+        jsr pw_get              ; (never swapped)
+        jne pw_bad
+        sta pw_hb
+        lda #SWAP_BOSS
+        sta pw_lo
+        bne @own
+@eng:   cmp #NENGINES+1
         jcs pw_bad
         cmp #CRATE_CAR+1        ; the crate car's engine isn't for sale
         jeq pw_bad
@@ -1041,8 +1058,10 @@ pw_dec_garage:
         ora pw_any
         sta pw_any
         ora pw_d                ; something, not the crate car's engine,
-        ora pw_d+1              ; and not on the crate car
+        ora pw_d+1              ; and not on the crate car or a boss's car
         jeq pw_bad
+        lda pw_lo
+        jmi pw_bad
         lda pw_d+1
         and #1 << (CRATE_CAR - 8)
         jne pw_bad

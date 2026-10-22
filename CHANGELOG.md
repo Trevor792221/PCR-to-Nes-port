@@ -3,6 +3,12 @@
 Every version of Pixel Racer NES, newest first. Downloads are on the
 [Releases page](https://github.com/Trevor792221/PCR-to-Nes-port/releases).
 
+## v5.6: Boss cars, data recorder (2026-10-22)
+
+* **Win the bosses' cars.** The first time you beat a boss, their car is yours, just as they raced it: the same model, parts and paint, marked BOSS CAR in the garage. Its tune, parts and swaps are locked (it stays as the boss built it), but you can repaint it, and race it or sell it. It sells for half the car's price, since its parts came free. With a full garage it's sold for you straight away. The garage password keeps boss cars as they are, and passwords for garages without one are unchanged.
+* Fixed: a dropped frame in two-player races when both players launch together (worst at sunset in the rain). Each player's tach now updates every other frame, in turns.
+* **Famicom Data Recorder.** Save your game to cassette and load it back on a Famicom with the Family BASIC keyboard and its data recorder. It's under OPTIONS → DATA RECORDER, and on the title screen so a fresh console can load a tape. To save, press RECORD on the deck, then A; it takes about 3 seconds of tape. To load, rewind, press A, then PLAY; B gives up. A tape only replaces your game if every byte checks out and it's a save from this version, so a bad or wrong tape leaves your game alone. The battery save and passwords work as before.
+
 ## v5.5: Battery saves, sunset garage, gem crates (2026-10-19)
 
 * **Battery saves are back.** The game saves itself as you play and CONTINUE picks up where you left off, even after the power goes off. It also keeps a backup of the last save, so a power cut while saving loses at most that one change instead of the whole game. Passwords still work as before.

@@ -15,6 +15,8 @@ GARAGE password, 12-74 characters (grows with the number of cars):
   Version 4 (written as 0 in the 2-bit field), 14-85 characters, only when
   a car has an engine or drivetrain swap: after each body colour, the
   record's swap bytes: engine 5 (id + 1, 0 = its own) | drivetrain 2.
+  Engine 31 (drivetrain 0) marks a car won from a boss (record CR_SWAP $80:
+  tune, parts and swaps locked); a garage with one uses version 4 too.
   Version 5 (also 0 in the field: longer than version 4 for the same number
   of cars), only when a car has paid for swaps it doesn't have fitted: after
   each car's swaps, spare 1 | if 1: engines 17 (bit e = engine e) |
@@ -60,6 +62,7 @@ def garage_len(ncars, version=3, spare=0):
 
 
 OWN_DRV = 20                # SV_OWNED: bit e = engine e, bit 20 + d = drivetrain d
+BOSS_CAR = 31               # engine field: a car won from a boss
 
 
 class Bits:
@@ -259,7 +262,10 @@ def decode_garage(s):
             return None
         if ver >= 4:
             engine, drive = b.get(5), b.get(2)
-            if engine > NENGINES or engine == CRATE_CAR + 1 or \
+            if engine == BOSS_CAR:
+                if drive:                       # a boss's car is never swapped
+                    return None
+            elif engine > NENGINES or engine == CRATE_CAR + 1 or \
                     (model == CRATE_CAR and (engine or drive)):
                 return None
             if ver == 5:
@@ -267,7 +273,8 @@ def decode_garage(s):
                 if b.get(1):
                     owned = b.get(17) | b.get(3) << OWN_DRV
                     # nothing at all, the crate car's engine, or the crate car
-                    if not owned or owned >> CRATE_CAR & 1 or model == CRATE_CAR:
+                    if not owned or owned >> CRATE_CAR & 1 or model == CRATE_CAR \
+                            or engine == BOSS_CAR:
                         return None
                 cars.append((model, parts, PAINT_LIST[col], engine, drive, owned))
             else:

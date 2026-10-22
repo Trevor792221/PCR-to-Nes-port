@@ -56,9 +56,10 @@ title_main:
         PRINT str_t_nes, 12, 4
         lda #0
         sta text_attr
-        PRINT str_t_cont, 12, 15
-        PRINT str_t_new, 12, 17
-        PRINT str_t_pw, 12, 19
+        PRINT str_t_cont, 12, 13
+        PRINT str_t_new, 12, 15
+        PRINT str_t_pw, 12, 17
+        PRINT str_t_tape, 12, 19
         PRINT str_t_fan1, 3, 26
         PRINT str_t_fan2, 5, 27
         ; road
@@ -110,11 +111,11 @@ title_main:
         lda #0
         sta ui_sel
         sta t_car_x
-        lda #3
+        lda #4
         sta ui_count
         lda #10
         sta ui_x
-        lda #15
+        lda #13
         sta ui_y0
         lda #2
         sta ui_dy
@@ -172,6 +173,14 @@ title_main:
 @pick:  jsr rng_stir
         jsr rev_play
         lda ui_sel
+        cmp #3
+        bne :+
+        FARCALL BANK_MAP, tape_screen   ; load a game off the tape
+        bne @redo
+        lda #MODE_GARAGE
+        sta next_mode
+        rts
+:       lda ui_sel
         cmp #2
         bne :+
         FARCALL BANK_PW, pw_title
@@ -205,6 +214,7 @@ str_t_nes:  .byte "NES EDITION", 0
 str_t_cont: .byte "CONTINUE", 0
 str_t_new:  .byte "NEW GAME", 0
 str_t_pw:   .byte "PASSWORD", 0
+str_t_tape: .byte "DATA RECORDER", 0
 str_t_fan1: .byte "UNOFFICIAL FAN-MADE DEMAKE", 0
 str_t_fan2: .byte "ORIGINAL ART AND MUSIC", 0
 str_t_sure: .byte "START OVER?", 0
@@ -214,9 +224,9 @@ str_blank:  .byte 0
 ; GARAGE (hub)
 ; ===========================================================================
 garage_main:
-@redraw:
         jsr garage_draw
-@loop:  jsr wait_frame
+garage_loop:
+        jsr wait_frame
         jsr read_pad
         jsr garage_sprites
         lda g_sel
@@ -231,11 +241,11 @@ garage_main:
         lda cheat_debug
         beq :+
         jsr debug_screen
-        bcs @redraw
+        bcs garage_main
         lda #MODE_RACE
         sta next_mode
         rts
-:       jmp @loop
+:       jmp garage_loop
 @go:    lda g_sel
         asl a
         tax
@@ -260,12 +270,23 @@ g_race: FARCALL BANK_MAP, map_screen    ; pick a region first
         rts
 :       jmp garage_main
 g_parts:
+        jsr cur_boss            ; a boss's car stays as the boss built it
+        bne g_locked
         FARCALL BANK_MENU2, parts_screen
         jmp garage_main
+g_locked:
+        MOVI16 ptr0, str_g_locked
+        ldy #16
+        jsr vb_msg
+        lda #SFX_ERROR
+        jsr sfx_play
+        jmp garage_loop
 g_mycars:
         jsr mycars_screen
         jmp garage_main
-g_tune: FARCALL BANK_MENU2, tune_screen
+g_tune: jsr cur_boss
+        bne g_locked
+        FARCALL BANK_MENU2, tune_screen
         jmp garage_main
 g_dealer:
         jsr dealer_screen
@@ -288,7 +309,9 @@ g_options:
 g_stats:
         jsr stats_screen
         jmp garage_main
-g_swap: FARCALL BANK_MAP, swap_screen
+g_swap: jsr cur_boss
+        bne g_locked
+        FARCALL BANK_MAP, swap_screen
         jmp garage_main
 
 ; garage_draw: whole garage screen (PPU off -> on)
@@ -333,7 +356,10 @@ garage_draw:
         jsr print
         lda #0
         sta text_attr
-        jsr cur_car_ptr
+        jsr cur_boss
+        beq :+
+        PRINT str_g_boss, 20, 14
+:       jsr cur_car_ptr
         ldy #15
         jsr stats_line
         jsr print
@@ -604,6 +630,8 @@ str_g2: .byte "MY CARS", 0
 str_g3: .byte "TUNE", 0
 str_g4: .byte "DEALER", 0
 str_g5: .byte "PAINT", 0
+str_g_boss:   .byte "BOSS CAR", 0
+str_g_locked: .byte "LOCKED: THIS IS A BOSS CAR", 0
 str_g6: .byte "CRATES", 0
 str_g7: .byte "DYNO", 0
 str_g8: .byte "OPTIONS", 0
@@ -1940,6 +1968,9 @@ sell_value:
         sta sv_acc,x
         dex
         bpl :-
+        ldy #CR_SWAP            ; a boss's car: its parts came free
+        lda (ptr1),y
+        bmi @sum
         ; parts: half of what every installed level cost
         lda #0
         sta sv_p
@@ -1974,7 +2005,7 @@ sell_value:
         lda sv_p
         cmp #NPARTS
         bne @part
-        ldx #2
+@sum:   ldx #2
 :       lda sv_acc,x
         sta m_a,x
         dex
@@ -2459,6 +2490,8 @@ rw_cash:    .res 3
 rw_xp:      .res 2
 rw_lvup:    .res 1
 rw_newreg:  .res 1          ; region + 1 when this race's XP opened one
+rw_bcar:    .res 1          ; boss + 1 when this race won the boss's car
+rw_bfull:   .res 1          ;   1: no room for it, paid for instead
 rw_reg0:    .res 1
 rw_best:    .res 1
 .segment "BANK1"
@@ -2649,7 +2682,47 @@ results_main:
         ldx #4
         ldy #24
         jsr print
-:       lda #0
+:       lda rw_bcar             ; "YOU WIN THEIR NOVA HYPER!"
+        beq @nobcar
+        lda #$20
+        sta text_attr
+        lda rw_bfull
+        bne @bfull
+        MOVI16 ptr0, str_r_bcar
+        ldy #0
+        jsr cat_ptr0
+        sty tmp7
+        ldx rw_bcar
+        lda boss_model-1,x
+        jsr car_name_ptr
+        ldy tmp7
+        jsr cat_ptr0
+:       dey                     ; (names are padded to 12)
+        lda linebuf,y
+        cmp #' '
+        beq :-
+        iny
+        lda #'!'
+        bne @bend
+@bfull: MOVI16 ptr0, str_r_bfull    ; "NO ROOM FOR IT: SOLD $9,000"
+        ldy #0
+        jsr cat_ptr0
+        sty tmp7
+        jsr bcar_value
+        jsr money_text
+        ldy tmp7
+        jsr cat_ptr0
+        lda #0
+@bend:  sta linebuf,y
+        iny
+        lda #0
+        sta linebuf,y
+        MOVI16 ptr0, linebuf
+        ldx #2
+        ldy #25
+        jsr print
+@nobcar:
+        lda #0
         sta text_attr
         lda rw_best
         beq @help
@@ -2806,6 +2879,8 @@ speed_unit:
 ; apply_rewards: money, xp, best time, ladder progress, stats; then save
 apply_rewards:
         lda #0
+        sta rw_bcar
+        sta rw_bfull
         sta rw_newreg
         sta rw_cash
         sta rw_cash+1
@@ -2911,6 +2986,8 @@ apply_rewards:
         lda SV_LADDER
         cmp #NBOSS
         jcs @pay
+        jsr boss_index          ; beaten for the first time: their car
+        jsr boss_car_win
         inc SV_LADDER
         ; 3 gems for a new boss
         clc
@@ -2996,6 +3073,8 @@ apply_rewards:
         bne @pay
         lda #1
         sta SV_SECRET
+        lda #BOSS_SECRET        ; and their car
+        jsr boss_car_win
         clc
         lda SV_GEMS
         adc #25
@@ -3029,6 +3108,46 @@ apply_rewards:
 
 quick_xp:   .byte 100, 150, 200 ; quick race win: easy, medium, hard
 
+; boss_car_win: A = boss -> their car (model, parts and paint as raced,
+; locked: SWAP_BOSS) joins the garage.  With no room: half its price.
+boss_car_win:
+        sta rw_bcar
+        inc rw_bcar             ; boss + 1
+        jsr free_slot
+        bcs @full
+        jsr slot_ptr
+        ldx rw_bcar
+        lda boss_model-1,x
+        jsr init_record
+        ldx rw_bcar
+        lda boss_paint-1,x
+        ldy #CR_PAINT
+        sta (ptr1),y
+        lda boss_level-1,x
+        ldy #CR_PARTS
+:       sta (ptr1),y
+        iny
+        cpy #CR_PARTS+NPARTS
+        bne :-
+        lda #SWAP_BOSS
+        ldy #CR_SWAP
+        sta (ptr1),y
+        rts
+@full:  lda #1
+        sta rw_bfull
+        jsr bcar_value
+        jmp cash_add
+
+; bcar_value: m_a = what the boss car rw_bcar is worth to sell (half its price)
+bcar_value:
+        ldx rw_bcar
+        lda boss_model-1,x
+        jsr car_price
+        lsr m_a+2
+        ror m_a+1
+        ror m_a
+        rts
+
 ; region_xp: rw_xp += 10 per region (quick and street wins)
 region_xp:
         ldx map_region
@@ -3044,6 +3163,8 @@ region_xp:
 @d:     rts
 
 str_results:  .byte "RESULTS", 0
+str_r_bcar:   .byte "YOU WIN THEIR ", 0
+str_r_bfull:  .byte "NO ROOM FOR IT: SOLD ", 0
 str_r_win:    .byte "YOU WIN!", 0
 str_r_p1win:  .byte "PLAYER 1 WINS!", 0
 str_r_p2win:  .byte "PLAYER 2 WINS!", 0

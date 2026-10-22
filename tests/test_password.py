@@ -33,8 +33,9 @@ def game_state(s):
     swap = lambda slot: s.wram(SV_CARS + slot * 48 + 47)   # engine | drive << 5
     slots = [k for k in range(8) if s.wram(SV_CARS + k * 48) != 0xFF]
     owned = lambda slot: s.wram(SV_OWNED + 3 * slot, 3)
+    fields = lambda v: (pw.BOSS_CAR, 0) if v & 0x80 else (v & 0x1F, v >> 5)   # boss car: 31
     if any(swap(slot) or owned(slot) for slot in slots):     # swapped: version 4
-        cars = [c + (swap(slot) & 0x1F, swap(slot) >> 5) for c, slot in zip(cars, slots)]
+        cars = [c + fields(swap(slot)) for c, slot in zip(cars, slots)]
     if any(owned(slot) for slot in slots):                  # paid-for swaps: version 5
         cars = [c + (owned(slot),) for c, slot in zip(cars, slots)]
     player = dict(cash=s.wram(SV_CASH, 3), gems=s.wram(SV_GEMS, 2), level=s.wram(SV_LEVEL),
@@ -250,7 +251,7 @@ class Passwords(unittest.TestCase):
         t.press(SELECT)
         t.step(40)
         self.assertEqual(t.mem('game_mode'), 0, 'back on the title')
-        self.assertEqual(t.mem('ui_count'), 3)
+        self.assertEqual(t.mem('ui_count'), 4, 'the title menu')
 
     def test_v1_passwords_from_v3_0_still_work(self):
         p = pw.encode_player(250000, 40, 9, 10, 3, 0, 4)      # 15 letters (v3.0)

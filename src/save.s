@@ -187,6 +187,14 @@ cur_car_ptr:
         lda (ptr1),y
         rts
 
+; cur_boss: Z clear if the car in use was won from a boss (ptr1 = it)
+cur_boss:
+        jsr cur_car_ptr
+        ldy #CR_SWAP
+        lda (ptr1),y
+        and #SWAP_BOSS
+        rts
+
 ; free_slot: carry clear and A = first empty slot; carry set if garage full
 free_slot:
         ldx #0

@@ -101,6 +101,7 @@ race_scene: .res 1          ; background: race_theme, + 3 when overcast
 opp_cap:    .res 1          ; easy rivals: power handicap /256 (0 outside quick races)
 race_weather: .res 1        ; W_CLEAR, W_CLOUDY, W_RAIN, W_SNOW (0 outside races)
 weather_force: .res 1       ; tests: weather + 1 for the next races (0 = random)
+theme_force: .res 1         ; tests: time of day + 1 likewise
 copy_bank:  .res 1          ; source bank for chr_copy / bank0_copy (0 = graphics)
 garage_song: .res 1         ; garage theme in use (SONG_GARAGE, SONG_NEON or SONG_NIGHT)
 new_song:   .res 1          ; set by a race: the garage picks a theme again
@@ -157,6 +158,7 @@ cheat_debug:     .byte 0        ; $FFC2  non-zero: SELECT in the garage = debug 
 .include "map.s"
 .include "tune.s"
 .include "swap.s"
+.include "tape.s"
 
 ; ---------------------------------------------------------------------------
 ; Reset stubs: identical in every bank so the console boots no matter which

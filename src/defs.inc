@@ -123,6 +123,8 @@ CR_NOS    = 46                  ;   nitrous: -4 more power .. +4 longer
 CR_SWAP   = 47                  ; swaps: engine id + 1 in bits 0-4, drivetrain
 SWAP_ENG  = $1F                 ;   + 1 in bits 5-6 (0 = the car's own)
 SWAP_DRV  = $60
+SWAP_BOSS = $80                 ;   bit 7: won from a boss (its tune, parts
+                                ;   and swaps are locked)
 CR_SIZE   = 48
 NCELLS    = 8                   ; fuel map cells
 
