@@ -1971,6 +1971,8 @@ pw_print_rows:
 ; game is loaded, 1 if the player backed out.  (A, not carry: farcall's bank
 ; switch shifts through the carry.)
 pw_title:
+        lda #1                  ; the keyboard types here, it isn't a pad
+        sta kb_off
         lda #0
         sta pw_kind
         jsr pw_enter
@@ -1986,8 +1988,11 @@ pw_title:
         jsr pw_apply
         jsr pw_apply_tune
         lda #0
+        sta kb_off
         rts
-@no:    lda #1
+@no:    lda #0
+        sta kb_off
+        lda #1
         rts
 
 ; pw_enter: type password pw_kind.  Carry clear when it decodes.

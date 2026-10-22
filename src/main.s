@@ -55,6 +55,9 @@ next_mode:  .res 1
 oam_idx:    .res 1
 text_attr:  .res 1          ; $00 normal font, $20 colour-3 font
 pad_rep:    .res 1          ; auto-repeat timer
+kb_off:     .res 1          ; 1: the keyboard isn't a controller (it types)
+kb_idle:    .res 1          ; frames until we look for a keyboard again
+kb_k:       .res 5          ; keyboard rows read this frame (1 = key down)
 pad_rpt:    .res 1          ; pad_new plus auto-repeat for d-pad
 sp_x:       .res 1          ; sprite helpers
 sp_y:       .res 1

@@ -274,6 +274,107 @@ wait_frames:
         rts
 
 ; ---------------------------------------------------------------------------
+; kb_pad: A = controller 1 buttons from the Family BASIC keyboard: arrows
+; for the d-pad, X or SPACE = A, Z = B, RETURN = START, ESC = SELECT.  Reads
+; only rows 0, 6, 7 and 8 (about 550 cycles).  Nothing plugged in reads as
+; every key down (an expansion pad drives one bit of four), so more than 6 of
+; those 20 keys down means no keyboard: then look again in a second.
+kb_pad:
+        lda kb_off
+        bne @none
+        lda kb_idle
+        beq :+
+        dec kb_idle
+@none:  lda #0
+        rts
+:       lda #$05                ; row 0, keyboard on
+        sta JOY1
+        lda #$04                ; row 0 column 0: RETURN
+        jsr kb_row
+        sta kb_k
+        ldx #6                  ; on to row 6 (the row steps on column 1 -> 0)
+:       lda #$06
+        sta JOY1
+        lda #$04
+        sta JOY1
+        dex
+        bne :-
+        lda #$06                ; row 6 column 1: X, Z
+        jsr kb_row
+        sta kb_k+1
+        lda #$04                ; row 7 column 0: ESC
+        jsr kb_row
+        sta kb_k+2
+        lda #$06
+        sta JOY1
+        lda #$04                ; row 8 column 0: UP, RIGHT, LEFT
+        jsr kb_row
+        sta kb_k+3
+        lda #$06                ; row 8 column 1: DOWN, SPACE
+        jsr kb_row
+        sta kb_k+4
+        lda #0                  ; keyboard off
+        sta JOY1
+        ldx #4                  ; keys down
+        ldy #0
+@cnt:   lda kb_k,x
+:       lsr a
+        bcc :+
+        iny
+:       bne :--
+        dex
+        bpl @cnt
+        cpy #7
+        bcc @map
+        lda #60                 ; no keyboard
+        sta kb_idle
+        lda #0
+        rts
+@map:   lda #0
+        lsr kb_k                ; row 0: F8, RETURN
+        lsr kb_k
+        bcc :+
+        ora #BTN_START
+:       lsr kb_k+1              ; row 6: X, Z
+        bcc :+
+        ora #BTN_A
+:       lsr kb_k+1
+        bcc :+
+        ora #BTN_B
+:       lsr kb_k+2              ; row 7: F1, ESC
+        lsr kb_k+2
+        bcc :+
+        ora #BTN_SELECT
+:       lsr kb_k+3              ; row 8: CLR, UP, RIGHT, LEFT
+        lsr kb_k+3
+        bcc :+
+        ora #BTN_UP
+:       lsr kb_k+3
+        bcc :+
+        ora #BTN_RIGHT
+:       lsr kb_k+3
+        bcc :+
+        ora #BTN_LEFT
+:       lsr kb_k+4              ; and DOWN, SPACE
+        bcc :+
+        ora #BTN_DOWN
+:       lsr kb_k+4
+        bcc :+
+        ora #BTN_A
+:       rts
+
+; kb_row: A to $4016, wait for the keyboard, A = its keys down (bits 0-3)
+kb_row:
+        sta JOY1
+        ldx #9
+:       dex
+        bne :-
+        lda JOY2
+        lsr a
+        and #$0F
+        eor #$0F
+        rts
+
 ; read_pad: pad, pad_new (newly pressed), pad_rpt (new + d-pad auto-repeat)
 ; ---------------------------------------------------------------------------
 read_pad:
@@ -297,6 +398,9 @@ read_pad:
         rol pad                 ; the sentinel bit ends the loop after 8
         bcc @rd
         ; Famicom expansion controllers on bit 1 are folded in above.
+        jsr kb_pad              ; and the Family BASIC keyboard as controller 1
+        ora pad
+        sta pad
         lda pad2_old
         eor #$FF
         and pad2

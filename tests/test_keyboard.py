@@ -31,7 +31,8 @@ class Port(Memory):
     def __getitem__(self, a):
         if a == 0x4017:
             t = self.cpu.processorCycles
-            assert t - self.wrote >= 50, 'read %d cycles after a write' % (t - self.wrote)
+            if self.on:                              # (controller reads: keyboard off)
+                assert t - self.wrote >= 50, 'read %d cycles after a write' % (t - self.wrote)
             if self.device == 'none':
                 return 0x40
             if self.device == 'pad':
@@ -114,6 +115,44 @@ class Keyboard(unittest.TestCase):
     def test_scan_leaves_the_keyboard_off(self):
         self.scan('A')
         self.assertFalse(self.port.on, 'so it does not answer the controller reads')
+
+
+BTN = dict(A=0x80, B=0x40, SELECT=0x20, START=0x10, UP=0x08, DOWN=0x04, LEFT=0x02, RIGHT=0x01)
+
+
+class KeyboardPad(unittest.TestCase):
+    """The keyboard as controller 1, everywhere but the password screen."""
+    setUp = Keyboard.setUp
+
+    def pad(self, *keys):
+        self.port.down = set(keys)
+        self.c.call('read_pad')
+        return self.c['pad']
+
+    def test_keys_press_buttons(self):
+        for key, button in (('UP', 'UP'), ('DOWN', 'DOWN'), ('LEFT', 'LEFT'), ('RIGHT', 'RIGHT'),
+                            ('X', 'A'), ('SPACE', 'A'), ('Z', 'B'), ('RETURN', 'START'),
+                            ('ESC', 'SELECT')):
+            self.assertEqual(self.pad(key), BTN[button], key)
+        self.assertEqual(self.pad('X', 'RIGHT', 'Z'), BTN['A'] | BTN['RIGHT'] | BTN['B'],
+                         'gas, shift and nitrous together')
+        self.assertEqual(self.pad('Q', 'F1', 'K'), 0, 'other keys do nothing')
+        self.pad('X')
+        self.assertLess(self.c.cycles, 1500, 'cheap enough for a race frame')
+        self.assertEqual(self.port.on, False, 'the keyboard is left off')
+
+    def test_no_keyboard_is_no_buttons_and_cheap(self):
+        for device in ('none', 'pad'):
+            self.setUp()
+            self.port.device = device
+            self.assertEqual(self.pad(), 0, device)
+            self.assertEqual(self.c['kb_idle'], 60, 'look again in a second')
+            self.pad()
+            self.assertLess(self.c.cycles, 400, 'meanwhile it costs next to nothing')
+
+    def test_not_while_typing_a_password(self):
+        self.c.put('kb_off', 1)
+        self.assertEqual(self.pad('X', 'RETURN'), 0)
 
 
 if __name__ == '__main__':

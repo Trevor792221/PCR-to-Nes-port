@@ -78,6 +78,11 @@ jumps to any ladder boss.
 | Start | Pause | |
 | Select | Quit, while paused | Sell car (My Cars) |
 
+**Famicom keyboard.** With the Family BASIC keyboard plugged in you can play
+on it instead: the **arrow keys** are the d-pad, **X** or **SPACE** is A,
+**Z** is B, **RETURN** is START and **ESC** is SELECT. The controller still
+works alongside it. On the password screen the keyboard types instead.
+
 **How to race.** Hold **A** to rev while the amber lights come on. When the
 light turns green, press **Right** to drop the clutch. Pressing it before
 green is a foul start, and you lose. Shift once the tach passes the orange
@@ -232,6 +237,8 @@ bleed edge to the edge of the label recess.
   the Family BASIC keyboard: every letter types itself, DEL and RETURN work,
   a held key types once, the reads wait for the keyboard, and nothing
   plugged in (or an expansion pad) types nothing.
+  It also checks the keyboard as controller 1: each key's button, several at
+  once, no keyboard (or an expansion pad) pressing nothing, and the cost.
 * `tests/test_tape.py` runs the data recorder on py65 against a model of the
   tape port: a save goes onto tape and back, through Mesen's way of
   recording, a flipped signal, a tape 10% fast or slow and timing wobble;

@@ -118,7 +118,8 @@ class Tape(unittest.TestCase):
         # Mesen records each stretch with the level written at its end;
         # a real deck may flip the signal, run fast or slow, and wobble
         for kind, speed, jitter in (('mesen', 1, 0), ('inverted', 1, 0), ('direct', .9, 0),
-                                    ('direct', 1.1, 0), ('mesen', 1.08, 60), ('inverted', .92, 60)):
+                                    ('direct', 1.1, 0), ('mesen', 1.08, 60), ('inverted', .92, 60),
+                                    ('direct', .85, 80), ('mesen', 1.15, 80)):
             c, result = self.load(variant(self.tape, kind, speed, jitter))
             self.assertEqual(result, TP_OK, (kind, speed, jitter))
             self.assertEqual(bytes(c.mem[0x6400:0x6600]), self.saved, (kind, speed, jitter))

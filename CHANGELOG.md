@@ -3,6 +3,11 @@
 Every version of Pixel Racer NES, newest first. Downloads are on the
 [Releases page](https://github.com/Trevor792221/PCR-to-Nes-port/releases).
 
+## v5.6: Play on the keyboard (2026-10-22)
+
+* **Famicom keyboard as a controller.** Play the whole game on the Family BASIC keyboard: the arrow keys are the d-pad, X or SPACE is A (gas), Z is B (nitrous), RETURN is START and ESC is SELECT. The controller still works at the same time. On the password screen the keyboard types letters as before. With no keyboard plugged in nothing changes.
+* The data recorder loads more reliably: it times the tape against its own lead-in, so a deck running up to 15% fast or slow, or with a wobbly signal, still loads. Tapes saved with v5.5 still work.
+
 ## v5.5: Battery saves, boss cars, data recorder (2026-10-22)
 
 * **Win the bosses' cars.** The first time you beat a boss, their car is yours, just as they raced it: the same model, parts and paint, marked BOSS CAR in the garage. Its tune, parts and swaps are locked (it stays as the boss built it), but you can repaint it, and race it or sell it. It sells for half the car's price, since its parts came free. With a full garage it's sold for you straight away. The garage password keeps boss cars as they are, and passwords for garages without one are unchanged.

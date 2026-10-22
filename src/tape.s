@@ -25,6 +25,9 @@ tp_sum:     .res 1
 tp_sum2:    .res 1
 tp_t:       .res 1          ; loading: halves and silences seen, for B checks
 tp_sel:     .res 1
+tp_s:       .res 2          ; loading: 16 short halves' worth (tp_avg)
+tp_q:       .res 2
+tp_pair:    .res 1          ; a bit's two halves from which it's a 1
 .segment "BANK6"
 
 TP_SHORT = 80                   ; half a 0: 80 x 5 cycles (about 2.2 kHz)
@@ -32,6 +35,9 @@ TP_LONG  = 160                  ; half a 1: about 1.1 kHz
 TP_LOOP  = 17                   ; cycles per tp_half count
 TP_HALF  = (TP_SHORT + TP_LONG) * 5 / 2 / TP_LOOP   ; a long half from here
 TP_PAIR  = TP_HALF * 2          ; a 1 bit from here (both halves added)
+TP_LEADX = 10                   ; lead-in: counts its loop spends between halves
+TP_LEADL = TP_HALF + TP_LEADX + 2   ; a lead-in half this long isn't a short one
+TP_LEADY = 3                    ; the start bit search: likewise
 TP_LEAD  = 2000                 ; lead-in bits: about 0.9 s
 TP_FOUND = 255                  ; short halves in a row that make a lead-in
 TP_SIZE  = $200                 ; bytes saved: $6000-$61FF
@@ -137,31 +143,76 @@ tape_read:
         sta tp_t
 @seek:  lda #0                  ; short halves in a row
         sta tp_n
+        sta tp_a                ; the half before this one
+        lda #<(16*25)           ; 16 short halves (a guess, until the
+        sta tp_s                ; lead-in says how fast this tape runs)
+        lda #>(16*25)
+        sta tp_s+1
 @s1:    inc tp_t                ; every 256 halves or silences: B?
         bne @s2
+        lda tp_n                ; (not in a lead-in: stopping to look could
+        cmp #16                 ; cut the start bit short)
+        bcs @s2
+        lda kb_off              ; (not the keyboard: reading it takes
+        pha                     ; long enough to miss the tape's edges)
+        lda #1
+        sta kb_off
         jsr read_pad
+        pla
+        sta kb_off
         lda #$04                ; (read_pad turned the port off)
         sta JOY1
+        lda JOY1                ; and where the signal is now
+        and #2
+        sta tp_lvl
         lda pad
         and #BTN_B
         beq @s2
         lda #TP_CANCEL
         rts
-@s2:    jsr tp_half
+@s2:    ldx #TP_LEADX           ; (counting the time since the last edge)
+        jsr tp_half_x
         bcs @seek               ; silence
-        cpx #TP_HALF
-        bcs @long
+        cpx #TP_LEADL
+        bcs @seek               ; a long half before a lead-in: start over
+        jsr tp_avg
         inc tp_n
-        bne @s1
-        dec tp_n                ; (stays at 255)
-        bne @s1
-@long:  lda tp_n                ; after a lead-in: the start bit
+        lda tp_n
         cmp #TP_FOUND
-        bcc @seek
-        jsr tp_half             ; its second half
-        bcs @bad
-        cpx #TP_HALF
-        bcc @bad
+        bcc @s1
+        ; A lead-in: the start bit is the first two halves in a row worth
+        ; 3.5 short ones or more (two long halves are 4; a short and a
+        ; long, however the halves pair up, are 3), measured against the
+        ; lead-in's own short halves, so the tape's speed doesn't matter.
+        ; A tight loop from here, so its counts are the halves' own.
+        jsr tp_sixteenth        ; 3.5 short halves = 4 - 0.5:
+        asl tp_q                ; tp_q = tp_s / 16 = one short half
+        asl tp_q                ; (the average: 0-255)
+        lda tp_q
+        sta tp_len              ; 4 of them
+        lsr tp_q
+        lsr tp_q
+        lsr tp_q
+        sec
+        sbc tp_q                ; less half of one
+        sta tp_len
+@lead:  ldx #TP_LEADY
+        jsr tp_half_x
+        bcs @seek
+        txa
+        clc
+        adc tp_a
+        bcs @start              ; (way over)
+        cmp tp_len
+        bcs @start
+        stx tp_a
+        jmp @lead
+@start: jsr tp_sixteenth        ; from here a bit is a 1 when its halves are
+        lda tp_q                ; worth 3 short ones or more (a 0 is 2, a 1
+        asl a                   ; is 4): 3S, less 1 for tp_get's own time
+        adc tp_q
+        sbc #0                  ; (carry clear: -1)
+        sta tp_pair
         lda #0
         sta tp_sum
         sta tp_sum2
@@ -212,6 +263,41 @@ tape_read:
 @bad2:  lda #TP_BAD
         rts
 
+; tp_avg: X = a short half -> tp_a, and into tp_s, 16 short halves'
+; worth (tp_s = tp_s * 15/16 + X: steady over the last 16 or so)
+tp_avg: stx tp_a
+        jsr tp_sixteenth
+        sec
+        lda tp_s
+        sbc tp_q
+        sta tp_s
+        lda tp_s+1
+        sbc #0
+        sta tp_s+1
+        clc
+        lda tp_s
+        adc tp_a
+        sta tp_s
+        bcc :+
+        inc tp_s+1
+:       rts
+
+; tp_sixteenth: tp_q = tp_s / 16 (one short half, 8 bits)
+tp_sixteenth:
+        lda tp_s+1
+        sta tp_q+1
+        lda tp_s
+        lsr tp_q+1
+        ror a
+        lsr tp_q+1
+        ror a
+        lsr tp_q+1
+        ror a
+        lsr tp_q+1
+        ror a
+        sta tp_q
+        rts
+
 ; tp_get: A = a byte off the tape, low bit first.  Carry set: the signal
 ; stopped.
 tp_get:
@@ -225,7 +311,9 @@ tp_get:
         txa
         clc
         adc tp_a
-        cmp #TP_PAIR            ; carry = the bit
+        bcs :+                  ; (way over: a 1)
+        cmp tp_pair             ; carry = the bit
+:
         ror tp_v
         dec tp_k
         bne @b
@@ -237,6 +325,7 @@ tp_get:
 ; counts.  Carry set if it didn't within 255 (silence).
 tp_half:
         ldx #0
+tp_half_x:                      ; (X = counts already gone since the edge)
 :       inx                     ; 2
         beq @quiet              ; 2
         lda JOY1                ; 4
