@@ -2,26 +2,51 @@
 ; save.s -- battery-backed save in WRAM (fixed bank)
 ; ===========================================================================
 
-save_magic: .byte "PXR3"          ; WRAM layout (48-byte car records)
+save_magic: .byte "PXR4"          ; WRAM layout (48-byte car records, SV_OWNED)
 
-; save_load: keep what's in WRAM across a reset if it's valid (there's no
-; battery: progress is kept as passwords), otherwise start a new game
+; The save lives in battery-backed WRAM at $6000 and the game changes it in
+; place, then save_write seals it with a checksum and copies it to
+; SV_BACKUP.  A power cut between a change and its save_write leaves a save
+; that fails the checksum: the backup, the last sealed save, takes its place.
+SV_BACKUP = $7000               ; $6000-$61FF as of the last save_write
+.assert SV_SUM + 2 <= $6200, error, "the save outgrew its backup"
+
+; save_load: keep the save if it's valid, else the backup if that is,
+; otherwise start a new game
 save_load:
+        jsr save_valid
+        bcs @ok
+        ldx #0                  ; the backup
+:       lda SV_BACKUP,x
+        sta $6000,x
+        lda SV_BACKUP+$100,x
+        sta $6100,x
+        inx
+        bne :-
+        jsr save_valid
+        jcc new_game
+@ok:    jsr cash_clamp          ; saves from before the cash cap
+        jmp save_write
+
+; save_valid: carry set if WRAM holds a save (its magic and checksum)
+save_valid:
         ldx #3
 @m:     lda SAVE_MAGIC,x
         cmp save_magic,x
-        jne new_game
+        bne @no
         dex
         bpl @m
         jsr save_sum
         lda tmp0
         cmp SV_SUM
-        jne new_game
+        bne @no
         lda tmp1
         cmp SV_SUM+1
-        jne new_game
-        jsr cash_clamp          ; saves from before the cash cap
-        jmp save_write
+        bne @no
+        sec
+        rts
+@no:    clc
+        rts
 
 ; new_game: wipe the save and give the player a starter car
 new_game:
@@ -82,6 +107,17 @@ save_write:
         sta SV_SUM
         lda tmp1
         sta SV_SUM+1
+        txa                     ; (keeps X)
+        pha
+        ldx #0                  ; and the backup
+:       lda $6000,x
+        sta SV_BACKUP,x
+        lda $6100,x
+        sta SV_BACKUP+$100,x
+        inx
+        bne :-
+        pla
+        tax
         rts
 
 ; save_sum: tmp0/tmp1 = 16-bit sum of $6004..SV_END-1 (rotating)

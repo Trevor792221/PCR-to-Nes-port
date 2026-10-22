@@ -623,6 +623,29 @@ class Features(unittest.TestCase):
         self.assertEqual(s.mem('res_flags') & 0x12, 0x02, 'foul, no launch')
         self.assertFalse((s.frame[88:96, 152:200] == perfect).all(), 'a dash, not 0.000')
 
+    def test_race_again_only_races_a_boss_open_here(self):
+        def beat_boss(ladder):
+            s = new_game()
+            give_car(s, 0, 11, 4)                    # fast enough for any early boss
+            s.nes[0x600C] = ladder                   # SV_LADDER: bosses beaten
+            start_race(s, 0)
+            drive_race(s, launch=5000)
+            s.step(60)
+            self.assertEqual(s.mem('game_mode'), 3)
+            self.assertEqual(s.wram(0x600C), ladder + 1, 'beat the boss')
+            s.press(START)                           # race again: the next boss
+            s.step(60)
+            return s
+        # boss 2 (Fukuoka) next: races
+        self.assertEqual(beat_boss(0).mem('game_mode'), 2)
+        # boss 3 lives in Hiroshima, and level 2 hasn't opened it: stays on the results
+        s = beat_boss(1)
+        self.assertEqual(s.mem('game_mode'), 3, 'not raced from Fukuoka')
+        self.assertEqual(s.wram(0x600C), 2)
+        s.press(A)                                   # back to the garage as usual
+        s.step(60)
+        self.assertEqual(s.mem('game_mode'), 1)
+
     def test_two_player_foul_start(self):
         s = new_game()
         self.start_two(s)
@@ -660,23 +683,23 @@ class Features(unittest.TestCase):
         self.assertIn(s.mem('mus_song'), (0, 4, 5), 'a garage theme again')
         self.assertTrue(playing(s), 'not silent after the jingle')
 
-    def test_garage_day_and_night_after_races(self):
+    def test_garage_day_sunset_and_night_after_races(self):
         from test_game import start_race
         s = new_game()
         seen = set()
-        for _ in range(8):
+        for _ in range(12):
             start_race(s, 4)
             drive_race(s, launch=4500, shift_margin=300)
             s.step(60)
             s.press(A)
             s.step(100)
-            night, song = s.mem('garage_night'), s.mem('mus_song')
-            if night:
+            look, song = s.mem('garage_look'), s.mem('mus_song')
+            if look == 1:
                 self.assertEqual(song, 5, 'night garage plays After Hours')
             else:
-                self.assertIn(song, (0, 4), 'day garage plays a day theme')
-            seen.add(night)
-        self.assertEqual(seen, {0, 1}, 'both day and night came up')
+                self.assertIn(song, (0, 4), 'day and sunset garages play a day theme')
+            seen.add(look)
+        self.assertEqual(seen, {0, 1, 2}, 'day, night and sunset all came up')
 
     def test_quit_to_title_from_options(self):
         s = new_game()

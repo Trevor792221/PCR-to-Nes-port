@@ -7,8 +7,14 @@
 ;               stock and are bought back at 3/4 of what they cost, and the
 ;               engine tune (fuel map, timing, boost, 2-step, nitrous) is reset.
 ;   drivetrain  FWD, RWD or AWD for DRIVE_GEMS.
-;   Going back to the car's own engine or drivetrain is free.  The crate
-;   car can't be swapped.
+;   Going back to the car's own engine or drivetrain is free, and so is
+;   anything the car has had fitted before: each is paid for once.  The
+;   crate car can't be swapped.
+;
+;   SV_OWNED (3 bytes a slot) holds what a car has paid for and isn't
+;   fitted now: bit e for engine e, bit OWN_DRV + d for drivetrain d.  A
+;   swap sets the bit of what comes out (unless it's the car's own) and
+;   clears the bit of what goes in, so a car with nothing spare is all 0.
 ; ===========================================================================
 
 .segment "BSS"
@@ -34,6 +40,7 @@ SW_DRV  = 1
 SW_BACK = 2
 SW_IY = 17                      ; info box lines 17-22
 SW_MY = 24                      ; message line
+OWN_DRV = 20                    ; SV_OWNED: drivetrain bits from here
 
 ; ---------------------------------------------------------------------------
 ; swap_screen
@@ -398,6 +405,10 @@ si_estat:
         ldx sw_e
         cmp swap_eng,x
         jeq si_free
+        lda swap_eng,x          ; paid for before?
+        jsr sw_owned
+        jne si_free
+        ldx sw_e
         ldy swap_eng,x          ; locked below its level?
         lda SV_LEVEL
         cmp eng_level,y
@@ -443,6 +454,11 @@ si_dstat:
         lda car_drive,x
         cmp sw_d
         beq si_free
+        lda sw_d                ; paid for before?
+        clc
+        adc #OWN_DRV
+        jsr sw_owned
+        bne si_free
         lda #DRIVE_GEMS
 si_gems:                        ; "A: SWAP FOR 10 GEMS"
         sta m_a
@@ -499,6 +515,10 @@ sw_buy_engine:
         ldx sw_e
         cmp swap_eng,x
         beq @free               ; back to its own engine
+        lda swap_eng,x
+        jsr sw_owned
+        bne @free               ; or one it has had before
+        ldx sw_e
         ldy swap_eng,x
         lda SV_LEVEL
         cmp eng_level,y
@@ -509,7 +529,8 @@ sw_buy_engine:
         jsr sw_pay
         bcs @free
         rts
-@free:  jsr cur_car_ptr
+@free:  jsr sw_mark_engine
+        jsr cur_car_ptr
         jsr sw_refund           ; old engine's parts: back to stock, 3/4 back
         ldy #CR_FUEL            ; and its tune: fuel map, timing,
         lda #0
@@ -575,11 +596,17 @@ sw_buy_drive:
         lda car_drive,x
         cmp sw_d
         beq @free
+        lda sw_d                ; had it before?
+        clc
+        adc #OWN_DRV
+        jsr sw_owned
+        bne @free
         lda #DRIVE_GEMS
         jsr sw_pay
         bcs @free
         rts
-@free:  jsr cur_car_ptr
+@free:  jsr sw_mark_drive
+        jsr cur_car_ptr
         tax
         lda car_drive,x
         cmp sw_d
@@ -616,6 +643,77 @@ sw_bought:
         jsr vb_str
         jsr wait_frame
         jmp sw_info
+
+; sw_mark_engine / sw_mark_drive: before a swap, the engine (drivetrain)
+; coming out counts as paid for unless it's the car's own, and the one going
+; in (sw_e / sw_d) is fitted, so it no longer counts
+sw_mark_engine:
+        jsr cur_car_ptr
+        ldy #CR_SWAP
+        lda (ptr1),y
+        and #SWAP_ENG
+        beq :+
+        sec
+        sbc #1
+        jsr sw_own_set
+:       ldx sw_e
+        lda swap_eng,x
+        jmp sw_own_clr
+sw_mark_drive:
+        jsr cur_car_ptr
+        ldy #CR_SWAP
+        lda (ptr1),y
+        and #SWAP_DRV
+        beq :+
+        lsr a                   ; drivetrain + 1
+        lsr a
+        lsr a
+        lsr a
+        lsr a
+        clc
+        adc #OWN_DRV-1
+        jsr sw_own_set
+:       lda sw_d
+        clc
+        adc #OWN_DRV
+        jmp sw_own_clr
+
+; sw_own_bit: A = SV_OWNED bit -> X = its byte for the car in use, A = mask
+sw_own_bit:
+        pha
+        and #7
+        tay
+        lda SV_CURCAR           ; slot * 3
+        sta sw_l
+        asl a
+        adc sw_l
+        sta sw_l
+        pla
+        lsr a
+        lsr a
+        lsr a
+        clc
+        adc sw_l
+        tax
+        lda sw_mask,y
+        rts
+; sw_owned: A = bit -> Z clear if the car has paid for it
+sw_owned:
+        jsr sw_own_bit
+        and SV_OWNED,x
+        rts
+sw_own_set:
+        jsr sw_own_bit
+        ora SV_OWNED,x
+        sta SV_OWNED,x
+        rts
+sw_own_clr:
+        jsr sw_own_bit
+        eor #$FF
+        and SV_OWNED,x
+        sta SV_OWNED,x
+        rts
+sw_mask: .byte $01, $02, $04, $08, $10, $20, $40, $80
 
 ; sw_pay: A = gems.  Carry set and paid, or carry clear (and said why).
 sw_pay:

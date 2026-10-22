@@ -9,11 +9,14 @@ sys.path.insert(0, os.path.join(HERE, '..', 'tools'))
 import gamedata as gd          # noqa: E402
 from mkdata import TIERS       # noqa: E402
 from harness import *          # noqa: E402,F401,F403
-from test_game import new_game, start_race, SV_CARS, SV_CASH   # noqa: E402
+from test_game import new_game, start_race, SV_CARS, SV_CASH, G_MYCARS   # noqa: E402
+SV_CURCAR = 0x600D
 from test_features import give_car                             # noqa: E402
 
 G_SWAP = 10
 SV_GEMS, SV_LEVEL = 0x6007, 0x600B
+SV_OWNED = 0x61B0                            # 3 bytes a slot: what it has paid for
+OWN_DRV = 20
 CR_PARTS, CR_FUEL, CR_TIMING, CR_TIREP, CR_BOOST, CR_LAUNCH, CR_NOS, CR_SWAP = \
     1, 34, 42, 43, 44, 45, 46, 47
 ROTOR = gd.NCARS + 1                         # engine ids after the cars' own
@@ -105,11 +108,72 @@ class Swap(unittest.TestCase):
         self.assertEqual(self.engine(s), 0, 'too low a level')
         s = garage(0, gems=4, level=20)
         open_swap(s)
-        pick_engine(s, 1)                            # 5 gems
+        pick_engine(s, 1)                            # 10 gems
         s.press(A)
         s.step(30)
         self.assertEqual(self.engine(s), 0, 'not enough gems')
         self.assertEqual(s.wram(SV_GEMS), 4)
+
+    def owned(self, s, slot=0):
+        return s.wram(SV_OWNED + 3 * slot, 3)
+
+    def swap_engine(self, s, engine):
+        pick_engine(s, engine)
+        s.press(A)
+        s.step(60)
+        self.assertEqual(self.engine(s), 0 if engine == 4 else engine + 1)
+
+    def test_an_engine_is_paid_for_once(self):
+        s = garage(4, gems=100)                      # Hollis SS: its own 5.7 V8 is engine 4
+        open_swap(s)
+        self.swap_engine(s, ROTOR)
+        rotor = gd.ENGINES[ROTOR][5]
+        self.assertEqual(s.wram(SV_GEMS), 100 - rotor)
+        self.assertEqual(self.owned(s), 0, 'fitted: nothing spare yet')
+        self.swap_engine(s, 4)                       # back to its own: free
+        self.assertEqual(self.owned(s), 1 << ROTOR, 'the rotary is paid for')
+        self.swap_engine(s, ROTOR)                   # and back again: free this time
+        self.assertEqual(s.wram(SV_GEMS), 100 - rotor)
+        self.assertEqual(self.owned(s), 0)
+        self.swap_engine(s, BIG_BLOCK)
+        big = gd.ENGINES[BIG_BLOCK][5]
+        self.assertEqual(s.wram(SV_GEMS), 100 - rotor - big)
+        self.assertEqual(self.owned(s), 1 << ROTOR)
+        self.swap_engine(s, ROTOR)
+        self.swap_engine(s, BIG_BLOCK)
+        self.assertEqual(s.wram(SV_GEMS), 100 - rotor - big, 'every engine it has had is free')
+        self.assertEqual(self.owned(s), 1 << ROTOR)
+        self.assertEqual(s.mem('lag'), 0)
+        # another car has paid for nothing
+        give_car(s, 1, 4, 0)
+        self.assertEqual(self.owned(s, 1), 0)
+
+    def test_a_drivetrain_is_paid_for_once(self):
+        s = garage(1, gems=50)                       # Komet: FWD
+        open_swap(s)
+        for drive, gems in ((gd.AWD, 40), (gd.RWD, 30), (gd.FWD, 30), (gd.AWD, 30), (gd.RWD, 30)):
+            pick_drive(s, drive)
+            s.press(A)
+            s.step(60)
+            self.assertEqual(self.drive(s), 0 if drive == gd.FWD else drive + 1)
+            self.assertEqual(s.wram(SV_GEMS), gems)
+        self.assertEqual(self.owned(s), 1 << OWN_DRV + gd.AWD)
+
+    def test_selling_a_car_forgets_its_swaps(self):
+        s = garage(4, gems=100)
+        give_car(s, 1, 1, 0)
+        s.nes[SV_OWNED + 3], s.nes[SV_OWNED + 5] = 0xFF, 0x70
+        s.nes[SV_CURCAR] = 0
+        s.garage_goto(G_MYCARS)
+        s.press(A)
+        s.step(30)
+        s.list_goto('mc_sel', 1)
+        s.press(SELECT)                              # sell
+        s.step(30)
+        s.press(A)
+        s.step(30)
+        self.assertEqual(s.wram(SV_CARS + 48), 0xFF, 'sold')
+        self.assertEqual(self.owned(s, 1), 0)
 
     def test_drivetrain_swap(self):
         s = garage(1)                                # Komet: FWD

@@ -16,6 +16,7 @@ SV_CARS_ = SV_CARS
 SV_GEMS, SV_XP, SV_LEVEL, SV_LADDER, SV_CURCAR = 0x6007, 0x6009, 0x600B, 0x600C, 0x600D
 SV_OPTIONS, SV_SECRET = 0x600E, 0x6018
 PW_TEXT = 0x6900
+SV_OWNED = 0x61B0               # 3 bytes a slot: swaps paid for, not fitted
 SV_WINS, SV_LOSSES, SV_CRATES, SV_STREET = 0x600F, 0x6011, 0x6013, 0x6017
 SV_RACES, SV_PBEST, SV_PBCAR, SV_TOPSPD = 0x6019, 0x601B, 0x601D, 0x601E
 
@@ -31,8 +32,11 @@ def game_state(s):
         cars.append((s.wram(b), [s.wram(b + 1 + i) for i in range(14)], s.wram(b + 15)))
     swap = lambda slot: s.wram(SV_CARS + slot * 48 + 47)   # engine | drive << 5
     slots = [k for k in range(8) if s.wram(SV_CARS + k * 48) != 0xFF]
-    if any(swap(slot) for slot in slots):                   # swapped: version 4
+    owned = lambda slot: s.wram(SV_OWNED + 3 * slot, 3)
+    if any(swap(slot) or owned(slot) for slot in slots):     # swapped: version 4
         cars = [c + (swap(slot) & 0x1F, swap(slot) >> 5) for c, slot in zip(cars, slots)]
+    if any(owned(slot) for slot in slots):                  # paid-for swaps: version 5
+        cars = [c + (owned(slot),) for c, slot in zip(cars, slots)]
     player = dict(cash=s.wram(SV_CASH, 3), gems=s.wram(SV_GEMS, 2), level=s.wram(SV_LEVEL),
                   xp=s.wram(SV_XP, 2), ladder=s.wram(SV_LADDER), secret=s.wram(SV_SECRET),
                   options=s.wram(SV_OPTIONS))
@@ -149,9 +153,16 @@ class Passwords(unittest.TestCase):
                 if not any(any(c[3:]) for c in cars):
                     ver = 3
                     cars = [c[:3] for c in cars]
+            if ver == 4 and rnd.random() < .5:       # swaps paid for: version 5
+                ver = 5
+                own = lambda: (rnd.getrandbits(17) & ~(1 << 12)) | rnd.getrandbits(3) << pw.OWN_DRV
+                cars = [c + (0 if c[0] == 12 or rnd.random() < .4 else own(),) for c in cars]
+                if not any(c[5] for c in cars):
+                    ver = 4
+                    cars = [c[:5] for c in cars]
             cur = rnd.randrange(n)
             g = pw.encode_garage(cars, cur)
-            self.assertEqual(len(g), pw.garage_len(n, ver))
+            self.assertEqual(len(g), pw.garage_len(n, ver, sum(1 for c in cars if c[5:] and c[5])))
             self.assertEqual(pw.decode_garage(g), dict(cars=cars, cur=cur))
             # a single wrong letter is caught (checksum / range checks)
             i = rnd.randrange(len(p))
@@ -296,10 +307,13 @@ class Passwords(unittest.TestCase):
         stock = [(2, [0] * 12, *(lambda r: (r[0], r[1:]))(pw._stock_ratios(2)))]
         self.assertEqual(pw.encode_tune(stock), '', 'nothing tuned: no password')
 
-    def tune_round_trip(self, slots, models, full=False):
+    def tune_round_trip(self, slots, models, full=False, owned=None):
         s = new_game()
         for slot, m in zip(slots, models):
             give_car(s, slot, m, 2)
+        for slot, bits in (owned or {}).items():
+            for i in range(3):
+                s.nes[SV_OWNED + 3 * slot + i] = bits >> 8 * i & 0xFF
         s.nes[SV_CURCAR] = slots[-1]
         tune_cars(s, random.Random(len(slots)), slots[:-1] if not full else slots, full)
         player, cars, cur = game_state(s)
@@ -307,6 +321,7 @@ class Passwords(unittest.TestCase):
         want = pw.encode_tune(tunes)
         show_passwords(s)
         g = ''.join(pw.ALPHABET[s.nes[PW_TEXT + i]] for i in range(s.mem('pw_len')))
+        self.assertEqual(g, pw.encode_garage(cars, cur))
         s.press(A)                                   # page 2: the tune password
         s.step(40)
         rom = ''.join(pw.ALPHABET[s.nes[PW_TEXT + i]] for i in range(s.mem('pw_len')))
@@ -318,7 +333,9 @@ class Passwords(unittest.TestCase):
         t.step(60)
         self.assertEqual(t.mem('game_mode'), 1, 'in the garage')
         self.assertEqual(garage_tunes(t), tunes)
+        self.assertEqual(game_state(t), (player, cars, cur))
         self.assertEqual(t.mem('lag'), 0)
+        self.garage = g
         return want
 
     def test_tunes_survive_a_fresh_console(self):
@@ -328,6 +345,36 @@ class Passwords(unittest.TestCase):
     def test_eight_tuned_cars_scroll(self):
         t = self.tune_round_trip(list(range(8)), [11, 9, 8, 7, 10, 5, 2, 12], full=True)
         self.assertGreater(len(t), 160, 'long enough to scroll the entry')
+
+    def test_paid_swaps_survive_a_fresh_console(self):
+        # every car has paid-for swaps and a full tune: the longest passwords
+        own = {k: (0x1EFFF & ~(1 << k)) | (5 << pw.OWN_DRV if k % 2 else 2 << pw.OWN_DRV)
+               for k in range(8)}
+        self.tune_round_trip(list(range(8)), [11, 9, 8, 7, 10, 5, 2, 0], full=True, owned=own)
+        self.assertEqual(len(self.garage), 119)
+        # the starter car and two more, one with one spare engine
+        self.tune_round_trip([2, 6], [1, 4], owned={6: 1 << 14})
+        self.assertEqual(len(self.garage), pw.garage_len(3, 5, spare=1))
+        self.assertGreater(len(self.garage), pw.garage_len(3, 4))
+
+    def test_paid_swaps_the_crate_car_cant_have(self):
+        # the crate car paying for swaps, and anyone owning the crate car's engine
+        for cars in ([(12, [0] * 14, 0x16, 0, 0, 1 << 3)],
+                     [(4, [0] * 14, 0x16, 0, 0, 1 << 12)]):
+            g = pw.encode_garage(cars, 0)
+            self.assertIsNone(pw.decode_garage(g))
+            t = to_password_screen()
+            type_password(t, pw.encode_player(3000, 5, 1, 0, 0, 0, 0, dict.fromkeys(dict(pw.STATS), 0)))
+            type_password(t, g)
+            self.assertEqual(t.mem('pw_kind'), 1, 'refused: still on password 2')
+        # version 4 cut short, or with a letter too many, is refused too
+        g = pw.encode_garage([(4, [0] * 14, 0x16, 14, 1, 1 << 15)], 0)
+        for wrong in (g[:-1], g + 'A'):
+            self.assertIsNone(pw.decode_garage(wrong))
+            t = to_password_screen()
+            type_password(t, pw.encode_player(3000, 5, 1, 0, 0, 0, 0, dict.fromkeys(dict(pw.STATS), 0)))
+            type_password(t, wrong)
+            self.assertEqual(t.mem('pw_kind'), 1, 'refused: still on password 2')
 
     def test_wrong_tune_password_is_refused(self):
         s = new_game()

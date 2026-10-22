@@ -302,13 +302,14 @@ garage_draw:
         beq @same               ; then the music to match
         lda #0
         sta new_song
-        jsr rand
-        and #1
-        sta garage_night
-        beq :+
+        lda #3                  ; day, night or sunset
+        jsr rand_below
+        sta garage_look
+        cmp #GL_NIGHT
+        bne :+
         lda #SONG_NIGHT         ; night: "After Hours"
         bne @song
-:       lda #SONG_GARAGE        ; day: one of the two day themes
+:       lda #SONG_GARAGE        ; day or sunset: one of the two day themes
         sta garage_song
         jsr rand
         and #1
@@ -549,10 +550,14 @@ draw_wheelie_bg:
         tay
         lda #3
         sta tmp6
-@t:     lda wb_day,y
-        ldx garage_night
-        beq :+
+@t:     ldx garage_look
+        lda wb_day,y
+        cpx #GL_NIGHT
+        bne :+
         lda wb_night,y
+:       cpx #GL_SUNSET
+        bne :+
+        lda wb_sunset,y
 :       sta PPUDATA
         iny
         dec tmp6
@@ -565,6 +570,7 @@ draw_wheelie_bg:
 wb_nt:      .byte <($2000 + 9*32 + 10), <($2000 + 10*32 + 10), <($2000 + 11*32 + 10)
 wb_day:     .byte T_WBAR_DAY_MAP
 wb_night:   .byte T_WBAR_NIGHT_MAP
+wb_sunset:  .byte T_WBAR_SUNSET_MAP
 
 ; draw_showroom: wall rows 4-10, floor rows 11-12 (PPU off)
 draw_showroom:
@@ -1893,6 +1899,15 @@ mycars_screen:
         lda #0
         sta SV_BESTS,x
         sta SV_BESTS+1,x
+        lda mc_sel              ; nor any swaps paid for
+        sta tmp0
+        asl a
+        adc tmp0
+        tax
+        lda #0
+        sta SV_OWNED,x
+        sta SV_OWNED+1,x
+        sta SV_OWNED+2,x
         ; keep SV_CURCAR pointing at the same car (slots don't move)
         jsr save_write
         lda #SFX_BUY
@@ -2676,15 +2691,19 @@ results_main:
         sta next_mode
         rts
 @again: ; race again with the same settings (new rival for quick/street)
-        lda #SFX_SELECT
-        jsr sfx_play
         lda race_kind
-        cmp #RK_LADDER
-        bne :+
+        cmp #RK_LADDER          ; a boss: the next one, if it's open here
+        bne :+                  ; (as race select checks)
+        jsr boss_index
+        jsr boss_open
+        bcc @shut
         jsr setup_ladder
         jmp @go
 :       cmp #RK_SECRET
         bne :+
+        lda #BOSS_SECRET
+        jsr boss_open
+        bcc @shut
         jsr setup_secret
         jmp @go
 :       cmp #RK_QUICK
@@ -2695,9 +2714,20 @@ results_main:
 :       cmp #RK_STREET
         bne @go
         jsr setup_street
-@go:    lda #MODE_RACE
+@go:    lda #SFX_SELECT
+        jsr sfx_play
+        lda #MODE_RACE
         sta next_mode
         rts
+@shut:  jsr lock_line           ; "BOSS IS IN OSAKA" / "LOCKED: REACH LEVEL 11"
+        lda #28
+        jsr pad_ptr0
+        ldx #2
+        ldy #28
+        jsr vb_str
+        lda #SFX_ERROR
+        jsr sfx_play
+        jmp @loop
 
 ; track_stats: race count, best 1/4 mile overall and top trap speed
 track_stats:
@@ -2898,6 +2928,9 @@ apply_rewards:
         sta rw_cash+1
         lda race_bet+2
         sta rw_cash+2
+        ldx race_diff           ; harder rivals: more XP
+        lda quick_xp,x
+        sta rw_xp
         jsr region_xp
         jmp @pay
 @street:
@@ -2993,6 +3026,8 @@ apply_rewards:
         inx
         stx rw_newreg
 :       jmp save_write
+
+quick_xp:   .byte 100, 150, 200 ; quick race win: easy, medium, hard
 
 ; region_xp: rw_xp += 10 per region (quick and street wins)
 region_xp:

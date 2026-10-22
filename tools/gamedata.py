@@ -139,32 +139,33 @@ ECU_RPM = 200
 # own engine (its hp, redline and curve from CARS); the ones after are
 # swap-only crate engines.  kg is the engine's own weight: a swap changes the
 # car's weight by the difference.  Going back to the car's own engine or
-# drivetrain is free.  The crate car (Zenith X400) can't be swapped, and its
-# engine isn't for sale.
+# drivetrain is free, and so is going back to anything the car has had
+# fitted before (each is paid for once).  The crate car (Zenith X400) can't
+# be swapped, and its engine isn't for sale.
 # Record bytes: CR_ENGINE = engine id + 1, CR_DRIVE = drive + 1 (0 = stock).
 # ---------------------------------------------------------------------------
 # name, kg, gems, level -- one per car, in CARS order
 OWN_ENGINES = [
-    ('1.0 I3',        70,  5,  1),
-    ('1.6 I4',       100,  5,  1),
-    ('2.0 I4',       120,  8,  2),
-    ('2.0 RALLY I4', 136, 10,  3),
-    ('5.7 V8',       220, 12,  4),
-    ('3.0 I6',       200, 12,  5),
-    ('4.7 TRUCK V8', 246, 14,  5),
-    ('2.6 I6',       210, 14,  7),
-    ('7.0 V8',       260, 18,  8),
-    ('3.8 V6',       190, 18, 10),
-    ('6.5 V12',      280, 24, 12),
-    ('HYBRID V8',    300, 30, 15),
+    ('1.0 I3',        70, 10,  1),
+    ('1.6 I4',       100, 10,  1),
+    ('2.0 I4',       120, 13,  2),
+    ('2.0 RALLY I4', 136, 15,  3),
+    ('5.7 V8',       220, 17,  4),
+    ('3.0 I6',       200, 17,  5),
+    ('4.7 TRUCK V8', 246, 19,  5),
+    ('2.6 I6',       210, 19,  7),
+    ('7.0 V8',       260, 23,  8),
+    ('3.8 V6',       190, 23, 10),
+    ('6.5 V12',      280, 29, 12),
+    ('HYBRID V8',    300, 35, 15),
     ('X400 PROTO',   240,  0, 99),
 ]
 # name, hp, kg, redline, curve, gems, level
 CRATE_ENGINES = [
-    ('TWIN ROTOR',   255, 106, 9000, 3, 10,  4),
-    ('HIGH-REV I4',  240, 116, 9400, 0,  9,  3),
-    ('FLAT SIX',     400, 190, 8600, 2, 18,  8),
-    ('BIG BLOCK V8', 560, 300, 6400, 1, 22, 10),
+    ('TWIN ROTOR',   255, 106, 9000, 3, 15,  4),
+    ('HIGH-REV I4',  240, 116, 9400, 0, 14,  3),
+    ('FLAT SIX',     400, 190, 8600, 2, 23,  8),
+    ('BIG BLOCK V8', 560, 300, 6400, 1, 27, 10),
 ]
 ENGINES = [(n, c[2], kg, c[4], c[5], gems, lv) for c, (n, kg, gems, lv) in zip(CARS, OWN_ENGINES)] \
     + CRATE_ENGINES

@@ -90,7 +90,10 @@ SV_PBCAR     = $601D            ; model that set it
 SV_TOPSPD    = $601E            ; top trap speed: mph (bits 0-9) | model << 12
 SV_CARS      = $6020            ; 8 slots x 48 bytes
 SV_BESTS     = SV_CARS + 8*CR_SIZE  ; $61A0: best 1/4 mile ET per slot in ms (8 x 2)
-SV_END       = SV_BESTS + 16    ; $61B0
+SV_OWNED     = SV_BESTS + 16    ; $61B0: swaps each slot has paid for (8 x 3):
+                                ;   bit e = engine e (0-16), bit 20 + d = drivetrain d;
+                                ;   only ones not fitted now (see swap.s)
+SV_END       = SV_OWNED + 24    ; $61C8
 SV_SUM       = SV_END           ; 2-byte checksum over $6004..SV_END-1
 NSLOTS       = 8
 
@@ -147,6 +150,10 @@ DYNO_BMP  = $6800               ; 2 KB dyno graph bitmap (128 tiles)
 IDLE_RPM  = 900
 
 ; --- race kinds ----------------------------------------------------------------
+GL_DAY    = 0                   ; garage_look: the garage by day,
+GL_NIGHT  = 1                   ;   at night (door open on the city),
+GL_SUNSET = 2                   ;   at sunset (door open on the sun going down)
+
 RK_LADDER = 0
 RK_QUICK  = 1
 RK_STREET = 2

@@ -15,6 +15,10 @@ GARAGE password, 12-74 characters (grows with the number of cars):
   Version 4 (written as 0 in the 2-bit field), 14-85 characters, only when
   a car has an engine or drivetrain swap: after each body colour, the
   record's swap bytes: engine 5 (id + 1, 0 = its own) | drivetrain 2.
+  Version 5 (also 0 in the field: longer than version 4 for the same number
+  of cars), only when a car has paid for swaps it doesn't have fitted: after
+  each car's swaps, spare 1 | if 1: engines 17 (bit e = engine e) |
+  drivetrains 3 (bit d) -- the SV_OWNED bits.
   (versions 1-2, 11-66 characters, have 12 parts: still accepted, with no
   wheelie bars or injectors.)
 TUNE password (optional, none when every car is stock), any length:
@@ -49,9 +53,13 @@ PAINT_LIST = [0x16, 0x06, 0x26, 0x27, 0x17, 0x28, 0x38, 0x2A, 0x1A, 0x0A, 0x2C, 
               0x21, 0x11, 0x12, 0x02, 0x13, 0x14, 0x24, 0x07, 0x00, 0x10, 0x30, 0x2D]
 
 
-def garage_len(ncars, version=3):
-    per = {4: 51, 3: 44}.get(version, 39)
-    return (16 + per * ncars + 4) // 5
+def garage_len(ncars, version=3, spare=0):
+    """spare (version 5): cars with paid-for swaps that aren't fitted."""
+    per = {5: 52, 4: 51, 3: 44}.get(version, 39)
+    return (16 + per * ncars + 20 * spare + 4) // 5
+
+
+OWN_DRV = 20                # SV_OWNED: bit e = engine e, bit 20 + d = drivetrain d
 
 
 class Bits:
@@ -191,15 +199,17 @@ def decode_player(s):
 
 
 def encode_garage(cars, cur, version=None):
-    """cars: list of (model, parts[14], body colour byte[, engine, drive])
-    with the record's swap bytes; cur: index.  Version 4 (the default when a
-    car is swapped, else 3) adds the swaps; version 3 has 14 parts; versions
-    1-2 (v3.0-v4.1) 12.  Versions 2-4 use the CRC; version 1 (v3.0) the
-    field sum."""
+    """cars: list of (model, parts[14], body colour byte[, engine, drive
+    [, owned]]) with the record's swap bytes and the slot's SV_OWNED bits;
+    cur: index.  Version 5 (the default when a car has paid-for swaps it
+    hasn't fitted) adds those, version 4 (when a car is swapped) the swaps,
+    else 3; version 3 has 14 parts; versions 1-2 (v3.0-v4.1) 12.  Versions
+    2-5 use the CRC; version 1 (v3.0) the field sum."""
     if version is None:
-        version = 4 if any(any(c[3:]) for c in cars) else 3
+        version = 5 if any(c[5:] and c[5] for c in cars) else \
+            4 if any(any(c[3:5]) for c in cars) else 3
     b = Bits(SEED_GARAGE, crc=version >= 2)
-    b.put(version & 3, 2)
+    b.put(0 if version >= 4 else version, 2)     # versions 4 and 5: 0
     b.put(len(cars) - 1, 3)
     b.put(cur, 3)
     n = NPARTS if version >= 3 else NPARTS_OLD
@@ -208,12 +218,18 @@ def encode_garage(cars, cur, version=None):
         for k in range(0, n, 2):
             b.put(parts[k] * 5 + parts[k + 1], 5)
         b.put(PAINT_LIST.index(paint) if paint in PAINT_LIST else 0, 5)
-        if version == 4:
-            engine, drive = swap or (0, 0)
+        if version >= 4:
+            engine, drive, owned = (list(swap) + [0, 0, 0])[:3]
             b.put(engine, 5)
             b.put(drive, 2)
+            if version == 5:
+                b.put(1 if owned else 0, 1)
+                if owned:
+                    b.put(owned & 0x1FFFF, 17)
+                    b.put(owned >> OWN_DRV & 7, 3)
     b.put(b.chk, 8, chk=False)
-    return b.text(garage_len(len(cars), version))
+    spare = sum(1 for c in cars if c[5:] and c[5]) if version == 5 else 0
+    return b.text(garage_len(len(cars), version, spare))
 
 
 def decode_garage(s):
@@ -222,7 +238,11 @@ def decode_garage(s):
     b.get(2)
     n = b.get(3) + 1
     cur = b.get(3)
-    if len(s) != garage_len(n, ver) or cur >= n:
+    if ver == 4 and len(s) > garage_len(n, 4):
+        ver = 5                     # (its true length is checked at the end)
+    elif len(s) != garage_len(n, ver):
+        return None
+    if cur >= n:
         return None
     cars = []
     for _ in range(n):
@@ -237,19 +257,28 @@ def decode_garage(s):
         col = b.get(5)
         if model >= NCARS or col > 23:
             return None
-        if ver == 4:
+        if ver >= 4:
             engine, drive = b.get(5), b.get(2)
             if engine > NENGINES or engine == CRATE_CAR + 1 or \
                     (model == CRATE_CAR and (engine or drive)):
                 return None
-            cars.append((model, parts, PAINT_LIST[col], engine, drive))
+            if ver == 5:
+                owned = 0
+                if b.get(1):
+                    owned = b.get(17) | b.get(3) << OWN_DRV
+                    # nothing at all, the crate car's engine, or the crate car
+                    if not owned or owned >> CRATE_CAR & 1 or model == CRATE_CAR:
+                        return None
+                cars.append((model, parts, PAINT_LIST[col], engine, drive, owned))
+            else:
+                cars.append((model, parts, PAINT_LIST[col], engine, drive))
         else:
             cars.append((model, parts, PAINT_LIST[col]))
     want = b.chk
     if b.get(8, chk=False) != want:
         return None
     pad = len(s) * 5 - b.pos
-    if pad and b.get(pad, chk=False):                           # padding must be 0
+    if not 0 <= pad < 5 or (pad and b.get(pad, chk=False)):   # padding must be 0
         return None
     return dict(cars=cars, cur=cur)
 

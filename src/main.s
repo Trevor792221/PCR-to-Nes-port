@@ -4,7 +4,7 @@
 ; popular by Pixel Car Racer.  All code, art, music and names are original.
 ;
 ; Build: ca65 + ld65 (see Makefile).  Mapper: MMC1 (SNROM), 128 KB PRG,
-; 8 KB CHR-RAM, 8 KB WRAM (no battery: progress is kept as two passwords).
+; 8 KB CHR-RAM, 8 KB battery-backed WRAM (the save; passwords work too).
 ; ===========================================================================
 
 .include "defs.inc"
@@ -104,7 +104,7 @@ weather_force: .res 1       ; tests: weather + 1 for the next races (0 = random)
 copy_bank:  .res 1          ; source bank for chr_copy / bank0_copy (0 = graphics)
 garage_song: .res 1         ; garage theme in use (SONG_GARAGE, SONG_NEON or SONG_NIGHT)
 new_song:   .res 1          ; set by a race: the garage picks a theme again
-garage_night: .res 1        ; 1: the garage is shown at night
+garage_look: .res 1         ; the garage: 0 day, 1 night, 2 sunset (GL_*)
 map_region: .res 1          ; map region the races are in (0 FUKUOKA .. 6 TOKYO)
 
 ; ---------------------------------------------------------------------------

@@ -373,10 +373,11 @@ def garage_wheelie(pix, ts):
     return out
 
 
-def build_garage(ts, night=False):  # noqa: C901
+def build_garage(ts, look='day'):  # noqa: C901
     """Garage backdrop behind the showroom car: nametable rows 4-12.
-    night=True: the roll-up door is open on a night sky (moon, stars, a lit
-    skyline) drawn in palette 1; the night colours are set in code.
+    look 'night': the roll-up door is open on a night sky (moon, stars, a lit
+    skyline); 'sunset': open on a sunset (a low sun, a black skyline).  The
+    open door is drawn in palette 1; those colours are set in code.
     Palettes (menu): 0 = black/white/grey/yellow (ceiling and lamps),
     2 = reds (tool chest), 3 = greys (walls, door, floor).
     Returns (map bytes 9x32, palette per 16x16 block, 5 block rows x 16)."""
@@ -420,8 +421,10 @@ def build_garage(ts, night=False):  # noqa: C901
                 pix[y][x] = '2' if (y - 20) % 4 < 2 else ('1' if (y - 20) % 4 == 2 else '3')
     for x in range(120, 136):
         pix[52][x] = pix[53][x] = '3'             # handle
-    if night:
+    if look == 'night':
         _night_door(pix)
+    elif look == 'sunset':
+        _sunset_door(pix)
     # pegboard with tools (cols 1-6, rows 6-7)
     for y in range(17, 31):
         for x in range(9, 55):
@@ -483,7 +486,7 @@ def build_garage(ts, night=False):  # noqa: C901
             gmap.append(ts.add(tile([rows[ty * 8 + y][tx * 8:tx * 8 + 8] for y in range(8)])))
     floor_b = tile(['11111111', '11111111', '11111111', '11111111', '22222222', '22222222', '22222222', '22222222'])
     gmap += [ts.add(floor_a)] * 32 + [ts.add(floor_b)] * 32
-    build_garage.wheelie[night] = wheelie
+    build_garage.wheelie[look] = wheelie
     # palettes per 16x16 block: block rows 2..6 (nametable rows 4-13)
     attr = []
     for by in range(5):
@@ -492,8 +495,8 @@ def build_garage(ts, night=False):  # noqa: C901
                 attr.append(0)                    # ceiling
             elif by in (1, 2) and bx in (12, 13):
                 attr.append(2)                    # tool chest
-            elif night and by in (1, 2) and 5 <= bx <= 10:
-                attr.append(1)                    # open door: night sky
+            elif look != 'day' and by in (1, 2) and 5 <= bx <= 10:
+                attr.append(1)                    # open door: the sky
             else:
                 attr.append(3)
     return bytes(gmap), bytes(attr)
@@ -531,6 +534,43 @@ def _night_door(pix):
         for x in range(80, 176):
             pix[y][x] = '2' if y == 48 else '1'
 
+def _sunset_door(pix):
+    """Open door on a sunset, on the 8x8 tile grid like the night door.
+    Tile columns 10-21, rows 6-9, palette 1: 1 the high sky (purple), 2 the
+    low sky (red), 3 the sun and the glow on the horizon, 0 the skyline in
+    silhouette.  Row 10 is the driveway (palette 3), as at night."""
+    for y in range(16, 48):
+        for x in range(80, 176):
+            ly = y - 16
+            if ly < 8:
+                c = '1'                                       # row 6
+            elif ly < 16:                                     # row 7: purple into red
+                k = ly - 8
+                c = '2' if (x + y) % 2 and k >= 2 or k >= 6 else '1'
+            elif ly < 24:
+                c = '2'                                       # row 8
+            else:
+                c = '3'                                       # row 9: the glow
+            pix[y][x] = c
+    # the sun: a disc sinking behind the skyline, tiles (15-16, 8-9)
+    cx, cy, r = 128, 37, 9
+    for y in range(24, 48):
+        for x in range(112, 144):
+            if (x - cx + .5) ** 2 + (y - cy + .5) ** 2 <= r * r:
+                pix[y][x] = '3'
+    # skyline, row 9: building tops per tile column 10..21 (pixel rows down)
+    tops = [3, 1, 1, 3, 5, 5, 5, 3, 1, 1, 3, 3]
+    for i, t in enumerate(tops):
+        for y in range(40 + t, 48):
+            for x in range(80 + i * 8, 88 + i * 8):
+                pix[y][x] = '0'
+        if t == 1:                                            # an antenna on the tall ones
+            pix[40][80 + i * 8 + 4] = '0'
+    for y in range(48, 56):                                   # driveway
+        for x in range(80, 176):
+            pix[y][x] = '2' if y == 48 else '1'
+
+
 def build_menu():
     ts = TileSet(0x80)
     ts.add(solid(0))
@@ -558,9 +598,12 @@ def build_menu():
     # garage backdrop, rows 4-12 (see build_garage)
     gmap, gattr = build_garage(ts)
     specials['GARAGE'] = (gmap, gattr)
-    specials['GARAGE_NIGHT'] = build_garage(ts, night=True)
-    specials['WBAR_DAY'] = build_garage.wheelie[False]
-    specials['WBAR_NIGHT'] = build_garage.wheelie[True]
+    specials['GARAGE_NIGHT'] = build_garage(ts, 'night')
+    specials['GARAGE_SUNSET'] = build_garage(ts, 'sunset')
+    assert specials['GARAGE_SUNSET'][1] == specials['GARAGE_NIGHT'][1]   # one attr table
+    specials['WBAR_DAY'] = build_garage.wheelie['day']
+    specials['WBAR_NIGHT'] = build_garage.wheelie['night']
+    specials['WBAR_SUNSET'] = build_garage.wheelie['sunset']
     # crate 4x4 (32x32)
     crate = [
         '11111111111111111111111111111111',
@@ -720,7 +763,8 @@ def main():
     w('garage_map.bin', menu_sp['GARAGE'][0])
     w('garage_attr.bin', menu_sp['GARAGE'][1])
     w('garage_night_map.bin', menu_sp['GARAGE_NIGHT'][0])
-    w('garage_night_attr.bin', menu_sp['GARAGE_NIGHT'][1])
+    w('garage_night_attr.bin', menu_sp['GARAGE_NIGHT'][1])     # (sunset's too)
+    w('garage_sunset_map.bin', menu_sp['GARAGE_SUNSET'][0])
     w('logo_map.bin', logo_map)
     w('sprites.chr', build_sprites())
     cars = list(range(art.NCAR_SHAPES))
@@ -734,7 +778,7 @@ def main():
         for k, v in race_sp.items():
             f.write('T_%s = $%02X\n' % (k, v))
         for k, v in menu_sp.items():
-            if k in ('GARAGE', 'GARAGE_NIGHT'):
+            if k in ('GARAGE', 'GARAGE_NIGHT', 'GARAGE_SUNSET'):
                 continue
             if isinstance(v, list):
                 f.write('.define T_%s_MAP %s\n' % (k, ', '.join('$%02X' % x for x in v)))

@@ -991,26 +991,15 @@ crates_screen:
         rts
 
 crate_buy:
-        lda cr_sel
-        bne @gem
-        lda #<2500
-        sta m_a
-        lda #>2500
-        sta m_a+1
-        lda #0
-        sta m_a+2
-        jsr cash_cmp
-        bcc @fail
-        jsr cash_sub
-        jmp @open
-@gem:   lda SV_GEMS+1
+        ldx cr_sel              ; both crates are paid in gems
+        lda SV_GEMS+1
         bne :+
         lda SV_GEMS
-        cmp #10
+        cmp crate_gems,x
         bcc @fail
 :       sec
         lda SV_GEMS
-        sbc #10
+        sbc crate_gems,x
         sta SV_GEMS
         lda SV_GEMS+1
         sbc #0
@@ -1311,6 +1300,7 @@ give_car:
 
 crate_map:    .byte T_CRATE_MAP
 ultra_odds:   .byte 1, 5
+crate_gems:   .byte 5, 10             ; standard, premium
 
 ; give_ultra: the crate-only car, gold, with a fanfare
 give_ultra:
@@ -1336,10 +1326,10 @@ give_ultra:
 
 str_cr_ultra: .byte "*** ULTRA RARE - 400 MPH! ***", 0
 str_crates:   .byte "CRATES", 0
-str_cr0:      .byte "STANDARD CRATE    $2500", 0
+str_cr0:      .byte "STANDARD CRATE   5 GEMS", 0
 str_cr1:      .byte "PREMIUM CRATE   10 GEMS", 0
 str_cr2:      .byte "BACK", 0
-str_cr_poor:  .byte "YOU CAN'T AFFORD THAT", 0
+str_cr_poor:  .byte "NOT ENOUGH GEMS", 0
 str_cr_cash:  .byte "CASH PRIZE: ", 0
 str_cr_gems:  .byte "YOU GOT ", 0
 str_cr_gems2: .byte " GEMS!", 0

@@ -110,6 +110,44 @@ class Game(unittest.TestCase):
         self.assertEqual(s.wram(SV_CARS + 1), 1)
         self.assertEqual(s.wram(SV_CASH, 3), cash)
 
+    def power_cycle(self, s):
+        """Reset (the WRAM stays, as with a battery), past the splash, CONTINUE."""
+        s.nes.reset()
+        s.step(60)
+        for _ in range(200):
+            if s.mem('game_mode') == 0:
+                break
+            s.press(START)
+        s.step(40)
+        s.press(A)                                   # CONTINUE
+        s.step(40)
+
+    def test_battery_save_survives_a_power_cut(self):
+        with open(ROM, 'rb') as f:
+            header = f.read(16)
+        self.assertTrue(header[6] & 2, 'battery')
+        self.assertEqual(header[10], 0x70, '8 KB of battery-backed PRG-RAM')
+        s = new_game()
+        s.garage_goto(G_PARTS)
+        s.press(A)
+        s.step(30)
+        s.press(A)                                   # intake level 1: saved
+        s.step(10)
+        cash = s.wram(SV_CASH, 3)
+        # the power goes mid-change: WRAM changed, checksum not updated yet
+        s.nes[SV_CARS + 2] = 3
+        s.nes[SV_CASH] ^= 0x55
+        self.power_cycle(s)
+        self.assertEqual(s.mem('game_mode'), 1)
+        self.assertEqual((s.wram(SV_CARS + 1), s.wram(SV_CARS + 2)), (1, 0), 'the last save')
+        self.assertEqual(s.wram(SV_CASH, 3), cash)
+        # both copies broken: a new game
+        s.nes[SV_CASH] ^= 0x55
+        s.nes[0x7004] ^= 0x55                        # the backup's cash
+        self.power_cycle(s)
+        self.assertEqual(s.wram(SV_CARS + 1), 0)
+        self.assertEqual(s.wram(SV_CASH, 3), 3000)
+
     def test_test_run(self):
         s = new_game()
         start_race(s, 4)
@@ -171,10 +209,17 @@ class Game(unittest.TestCase):
         s.press(A)
         s.step(40)
         cash = s.wram(SV_CASH, 3)
-        s.press(A)                                   # standard crate
+        s.nes[SV_GEMS] = 4                           # crates are paid in gems only
+        s.press(A)                                   # standard crate: 5 gems
         s.step(60)
-        self.assertNotEqual(s.wram(SV_CASH, 3), cash)
+        self.assertEqual(s.wram(0x6013), 0, 'not enough gems, plenty of cash')
+        self.assertEqual(s.wram(SV_CASH, 3), cash)
+        s.nes[SV_GEMS] = 5
+        s.press(A)
+        s.step(60)
         self.assertEqual(s.wram(0x6013), 1)          # crates opened
+        self.assertLessEqual(s.wram(SV_GEMS, 2), 3, '5 gems paid (a gem prize is 1-3)')
+        self.assertGreaterEqual(s.wram(SV_CASH, 3), cash, 'no cash paid')
 
     def test_dealer_streams_the_right_big_car(self):
         # every model's 2x tiles must come from its own shape (odd shapes
